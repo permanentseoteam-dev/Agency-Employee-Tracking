@@ -53,7 +53,7 @@ export function InviteEmployee() {
   }
 
   if (created) {
-    const message = `Agency Tracker login\nEmail: ${created.email}\nTemporary password: ${created.password}\nYou'll be asked to choose your own password when you first sign in.`
+    const message = `PSEO Tracker login\nEmail: ${created.email}\nTemporary password: ${created.password}\nYou'll be asked to choose your own password when you first sign in.`
     return (
       <Card className="mx-auto max-w-xl">
         <CardContent className="space-y-4 py-6">

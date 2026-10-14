@@ -14,6 +14,6 @@ export const useRoleStore = create<RoleState>()(
       selected: undefined,
       select: (role) => set({ selected: role })
     }),
-    { name: 'agency-tracker-role' }
+    { name: 'pseo-tracker-role' }
   )
 )

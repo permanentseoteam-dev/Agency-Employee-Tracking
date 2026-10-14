@@ -6,12 +6,12 @@
   Unzips the newest backup (or -Zip) into a temporary folder, starts a second PocketBase on
   127.0.0.1:8099 with it, signs in with a throwaway superuser created only in that copy, and
   prints how many records each important collection holds. Then it stops and deletes the copy.
-    powershell -ExecutionPolicy Bypass -File .\restore-drill.ps1 -BackupDir E:\AgencyTrackerBackups
+    powershell -ExecutionPolicy Bypass -File .\restore-drill.ps1 -BackupDir E:\PSEOTrackerBackups
 
   To restore for real after a disaster, see docs/deployment.md ("Restoring a backup").
 #>
 param(
-  [string]$BackupDir = 'E:\AgencyTrackerBackups',
+  [string]$BackupDir = 'E:\PSEOTrackerBackups',
   [string]$Zip = '',
   [string]$ServerDir = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
   [int]$Port = 8099

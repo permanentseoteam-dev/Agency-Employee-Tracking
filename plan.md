@@ -38,7 +38,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 | Backend | **PocketBase**, a single `pocketbase.exe` that bundles the SQLite database, auth, REST API, realtime, JS hooks, cron, file storage, backups and an admin dashboard |
 | Client SDK | `pocketbase` npm package (used in both the renderer and the Electron main process) |
 | Offline queue | electron-store in the main process |
-| Logging | electron-log (main process, rotating file in `%APPDATA%\Agency Tracker\logs`) |
+| Logging | electron-log (main process, rotating file in `%APPDATA%\PSEO Tracker\logs`) |
 | App security | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, a strict Content-Security-Policy (only the app itself and the PocketBase URL), no remote content |
 | Tests | Vitest |
 | Packaging | electron-builder, NSIS installer for Windows |
@@ -111,7 +111,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
   - it overlaps an existing segment for the same user
 
   The sync queue drops a rejected segment after logging it and does not retry it.
-- **Logs:** `electron-log` writes to `%APPDATA%\Agency Tracker\logs`. Settings has "Open logs folder" so an employee can send the file when there's a problem.
+- **Logs:** `electron-log` writes to `%APPDATA%\PSEO Tracker\logs`. Settings has "Open logs folder" so an employee can send the file when there's a problem.
 - **Known limit:** a video call with no keyboard or mouse input counts as idle. A Focus / In a meeting status is planned for after the MVP (§11).
 - **Offline:** segments are queued locally and synced when the connection returns, so no time is lost.
 - **Time format everywhere:** `Xh Ym`, for example `5h 23m`.
@@ -408,7 +408,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
-- **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/agency-tracker-releases`), backups copied to the E: drive.
+- **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/pseo-tracker-releases`), backups copied to the E: drive.
   - `electron-builder.yml`: per-user one-click NSIS installer with desktop and Start menu shortcuts, app icon (`scripts/make-icon.mjs` → `build/`), publish to the releases repo. `npm run dist` builds, `npm run release` publishes (needs `GH_TOKEN`); `scripts/check-release-env.mjs` refuses a build whose `VITE_PB_URL` is localhost, a raw IP or unset (`.env.production`)
   - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version
   - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (nightly copy of PocketBase's 02:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)

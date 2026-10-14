@@ -1,6 +1,6 @@
 {
-  "name": "agency-tracker",
-  "productName": "Agency Tracker",
+  "name": "pseo-tracker",
+  "productName": "PSEO Tracker",
   "version": "0.1.0",
   "description": "Employee activity, attendance, leave and payroll tracker for the agency",
   "author": "Permanent SEO",
@@ -15,7 +15,7 @@
     "test": "vitest run",
     "pb": "server\\pocketbase.exe serve --dir server\\pb_data",
     "check:rules": "node scripts/check-rules.mjs",
-    "icon": "node scripts/make-icon.mjs",
+    "icon": "electron scripts/make-icon.mjs",
     "dist": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish never",
     "release": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish always"
   },

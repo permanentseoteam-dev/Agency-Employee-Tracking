@@ -22,7 +22,7 @@ export const useTheme = create<ThemeState>()(
       }
     }),
     {
-      name: 'agency-tracker-theme',
+      name: 'pseo-tracker-theme',
       onRehydrateStorage: () => (state) => apply(state?.theme ?? 'light')
     }
   )

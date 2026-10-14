@@ -1,6 +1,6 @@
-# PocketBase — Beginner's Guide for Agency Tracker
+# PocketBase — Beginner's Guide for PSEO Tracker
 
-This guide covers what you need to know about PocketBase to build and run Agency Tracker. It assumes you have never used it before.
+This guide covers what you need to know about PocketBase to build and run PSEO Tracker. It assumes you have never used it before.
 
 Official docs: https://pocketbase.io/docs/ (the examples below follow PocketBase v0.23 and later).
 
@@ -372,7 +372,7 @@ Finally, build the app with `VITE_PB_URL` set to the production address.
 
 ---
 
-## 9. How Agency Tracker uses PocketBase
+## 9. How PSEO Tracker uses PocketBase
 
 | Feature | Collections | Server code |
 |---|---|---|

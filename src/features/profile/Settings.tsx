@@ -64,7 +64,7 @@ export function Settings() {
               onChange={(e) => void window.tracker.setAutostart(e.target.checked).then(setAutostart)}
             />
             <span>
-              <span className="font-medium">Start Agency Tracker when Windows starts</span>
+              <span className="font-medium">Start PSEO Tracker when Windows starts</span>
               <span className="block text-slate-500">
                 {autostart && !autostart.supported
                   ? 'Available in the installed app only.'

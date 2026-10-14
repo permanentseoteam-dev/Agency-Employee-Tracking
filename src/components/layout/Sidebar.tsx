@@ -9,7 +9,6 @@ import {
   Plane,
   Radio,
   SlidersHorizontal,
-  Timer,
   Wallet,
   type LucideIcon
 } from 'lucide-react'
@@ -17,6 +16,7 @@ import { NavLink } from 'react-router-dom'
 import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 import { navFor, type NavIcon } from '@/lib/roles'
+import logo from '@/assets/logo.png'
 
 const ICONS: Record<NavIcon, LucideIcon> = {
   stats: Gauge,
@@ -38,8 +38,8 @@ export function Sidebar() {
   return (
     <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-4 dark:border-slate-800">
-        <Timer className="size-5 text-indigo-600" aria-hidden />
-        <span className="font-semibold">Agency Tracker</span>
+        <img src={logo} alt="" className="size-6 rounded-md" />
+        <span className="font-semibold">PSEO Tracker</span>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2" aria-label="Main">
         {navFor(role).map((item) => {

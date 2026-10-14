@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// Agency Tracker schema (plan.md §5). Date-only values are "YYYY-MM-DD" text in
+// PSEO Tracker schema (plan.md §5). Date-only values are "YYYY-MM-DD" text in
 // the org timezone; instants (started_at, last_seen, …) are UTC date fields.
 
 const AUTH = '@request.auth.id != ""'

@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Run once, in PowerShell opened as Administrator, from this folder:
-    powershell -ExecutionPolicy Bypass -File .\install-service.ps1 -DataDir D:\AgencyTracker\pb_data
+    powershell -ExecutionPolicy Bypass -File .\install-service.ps1 -DataDir D:\PSEOTracker\pb_data
 
   What it does:
   - registers the service "PocketBase" with NSSM, starting at boot and restarting itself after a crash
@@ -16,7 +16,7 @@
 #>
 param(
   # Where the database lives. Use a non-C: drive (plan §9).
-  [string]$DataDir = 'D:\AgencyTracker\pb_data',
+  [string]$DataDir = 'D:\PSEOTracker\pb_data',
   # The folder holding pocketbase.exe, pb_migrations and pb_hooks (default: the server folder above this script).
   [string]$ServerDir = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path,
   [string]$Nssm = (Join-Path $PSScriptRoot 'nssm.exe'),
@@ -49,7 +49,7 @@ $params = "serve --http 0.0.0.0:$Port --dir `"$DataDir`" --migrationsDir `"$(Joi
 & $Nssm set $ServiceName Application $exe | Out-Null
 & $Nssm set $ServiceName AppParameters $params | Out-Null
 & $Nssm set $ServiceName AppDirectory $ServerDir | Out-Null
-& $Nssm set $ServiceName DisplayName 'Agency Tracker server (PocketBase)' | Out-Null
+& $Nssm set $ServiceName DisplayName 'PSEO Tracker server (PocketBase)' | Out-Null
 & $Nssm set $ServiceName Start SERVICE_AUTO_START | Out-Null
 & $Nssm set $ServiceName AppStopMethodConsole 30000 | Out-Null
 & $Nssm set $ServiceName AppExit Default Restart | Out-Null
@@ -59,7 +59,7 @@ $params = "serve --http 0.0.0.0:$Port --dir `"$DataDir`" --migrationsDir `"$(Joi
 & $Nssm set $ServiceName AppRotateFiles 1 | Out-Null
 & $Nssm set $ServiceName AppRotateBytes 10485760 | Out-Null
 
-$rule = 'Agency Tracker server (Tailscale only)'
+$rule = 'PSEO Tracker server (Tailscale only)'
 Get-NetFirewallRule -DisplayName $rule -ErrorAction SilentlyContinue | Remove-NetFirewallRule
 New-NetFirewallRule -DisplayName $rule -Direction Inbound -Protocol TCP -LocalPort $Port -RemoteAddress '100.64.0.0/10' -Action Allow | Out-Null
 

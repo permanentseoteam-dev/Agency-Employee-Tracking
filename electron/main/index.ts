@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
+import appIcon from '../../build/icon.png?asset'
 import { ensureAutostart, HIDDEN_ARG } from './autostart'
 import { onStatus, shutdown, startEngine, status, stopNow } from './engine'
 import { registerIpc } from './ipc'
@@ -38,7 +39,8 @@ if (!app.requestSingleInstanceLock()) {
       minWidth: 960,
       minHeight: 600,
       show: false,
-      title: 'Agency Tracker',
+      title: 'PSEO Tracker',
+      icon: appIcon,
       autoHideMenuBar: true,
       webPreferences: {
         preload: join(here, '../preload/index.cjs'),
@@ -88,10 +90,10 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   // Windows groups the app's notifications and taskbar entry under this id (matches electron-builder's appId).
-  app.setAppUserModelId('com.permanentseo.agencytracker')
+  app.setAppUserModelId('com.permanentseo.pseotracker')
 
   app.whenReady().then(() => {
-    log.info(`Agency Tracker ${app.getVersion()} starting`)
+    log.info(`PSEO Tracker ${app.getVersion()} starting`)
     registerIpc()
     startSessionRefresh()
     startEngine()

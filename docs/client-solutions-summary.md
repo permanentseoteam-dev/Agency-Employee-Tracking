@@ -1,4 +1,4 @@
-# Agency Tracker: Data Protection Plan
+# PSEO Tracker: Data Protection Plan
 
 ## The risk
 All tracker data is stored on one server. If that machine's Windows install gets corrupted, its disk fails, or Windows is reinstalled, the data could be lost.

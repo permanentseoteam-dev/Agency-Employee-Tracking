@@ -1,6 +1,6 @@
 import log from 'electron-log/main'
 
-// File log at %APPDATA%\Agency Tracker\logs\main.log, rotated at 5 MB.
+// File log at %APPDATA%\PSEO Tracker\logs\main.log, rotated at 5 MB.
 export function initLog(): void {
   log.transports.file.maxSize = 5 * 1024 * 1024
   log.transports.file.level = 'info'

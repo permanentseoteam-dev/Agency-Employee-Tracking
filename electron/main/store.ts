@@ -1,4 +1,4 @@
-// The main process's own state on disk (%APPDATA%\Agency Tracker\tracker.json).
+// The main process's own state on disk (%APPDATA%\PSEO Tracker\tracker.json).
 // Written synchronously, so nothing is lost if Windows shuts the app down.
 import Store from 'electron-store'
 import type { TrackerSettings } from '../preload/api'

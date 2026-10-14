@@ -11,8 +11,8 @@
   but not against theft, fire or ransomware. Copy the newest zip somewhere else now and then.
 #>
 param(
-  [string]$DataDir = 'D:\AgencyTracker\pb_data',
-  [string]$BackupDir = 'E:\AgencyTrackerBackups',
+  [string]$DataDir = 'D:\PSEOTracker\pb_data',
+  [string]$BackupDir = 'E:\PSEOTrackerBackups',
   [int]$Keep = 30
 )
 $ErrorActionPreference = 'Stop'

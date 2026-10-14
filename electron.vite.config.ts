@@ -21,7 +21,7 @@ function cspPlugin(pbUrl: string): Plugin {
     "frame-ancestors 'none'"
   ].join('; ')
   return {
-    name: 'agency-tracker-csp',
+    name: 'pseo-tracker-csp',
     apply: 'build',
     transformIndexHtml: (html) =>
       html.replace(

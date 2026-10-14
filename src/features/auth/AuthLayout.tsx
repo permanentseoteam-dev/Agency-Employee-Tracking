@@ -1,14 +1,14 @@
 import type { ReactNode } from 'react'
-import { Timer } from 'lucide-react'
+import logo from '@/assets/logo.png'
 import { Card } from '@/components/ui/Card'
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: string; children: ReactNode }) {
   return (
     <div className="flex min-h-full items-center justify-center bg-slate-50 px-4 py-10 dark:bg-slate-950">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center justify-center gap-2 text-indigo-600">
-          <Timer className="size-7" aria-hidden />
-          <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">Agency Tracker</span>
+        <div className="mb-6 flex items-center justify-center gap-2">
+          <img src={logo} alt="" className="size-8 rounded-lg" />
+          <span className="text-lg font-semibold text-slate-900 dark:text-slate-100">PSEO Tracker</span>
         </div>
         <Card className="p-6">
           <h1 className="text-xl font-semibold">{title}</h1>
