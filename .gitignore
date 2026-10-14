@@ -10,3 +10,6 @@ dist/
 # PocketBase: binary is downloaded, data never committed
 server/pocketbase.exe
 server/pb_data/
+
+# Claude Code: personal settings stay local
+.claude/settings.local.json
