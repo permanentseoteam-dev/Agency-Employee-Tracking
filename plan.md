@@ -191,7 +191,7 @@ These settings live in a single `org_settings` record:
 
 ## 5. Collections (PocketBase)
 
-Every collection gets automatic `id` (15 characters), `created` and `updated` fields. "→" marks a **relation** field. Dates and times are stored in UTC and shown in Asia/Karachi.
+Every collection gets automatic `id` (15 characters), `created` and `updated` fields. "→" marks a **relation** field. Instants (`started_at`, `last_seen`, `decided_at` …) are UTC date fields shown in Asia/Karachi. **Date-only values** (`attendance.date`, `holidays.date`, leave `start_date`/`end_date`, `joined_on`, `left_on`) are `"YYYY-MM-DD"` text in Karachi time, which avoids a 5-hour shift moving them to the wrong day. The schema lives in `server/pb_migrations/1791950000_init_schema.js`, and the defaults are in `1791950100_seed_defaults.js`.
 
 | Collection (type) | Fields |
 |---|---|
@@ -343,7 +343,14 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - secure window and file logging working
   - `formatDuration` and the Asia/Karachi date helpers, with 16 tests passing
 - Docs: this plan, [roadmap.md](roadmap.md), [docs/pocketbase-guide.md](docs/pocketbase-guide.md) and [docs/client-solutions-summary.md](docs/client-solutions-summary.md).
-- **Next: M1**, the backend core. It needs your superuser email and password, which you create yourself.
+- **M1 done** (2026-10-14):
+  - all 14 collections plus the `leave_balances` view, with the locked-down rules from §5
+  - seed defaults loaded
+  - 30-day logins
+  - daily backups scheduled
+  - `npm run check:rules`: 49 of 49 checks pass
+- **Your step:** create the PocketBase superuser and the first app admin (see the M1 hand-off).
+- **Next: M2**, auth, the app shell and roles.
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

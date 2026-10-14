@@ -1,0 +1,263 @@
+// Verifies the API rules in plan.md §5 against a throwaway PocketBase.
+// Usage: npm run check:rules   (needs server\pocketbase.exe; never touches server\pb_data)
+import { spawn, execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import PocketBase from 'pocketbase'
+
+const ROOT = resolve(import.meta.dirname, '..')
+const EXE = join(ROOT, 'server', 'pocketbase.exe')
+const MIGRATIONS = join(ROOT, 'server', 'pb_migrations')
+const HOOKS = join(ROOT, 'server', 'pb_hooks')
+const PORT = 8097
+const URL = `http://127.0.0.1:${PORT}`
+const PASS = 'Test-pass-12345'
+
+const dir = mkdtempSync(join(tmpdir(), 'agency-rules-'))
+const common = ['--dir', dir, '--migrationsDir', MIGRATIONS, '--hooksDir', HOOKS]
+
+let failed = 0
+let passed = 0
+function check(name, ok, detail = '') {
+  if (ok) passed++
+  else failed++
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${ok || !detail ? '' : `  (${detail})`}`)
+}
+async function allowed(name, fn) {
+  try {
+    await fn()
+    check(name, true)
+  } catch (e) {
+    check(name, false, `${e.status} ${e.message}`)
+  }
+}
+async function denied(name, fn) {
+  try {
+    await fn()
+    check(name, false, 'request was allowed')
+  } catch (e) {
+    check(name, e.status >= 400 && e.status < 500, `${e.status} ${e.message}`)
+  }
+}
+
+const server = (() => {
+  execFileSync(EXE, ['migrate', 'up', ...common], { stdio: 'ignore' })
+  execFileSync(EXE, ['superuser', 'upsert', 'root@test.local', PASS, ...common], { stdio: 'ignore' })
+  return spawn(EXE, ['serve', '--http', `127.0.0.1:${PORT}`, ...common], { stdio: 'ignore' })
+})()
+
+async function waitForServer() {
+  for (let i = 0; i < 50; i++) {
+    try {
+      const r = await fetch(`${URL}/api/health`)
+      if (r.ok) return
+    } catch {}
+    await new Promise((r) => setTimeout(r, 200))
+  }
+  throw new Error('PocketBase did not start')
+}
+
+async function as(email) {
+  const pb = new PocketBase(URL)
+  pb.autoCancellation(false)
+  await pb.collection('users').authWithPassword(email, PASS)
+  return pb
+}
+
+try {
+  await waitForServer()
+  const root = new PocketBase(URL)
+  root.autoCancellation(false)
+  await root.collection('_superusers').authWithPassword('root@test.local', PASS)
+
+  // --- fixtures ---------------------------------------------------------------
+  const mkUser = (email, role, extra = {}) =>
+    root.collection('users').create({
+      email,
+      password: PASS,
+      passwordConfirm: PASS,
+      full_name: email.split('@')[0],
+      role,
+      active: true,
+      ...extra
+    })
+  const admin = await mkUser('admin@test.local', 'admin')
+  const mgrA = await mkUser('mgr.a@test.local', 'manager')
+  const mgrB = await mkUser('mgr.b@test.local', 'manager')
+  const teamA = await root.collection('teams').create({ name: 'Team A', manager: mgrA.id })
+  const teamB = await root.collection('teams').create({ name: 'Team B', manager: mgrB.id })
+  await root.collection('users').update(mgrA.id, { team: teamA.id })
+  await root.collection('users').update(mgrB.id, { team: teamB.id })
+  const empA = await mkUser('emp.a@test.local', 'employee', { team: teamA.id })
+  const empB = await mkUser('emp.b@test.local', 'employee', { team: teamB.id })
+  await mkUser('gone@test.local', 'employee', { team: teamA.id, active: false, left_on: '2026-09-30' })
+  for (const u of [admin, mgrA, mgrB, empA, empB]) {
+    await root.collection('salaries').create({ user: u.id, monthly_salary_pkr: 100000 })
+    await root.collection('presence').create({ user: u.id, status: 'offline' })
+  }
+  const sick = await root.collection('leave_types').getFirstListItem('name = "Sick"')
+
+  const pbAdmin = await as('admin@test.local')
+  const pbMgrA = await as('mgr.a@test.local')
+  const pbEmpA = await as('emp.a@test.local')
+
+  const seg = (user, minute) => ({
+    user,
+    state: 'active',
+    started_at: `2026-10-14 05:${String(minute).padStart(2, '0')}:00.000Z`,
+    ended_at: `2026-10-14 05:${String(minute + 5).padStart(2, '0')}:00.000Z`
+  })
+
+  // --- login ------------------------------------------------------------------
+  await denied('inactive user cannot log in', () => as('gone@test.local'))
+
+  // --- seed data ---------------------------------------------------------------
+  const settings = await pbEmpA.collection('org_settings').getFullList()
+  check('seed: one org_settings record with 09:00 shift', settings.length === 1 && settings[0].shift_start === '09:00')
+  const types = await pbEmpA.collection('leave_types').getFullList()
+  check('seed: 3 leave types', types.length === 3)
+  const s = await root.settings.getAll()
+  check('backups: daily 21:00 UTC, keep 14', s.backups.cron === '0 21 * * *' && s.backups.cronMaxKeep === 14)
+  const usersCol = await root.collections.getOne('users')
+  check('users token lasts 30 days', usersCol.authToken.duration === 2592000)
+
+  // --- salaries & payroll -----------------------------------------------------
+  check('employee sees no salaries', (await pbEmpA.collection('salaries').getFullList()).length === 0)
+  check('manager sees no salaries', (await pbMgrA.collection('salaries').getFullList()).length === 0)
+  check('admin sees all 5 salaries', (await pbAdmin.collection('salaries').getFullList()).length === 5)
+  await denied('employee cannot create a payroll run', () =>
+    pbEmpA.collection('payroll_runs').create({ month: '2026-10', status: 'draft' })
+  )
+  await allowed('admin can create a payroll run', () =>
+    pbAdmin.collection('payroll_runs').create({ month: '2026-10', status: 'draft' })
+  )
+
+  // --- users ------------------------------------------------------------------
+  await allowed('employee can edit own phone', () => pbEmpA.collection('users').update(empA.id, { phone: '0300' }))
+  await denied('employee cannot make self admin', () => pbEmpA.collection('users').update(empA.id, { role: 'admin' }))
+  await denied('employee cannot change own team', () => pbEmpA.collection('users').update(empA.id, { team: teamB.id }))
+  await denied('employee cannot edit someone else', () => pbEmpA.collection('users').update(empB.id, { phone: '1' }))
+  await denied('employee cannot create users', () =>
+    pbEmpA.collection('users').create({ email: 'x@test.local', password: PASS, passwordConfirm: PASS, role: 'admin' })
+  )
+  await allowed('admin can change a role', () => pbAdmin.collection('users').update(empB.id, { designation: 'Dev' }))
+  const seenByEmp = await pbEmpA.collection('users').getOne(empB.id)
+  check('employee cannot see other emails', !seenByEmp.email)
+  const seenByAdmin = await pbAdmin.collection('users').getOne(empB.id)
+  check('admin can see emails', seenByAdmin.email === 'emp.b@test.local')
+
+  // --- activity segments --------------------------------------------------------
+  const own = await pbEmpA.collection('activity_segments').create({ id: 'segtestaaaaaaa1', ...seg(empA.id, 0) })
+  check('employee can create own segment with client id', own.id === 'segtestaaaaaaa1')
+  await denied('duplicate segment id is rejected', () =>
+    pbEmpA.collection('activity_segments').create({ id: 'segtestaaaaaaa1', ...seg(empA.id, 0) })
+  )
+  await denied('employee cannot create a segment for someone else', () =>
+    pbEmpA.collection('activity_segments').create(seg(empB.id, 10))
+  )
+  await denied('employee cannot edit own segment', () =>
+    pbEmpA.collection('activity_segments').update(own.id, { state: 'idle' })
+  )
+  await denied('employee cannot delete own segment', () => pbEmpA.collection('activity_segments').delete(own.id))
+  await root.collection('activity_segments').create(seg(empB.id, 20))
+  check('employee sees only own segments', (await pbEmpA.collection('activity_segments').getFullList()).length === 1)
+  check('manager A sees team A segments only', (await pbMgrA.collection('activity_segments').getFullList()).length === 1)
+  check('admin sees all segments', (await pbAdmin.collection('activity_segments').getFullList()).length === 2)
+
+  // --- presence (Live Board) ----------------------------------------------------
+  const mgrBoard = await pbMgrA.collection('presence').getFullList()
+  check('manager A board shows self + emp A only', mgrBoard.length === 2 && !mgrBoard.some((p) => p.user === empB.id))
+  check('admin board shows everyone', (await pbAdmin.collection('presence').getFullList()).length === 5)
+  const myPresence = await pbEmpA.collection('presence').getFirstListItem(`user = "${empA.id}"`)
+  await allowed('employee can update own presence', () =>
+    pbEmpA.collection('presence').update(myPresence.id, { status: 'active', today_active_s: 60 })
+  )
+  await denied('employee cannot move presence to another user', () =>
+    pbEmpA.collection('presence').update(myPresence.id, { user: empB.id })
+  )
+
+  // --- attendance & notifications are hook-only ---------------------------------
+  await denied('employee cannot write attendance', () =>
+    pbEmpA.collection('attendance').create({ user: empA.id, date: '2026-10-14', status: 'present' })
+  )
+  await denied('admin cannot write attendance directly either', () =>
+    pbAdmin.collection('attendance').create({ user: empA.id, date: '2026-10-14', status: 'present' })
+  )
+  await denied('users cannot create notifications', () =>
+    pbEmpA.collection('notifications').create({ user: empA.id, type: 'x' })
+  )
+
+  // --- leave ------------------------------------------------------------------
+  const leave = (user, extra = {}) => ({
+    user,
+    leave_type: sick.id,
+    start_date: '2026-10-20',
+    end_date: '2026-10-20',
+    days: 1,
+    status: 'pending',
+    ...extra
+  })
+  const reqA = await pbEmpA.collection('leave_requests').create(leave(empA.id))
+  check('employee can apply for leave', reqA.status === 'pending')
+  await denied('employee cannot apply as approved', () =>
+    pbEmpA.collection('leave_requests').create(leave(empA.id, { start_date: '2026-10-21', end_date: '2026-10-21', status: 'approved' }))
+  )
+  await denied('employee cannot approve own leave', () =>
+    pbEmpA.collection('leave_requests').update(reqA.id, { status: 'approved' })
+  )
+  const reqB = await root.collection('leave_requests').create(leave(empB.id))
+  await denied('manager A cannot approve team B leave', () =>
+    pbMgrA.collection('leave_requests').update(reqB.id, { status: 'approved' })
+  )
+  await allowed('manager A approves team A leave', () =>
+    pbMgrA.collection('leave_requests').update(reqA.id, { status: 'approved', approver: mgrA.id })
+  )
+  const reqMgr = await pbMgrA.collection('leave_requests').create(leave(mgrA.id))
+  await denied('manager cannot approve own leave', () =>
+    pbMgrA.collection('leave_requests').update(reqMgr.id, { status: 'approved' })
+  )
+  await allowed('admin approves the manager leave', () =>
+    pbAdmin.collection('leave_requests').update(reqMgr.id, { status: 'approved', approver: admin.id })
+  )
+  const reqA2 = await pbEmpA.collection('leave_requests').create(leave(empA.id, { start_date: '2026-10-22', end_date: '2026-10-22' }))
+  await allowed('employee can cancel own pending leave', () =>
+    pbEmpA.collection('leave_requests').update(reqA2.id, { status: 'cancelled' })
+  )
+
+  // --- leave balances view -------------------------------------------------------
+  const myBal = await pbEmpA.collection('leave_balances').getFullList()
+  const mySick = myBal.find((b) => b.leave_type === sick.id)
+  check('employee sees only own 3 balances', myBal.length === 3 && myBal.every((b) => b.user === empA.id))
+  check('Sick balance: 8 − 1 approved = 7', mySick?.used === 1 && mySick?.remaining === 7, JSON.stringify(mySick))
+  const mgrBal = await pbMgrA.collection('leave_balances').getFullList()
+  check('manager A sees own + team A balances (inactive excluded)', mgrBal.length === 6, `got ${mgrBal.length}`)
+
+  // --- shared data -------------------------------------------------------------
+  await denied('employee cannot change org settings', () =>
+    pbEmpA.collection('org_settings').update(settings[0].id, { grace_minutes: 60 })
+  )
+  await allowed('admin can change org settings', () =>
+    pbAdmin.collection('org_settings').update(settings[0].id, { grace_minutes: 15 })
+  )
+  await denied('employee cannot add holidays', () =>
+    pbEmpA.collection('holidays').create({ date: '2026-12-25', name: 'Quaid Day' })
+  )
+  await allowed('admin can add holidays', () =>
+    pbAdmin.collection('holidays').create({ date: '2026-12-25', name: 'Quaid Day' })
+  )
+  await denied('bad date format is rejected', () =>
+    pbAdmin.collection('holidays').create({ date: '25-12-2026', name: 'x' })
+  )
+} catch (e) {
+  failed++
+  console.error('ERROR', e?.status ?? '', e?.message ?? e, e?.response ? JSON.stringify(e.response) : '')
+} finally {
+  server.kill()
+  await new Promise((r) => setTimeout(r, 500))
+  try {
+    rmSync(dir, { recursive: true, force: true })
+  } catch {}
+  console.log(`\n${passed} passed, ${failed} failed`)
+  process.exitCode = failed ? 1 : 0
+}

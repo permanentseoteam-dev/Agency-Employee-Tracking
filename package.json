@@ -12,7 +12,8 @@
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
-    "pb": "server\\pocketbase.exe serve --dir server\\pb_data"
+    "pb": "server\\pocketbase.exe serve --dir server\\pb_data",
+    "check:rules": "node scripts/check-rules.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.2.1",
