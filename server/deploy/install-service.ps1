@@ -76,4 +76,4 @@ try {
 }
 Write-Host ''
 Write-Host "Dashboard on this PC: http://127.0.0.1:$Port/_/"
-Write-Host "Staff apps connect to:  http://$($env:COMPUTERNAME.ToLower()):$Port  (the Tailscale machine name; check it in the Tailscale admin console)"
+Write-Host "Staff apps connect to:  http://<Tailscale machine name>:$Port, e.g. http://agency-server:$Port (setup-server.ps1 names this PC agency-server)"

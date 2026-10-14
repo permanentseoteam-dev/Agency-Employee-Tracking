@@ -6,10 +6,13 @@ copyright: Copyright © 2026 Permanent SEO
 directories:
   output: dist
   buildResources: build
+# Release builds go to out-release/, never out/ (which the development copy runs).
 files:
-  - out/**
+  - out-release/**
   - package.json
   - '!**/*.map'
+extraMetadata:
+  main: out-release/main/index.js
 win:
   target:
     - target: nsis

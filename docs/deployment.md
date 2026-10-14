@@ -1,120 +1,150 @@
 # Going live: server, installer, updates and backups
 
-This is the step-by-step for putting PSEO Tracker into use (roadmap M12). The setup chosen:
+This is how PSEO Tracker runs for the whole agency (roadmap M12), and the steps to set it up.
 
-- **Server:** an always-on Windows PC in the office runs PocketBase as a Windows service.
-- **Network:** staff PCs reach it over **Tailscale** (a free private network). Nothing is opened to the internet and no domain is needed.
-- **Updates:** installers are published to a public, releases-only GitHub repo, `permanentseoteam-dev/pseo-tracker-releases`. Installed apps update themselves from there.
-- **Backups:** PocketBase makes a backup zip every night at 02:00, and a scheduled task copies it to the **E: drive** at 03:00.
+- **Server:** an office PC runs the database (PocketBase) as the Windows service "PocketBase" from `D:\PSEOTracker`. On Tailscale it is called **agency-server**.
+- **Network:** staff PCs and laptops reach it over **Tailscale**, a free private network, under the agency's Tailscale account. The app connects to `http://agency-server:8090`. Nothing is opened to the internet: the firewall lets only Tailscale addresses reach port 8090.
+- **Backups:** PocketBase makes a backup zip every day at 13:00 (Pakistan time). A scheduled task copies it to `E:\PSEOTrackerBackups` at 13:30, or as soon as the PC is on again.
+- **Updates:** installers go to a public, releases-only GitHub repo, `permanentseoteam-dev/pseo-tracker-releases`, and installed apps update themselves from there (Part D).
 
-Allow about an hour for parts A and B the first time.
-
----
-
-## Part A: the server PC (once)
-
-**What it needs:** Windows 10/11 that stays on, plugged into a UPS if possible. The database goes on a non-C: drive (D: below) and backups on E:. Adjust the drive letters if yours differ.
-
-1. **Tailscale.** Install it from tailscale.com/download and sign in with the agency's Tailscale account. In the admin console (login.tailscale.com), rename the machine to something short such as `agency-server`. Check under DNS that **MagicDNS** is on. Staff apps will reach the server at `http://agency-server:8090`.
-2. **Copy the server folder.** Copy `server\` from the repo to the PC, e.g. `D:\PSEOTracker\server\`. It must contain `pocketbase.exe`, `pb_migrations\`, `pb_hooks\` and `deploy\`. Don't copy `pb_data\`, which is development test data.
-3. **NSSM.** Download it from nssm.cc/download and put `win64\nssm.exe` into `D:\PSEOTracker\server\deploy\`.
-4. **Install the service.** Open PowerShell **as Administrator**:
-   ```powershell
-   cd D:\PSEOTracker\server\deploy
-   powershell -ExecutionPolicy Bypass -File .\install-service.ps1 -DataDir D:\PSEOTracker\pb_data
-   ```
-   This creates the service "PocketBase", which starts at boot and restarts after a crash. It also:
-   - gives PocketBase 30 seconds to shut down cleanly
-   - opens port 8090 to Tailscale addresses only
-   - turns off sleep while the PC is on mains power
-   
-   The migrations run on first start, creating the collections and the default rules and leave types.
-5. **Your superuser** (the dashboard login). In the same window:
-   ```powershell
-   ..\pocketbase.exe superuser upsert you@agency.com "a-long-password" --dir D:\PSEOTracker\pb_data
-   ```
-   Open `http://127.0.0.1:8090/_/` on the server PC and sign in.
-6. **The first app admin.** In the dashboard, open **users**, then **New record**. Fill in email, password, full name, `role = admin` and `active = on`. Everyone else is added from the app (Organization → Add employee).
-7. **Rules.** Sign in to the app as that admin and check **Rules**: shift, working days, grace, idle threshold and late penalty. Add this year's holidays under **Calendar → Holidays**.
-
-### Backups to E:
-
-8. Register the nightly copy (PowerShell as Administrator):
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\register-backup-task.ps1 -DataDir D:\PSEOTracker\pb_data -BackupDir E:\PSEOTrackerBackups
-   ```
-9. Test it once by hand:
-   1. In the dashboard: Settings → Backups → **Backup now**.
-   2. Run `Start-ScheduledTask -TaskName "PSEO Tracker backup copy"`.
-   3. Check that the zip is in `E:\PSEOTrackerBackups` and that `backup-log.txt` has a new line.
-10. **Restore drill.** Do it now, then every few months:
-    ```powershell
-    powershell -ExecutionPolicy Bypass -File .\restore-drill.ps1 -BackupDir E:\PSEOTrackerBackups
-    ```
-    It restores the newest zip into a temporary copy on port 8099, prints the record counts and deletes the copy. The live server isn't touched.
-
-> E: protects against a failed data drive or a corrupted database, but not against theft, fire or ransomware hitting the whole PC. Now and then, copy the newest zip from E: to a USB drive or cloud storage kept elsewhere.
+**Status on 2026-10-14:**
+- [x] Part A: the server is set up on the office PC, with the first admin login.
+- [x] The installer is built (`dist\PSEO-Tracker-Setup-0.1.0.exe`) and installed on the server PC.
+- [ ] Part B: the Tailscale admin console steps.
+- [ ] Part C: the first staff PC.
+- [ ] Part D: the GitHub releases repo for automatic updates.
 
 ---
 
-## Part B: building and publishing the installer (on the developer PC)
+## Part A: the server PC (done; repeat only for a new server)
 
-1. **The releases repo.** On GitHub, create an **empty public** repo, `permanentseoteam-dev/pseo-tracker-releases`. It only holds installers; the source code stays private.
-2. **A token.** Create a GitHub token (Settings → Developer settings → Personal access tokens) with `repo` access to that repo. Set it in the terminal that builds:
+1. The PC needs this repo with `server\pocketbase.exe`, a D: drive for the database and an E: drive for backups.
+2. Open PowerShell **as Administrator** and run:
+   ```powershell
+   cd F:\agency-tracker\server\deploy
+   powershell -ExecutionPolicy Bypass -File .\setup-server.ps1
+   ```
+   [setup-server.ps1](../server/deploy/setup-server.ps1) does everything in one go and writes a log to `D:\PSEOTracker\setup-log.txt`:
+   1. copies `pocketbase.exe`, `pb_migrations`, `pb_hooks` and `deploy` to `D:\PSEOTracker\server`
+   2. turns off the development database, the task "PSEO Tracker Database", which used port 8090
+   3. installs the service "PocketBase" with NSSM ([install-service.ps1](../server/deploy/install-service.ps1)). It starts at boot, restarts after a crash, opens port 8090 to Tailscale addresses only, and turns off sleep on mains power
+   4. schedules the daily backup copy to E: ([register-backup-task.ps1](../server/deploy/register-backup-task.ps1))
+   5. on the first run, asks for your email, name and a password, and creates both the dashboard login and your admin account in the app ([create-first-admin.ps1](../server/deploy/create-first-admin.ps1)). It then makes a first backup and tests the copy to E:
+   6. installs Tailscale (always on, even before anyone signs in to Windows) and signs the PC in as `agency-server`; your browser opens for the Tailscale sign-in
+3. Sign in to the app and set **Rules** (shift, working days, grace, idle threshold, late penalty) and this year's **Calendar → Holidays**. A new database starts with 09:00–18:00, Monday to Friday, and a 5-minute idle threshold.
+
+The script is safe to run again: finished steps are skipped or refreshed. Run it again (as Administrator) whenever `pb_hooks` or `pb_migrations` change. That is how server changes go live: the service runs the copy in `D:\PSEOTracker\server`, not the repo.
+
+**Living with the server PC:**
+- Keep it on during work hours. It may be off at night: attendance is recounted every hour for the past 7 days, and the backup runs at 13:00. While it's off, staff apps keep recording and send the time later, for up to 30 days.
+- A UPS is strongly recommended. A network cable is better than Wi-Fi if one is near.
+- Port 8090 on this PC is now the live database. Tests never use it: they run on throwaway databases (`npm run test:env` on 8099, `npm run check:rules` on 8097).
+- The old development data is still in `F:\agency-tracker\server\pb_data`, unused.
+- Dashboard (on this PC only): `http://127.0.0.1:8090/_/`.
+
+---
+
+## Part B: the Tailscale admin console (once, about 5 minutes)
+
+Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale account.
+
+1. **Keep the server connected.** Open **Machines**, then the **⋯** menu on `agency-server`, and choose **Disable key expiry**. Otherwise Tailscale signs the server out after 180 days.
+2. **Let staff PCs reach only the tracker.** Open **Access controls**, replace everything in the editor with the policy below, and click **Save**:
+   ```jsonc
+   {
+     // Only tailnet admins (you) may give devices the tag:staff label.
+     "tagOwners": {
+       "tag:staff": ["autogroup:admin"],
+     },
+     // The server's Tailscale address: replace 100.x.y.z with the one shown under Machines > agency-server.
+     "hosts": {
+       "agency-server": "100.x.y.z",
+     },
+     "grants": [
+       // Your own devices, signed in with the agency account, can reach everything.
+       {"src": ["autogroup:member"], "dst": ["*"], "ip": ["*"]},
+       // Staff PCs and laptops can reach only PSEO Tracker on the server, not each other or your files.
+       {"src": ["tag:staff"], "dst": ["host:agency-server"], "ip": ["tcp:8090"]},
+     ],
+   }
+   ```
+   If the server is ever set up again and gets a new Tailscale address, update `hosts`.
+3. **Make a key for staff PCs.** Open **Settings → Keys → Generate auth key**:
+   - **Reusable:** on
+   - **Expiration:** 90 days
+   - **Tags:** `tag:staff`
+
+   Click **Generate** and copy the key, which starts with `tskey-auth-`. It is shown only once, so keep it somewhere private. Devices joined with it are tagged, so they never need signing in again.
+4. **Optional check from your phone:** install the Tailscale app, sign in with the agency account, and open `http://agency-server:8090/api/health` in the phone's browser. It should say `API is healthy`. That proves other devices can reach the server.
+
+---
+
+## Part C: staff PCs and laptops (about 5 minutes each)
+
+**Before you start:** in the app, add the employee (**Organization → Add employee**) and note their email and temporary password.
+
+1. Copy the folder `F:\agency-tracker\dist\staff-pc-setup` to the PC (USB stick or Google Drive). It holds the installer, the Tailscale installer, `Set up this PC.cmd` and a short `README.txt`.
+2. On the PC, signed in to Windows **as the employee**, double-click **Set up this PC.cmd**. Click **Yes** when Windows asks, and paste the auth key from Part B when asked. The script ([setup-staff-pc.ps1](../scripts/staff-pc/setup-staff-pc.ps1)):
+   - installs Tailscale and joins the agency network
+   - checks that `agency-server` answers
+   - installs PSEO Tracker for that Windows user and opens it
+3. The employee signs in, chooses a new password and accepts the tracking notice.
+4. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
+
+From then on the app starts by itself (hidden in the tray) at every Windows sign-in and records active and idle time during shift hours. Employees can't turn that off. Laptops work anywhere with internet. Without a connection they keep recording and send the time later.
+
+**Tip:** to skip pasting the key, put it in `tailscale-key.txt` inside the folder before copying it, and delete that file afterwards.
+
+**When someone leaves:** deactivate them in the app (**Organization**), and remove their PC under **Machines** in the Tailscale admin console.
+
+---
+
+## Part D: updates
+
+**One-time setup:**
+1. On GitHub, create an **empty public** repo, `permanentseoteam-dev/pseo-tracker-releases`. It holds only installers; the source code stays private.
+2. Create a GitHub token (**Settings → Developer settings → Personal access tokens**) with `repo` access to it.
+
+**Each update:**
+1. Raise `"version"` in `package.json`, e.g. `0.1.0` → `0.2.0`, and commit.
+2. In PowerShell in `F:\agency-tracker`:
    ```powershell
    $env:GH_TOKEN = 'ghp_…'
-   ```
-3. **The server address.** Copy `.env.production.example` to `.env.production` and set `VITE_PB_URL=http://agency-server:8090` (your Tailscale machine name). It's baked into the installer. The build refuses `localhost` or a raw IP.
-4. **Build and publish:**
-   ```powershell
    npm run release
    ```
-   This builds `dist\PSEO-Tracker-Setup-<version>.exe` and creates a GitHub release with it. Check the release on GitHub. If it is a draft, publish it.
-   `npm run dist` builds the same installer without publishing, for a test.
+   This builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes a GitHub release. If GitHub shows it as a draft, publish it.
+3. Copy the new installer into `dist\staff-pc-setup` (delete the old one), so new PCs get the latest version.
+
+Installed apps check at start-up and every 6 hours, download quietly, and install the update when nobody is being tracked on that PC (outside shift hours, or with the screen locked) or when the app quits.
+
+Until the releases repo exists, the check fails quietly in the app log (`updater: 404`) and nothing else happens. Apps installed today will update themselves once a newer release is published.
+
+`npm run dist` builds the same installer without publishing. Release builds go to `out-release\`, never `out\`, so building one doesn't disturb a running development copy. The server address comes from `.env.production` (`VITE_PB_URL=http://agency-server:8090`); the build refuses `localhost` or a raw IP.
 
 ---
 
-## Part C: installing on staff PCs
+## Backups and restoring
 
-1. Install **Tailscale** and sign it into the **agency's** Tailscale account. Staff don't need their own accounts; the free plan allows up to 100 devices.
-2. Run `PSEO-Tracker-Setup-<version>.exe`. The installer isn't code-signed, so Windows SmartScreen shows "Windows protected your PC" the first time. Click **More info**, then **Run anyway**. Updates don't show this.
-3. The app installs for that Windows user, without admin rights, and opens. Sign in with the details from Organization → Add employee, change the password, and accept the tracking notice.
-4. From then on, the app starts hidden in the tray at every Windows sign-in. For employees this can't be turned off.
+- PocketBase keeps the last 14 daily backups in `D:\PSEOTracker\pb_data\backups`; E: keeps 30. Each copy adds a line to `E:\PSEOTrackerBackups\backup-log.txt`.
+- E: protects against a failed D: drive or a corrupted database, but not against theft, fire or ransomware. Now and then, copy the newest zip to a USB drive or cloud storage kept elsewhere.
+- **Restore drill** (every few months): `powershell -ExecutionPolicy Bypass -File .\restore-drill.ps1 -BackupDir E:\PSEOTrackerBackups` in `D:\PSEOTracker\server\deploy`. It restores the newest zip into a temporary copy on port 8099, prints the record counts and deletes the copy. The live server isn't touched.
 
----
-
-## Part D: shipping an update
-
-1. Raise `"version"` in `package.json`, e.g. `0.1.0` → `0.2.0`, and commit.
-2. Run `npm run release` (with `GH_TOKEN` set).
-3. Installed apps check every 6 hours and at start-up, and download the update quietly. It installs itself:
-   - the next time nobody is being tracked on that PC (outside shift hours or with the screen locked), or
-   - when the app quits.
-   
-   The log shows `updater: installing 0.2.0 …`.
-
-**Server changes** (new `pb_hooks` or `pb_migrations` files) are deployed separately:
-1. Copy the two folders over the ones on the server.
-2. Restart the service: `nssm restart PocketBase`. New migrations apply on start.
-
----
-
-## Restoring a backup for real
-
-1. Stop the service: `nssm stop PocketBase`.
-2. Rename `D:\PSEOTracker\pb_data` to `pb_data-broken` and keep it until you're sure.
+**Restoring for real** (PowerShell as Administrator):
+1. `Stop-Service PocketBase`
+2. Rename `D:\PSEOTracker\pb_data` to `pb_data-broken`, and keep it until you're sure.
 3. Unzip the chosen backup from `E:\PSEOTrackerBackups` into a new, empty `D:\PSEOTracker\pb_data`.
-4. Start the service: `nssm start PocketBase`, then check the app.
+4. `Start-Service PocketBase`, then check the app.
 
-Anything recorded after that backup is lost: at most a day with nightly backups. The exception is time a staff PC hadn't synced yet, which the app still sends.
+Anything recorded after that backup is lost, at most a day. The exception is time a staff PC hadn't sent yet, which the app still sends.
 
 ---
 
 ## Go-live checklist (roadmap M12 "Done when")
 
-- [ ] The installer runs on a clean Windows 10/11 PC (SmartScreen: More info → Run anyway).
-- [ ] After a reboot the app starts by itself in the tray, and the Live Board shows that person Active or Idle.
-- [ ] Their tracked time appears on the production server (Reports, or the `activity_segments` collection).
+- [x] The server answers at `http://agency-server:8090` over Tailscale, and the first backup reached E: (2026-10-14).
+- [x] The installer installs and starts on the server PC, registers start-with-Windows, and reaches the server (2026-10-14).
+- [ ] The installer runs on a staff PC or laptop. The Live Board shows that person Active or Idle, and their time appears in Reports.
+- [ ] After a reboot of that PC, the app starts by itself in the tray.
 - [ ] A published higher version installs itself on that PC. Hover the tray icon: the tooltip shows the version.
 - [ ] A backup zip from E: has been restored with `restore-drill.ps1`.
 - [ ] The manual end-to-end steps in plan.md §8 pass against the production server.

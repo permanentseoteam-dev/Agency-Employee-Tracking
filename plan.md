@@ -80,7 +80,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 │                                 POST /api/org/reset-password           │
 │            segments.pb.js       validate segments (overlap, length,    │
 │                                 future-dated, older than 30 days)      │
-│            attendance.pb.js     cron 01:00 PKT + POST /api/attendance/ │
+│            attendance.pb.js     cron hourly    + POST /api/attendance/ │
 │                                 recompute                              │
 │            payroll.pb.js        POST /api/payroll/run, finalize lock   │
 │            notifications.pb.js  leave_requests → notifications         │
@@ -121,7 +121,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
   - **Reports:** daily, weekly and monthly active and idle hours per employee. Filter by team, employee and date range. Export to CSV. Totals come from the `reports.pb.js` route, which limits a manager to their own teams.
 
 ### 4.2 Attendance
-- Marked automatically by the attendance hook. It runs nightly as a PocketBase cron job at 01:00 PKT (`0 20 * * *` UTC) for the previous day. It can also be run on demand with `POST /api/attendance/recompute`.
+- Marked automatically by the attendance hook. It runs every hour as a PocketBase cron job (`5 * * * *`) and recounts the 7 finished days, so a server that was off at night catches up. It can also be run on demand with `POST /api/attendance/recompute`.
 - No record is created for days before `joined_on` or after `left_on`.
 - **Status order (first match wins):**
   1. Holiday or weekend
@@ -388,7 +388,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
 - **M8 paused** (2026-10-14): the user stopped the M8 design run and asked to continue with the other modules one at a time. Attendance already reads approved leave, so it works without M8.
 - **M7 done** (2026-10-14, committed but not pushed):
   - `lib/attendance.js`: `statusFor(day, settings, segments, leaves, holidays)` in the plan's order (holiday or weekend → on leave → absent → half day → late → present); first activity exactly at shift start + grace is still on time; idle time alone counts as absent
-  - `attendance.pb.js`: nightly cron `0 20 * * *` (01:00 PKT) counts the 7 days just finished, so segments that synced late still count; `POST /api/attendance/recompute` (admins only, one date or a range of up to 31 days, finished days only). Both upsert records only between `joined_on` and `left_on`. The database side lives in `lib/attendance_store.js`, shared by both
+  - `attendance.pb.js`: hourly cron `5 * * * *` (nightly at 01:00 PKT until the go-live setup) counts the 7 days just finished, so segments that synced late still count; `POST /api/attendance/recompute` (admins only, one date or a range of up to 31 days, finished days only). Both upsert records only between `joined_on` and `left_on`. The database side lives in `lib/attendance_store.js`, shared by both
   - Attendance grid (employees × days, team filter, row totals, hover details, Recompute for admins) and My Attendance (daily status, first/last activity, month totals)
   - `check:rules` 77 of 77; end-to-end 29 of 29, including grace boundaries, leave, holiday, weekend, the employment window, manager scope and the nightly job
 - **M9 done** (2026-10-14, committed but not pushed):
@@ -408,10 +408,15 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
+- **Go-live setup** (2026-10-14): an office PC is the server, `agency-server` on Tailscale (the agency's tailnet), with a fresh database in `D:\PSEOTracker` run by the "PocketBase" service. The development database task is turned off.
+  - `server/deploy/setup-server.ps1` does the whole server setup in one elevated run: copy the server files, service, firewall, backup task, first login (`create-first-admin.ps1`), Tailscale. Re-running it deploys `pb_hooks` and `pb_migrations` changes
+  - attendance runs hourly and the backup at 13:00 PKT (copy to E: at 13:30), because the server PC may be off at night. The backup task calls PowerShell by full path, since this PC's system PATH lacks it (that made the task fail with 0x80070002)
+  - release builds go to `out-release/` (`electron-builder.yml` `extraMetadata.main`), never `out/`. `.env.production` holds `http://agency-server:8090`. `dist\PSEO-Tracker-Setup-0.1.0.exe` is installed on the server PC for the admin
+  - staff PCs: the `dist\staff-pc-setup` kit (`scripts/staff-pc/`) installs Tailscale with a tagged auth key, checks the server, and installs the app. Still to do by you: Part B of docs/deployment.md (disable key expiry for the server, the access policy, the auth key), the first staff PC, and the releases repo
 - **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/pseo-tracker-releases`), backups copied to the E: drive.
   - `electron-builder.yml`: per-user one-click NSIS installer with desktop and Start menu shortcuts, app icon (`scripts/make-icon.mjs` → `build/`), publish to the releases repo. `npm run dist` builds, `npm run release` publishes (needs `GH_TOKEN`); `scripts/check-release-env.mjs` refuses a build whose `VITE_PB_URL` is localhost, a raw IP or unset (`.env.production`)
   - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version
-  - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (nightly copy of PocketBase's 02:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)
+  - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (daily copy of PocketBase's 13:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)
   - verified on this PC: the packaged app signs in, tracks, reaches the server and registers start-with-Windows (locked for employees); a 0.1.0 install found, downloaded and installed 0.1.1 by itself and restarted as 0.1.1; backup → copy to the backup drive → restore drill passed. Test installs and startup entries were removed afterwards
   - **still to do by you before go-live:** create the releases repo and a `GH_TOKEN`, set up the office PC with docs/deployment.md, then tick the go-live checklist at the end of that guide (clean-PC install, reboot autostart, data on the production server, a published update, a restore from E:)
 - **M8 done** (2026-10-14, pushed):

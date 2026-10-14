@@ -3,9 +3,11 @@
 // admin. Attendance records are written only here (the API rules lock them).
 // Each handler runs in its own isolated context: helpers come from require().
 
-// 20:00 UTC = 01:00 in Karachi. Counts the 7 days just finished, so segments that
-// synced late (from a PC that was offline) still reach attendance.
-cronAdd('attendance', '0 20 * * *', () => {
+// Every hour at :05. Counts the 7 days just finished, so segments that synced late
+// (from a PC that was offline) still reach attendance. Hourly rather than nightly
+// because the server is an office PC that may be off at night, and cron doesn't
+// catch up on a missed run; recounting finished days is idempotent.
+cronAdd('attendance', '5 * * * *', () => {
   const lib = require(`${__hooks}/lib/attendance.js`)
   const store = require(`${__hooks}/lib/attendance_store.js`)
   try {

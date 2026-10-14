@@ -120,7 +120,7 @@ try {
   const types = await pbEmpA.collection('leave_types').getFullList()
   check('seed: 3 leave types', types.length === 3)
   const s = await root.settings.getAll()
-  check('backups: daily 21:00 UTC, keep 14', s.backups.cron === '0 21 * * *' && s.backups.cronMaxKeep === 14)
+  check('backups: daily 08:00 UTC (13:00 PKT), keep 14', s.backups.cron === '0 8 * * *' && s.backups.cronMaxKeep === 14)
   const usersCol = await root.collections.getOne('users')
   check('users token lasts 30 days', usersCol.authToken.duration === 2592000)
 

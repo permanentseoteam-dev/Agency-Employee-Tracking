@@ -305,7 +305,7 @@ All data lives in `pb_data/` on the server's disk. If Windows on that machine ge
 ### Layer 1 — Automatic off-site backups (the main protection)
 1. Create a free bucket at **Cloudflare R2** (10 GB free) or **Backblaze B2** (10 GB free). Generate an access key with read and write access to that bucket only.
 2. Dashboard → **Settings → Backups**:
-   - Turn on **auto backups** with cron `0 21 * * *`, which is 02:00 PKT, after the 01:00 attendance cron. Keep the last **14**.
+   - Turn on **auto backups** with cron `0 8 * * *`, which is 13:00 PKT, because the office server may be off at night. Keep the last **14**. The migration `1791980000_backup_daytime.js` sets this.
    - Turn on **Use S3 storage** and fill in:
      - **endpoint**: R2 is `https://<account-id>.r2.cloudflarestorage.com`, B2 is `https://s3.<region>.backblazeb2.com`
      - **bucket**, **region** (R2: `auto`), **access key** and **secret**

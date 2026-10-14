@@ -17,9 +17,11 @@
     "check:rules": "node scripts/check-rules.mjs",
     "test:env": "node scripts/test-env/index.mjs",
     "test:app": "node scripts/test-env/app.mjs",
+    "test:e2e": "node scripts/e2e/run.mjs",
+    "test:all": "npm run typecheck && npm test && npm run check:rules && npm run test:e2e",
     "icon": "electron scripts/make-icon.mjs",
-    "dist": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish never",
-    "release": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish always"
+    "dist": "node scripts/check-release-env.mjs && electron-vite build --mode production --outDir out-release && electron-builder --win --publish never",
+    "release": "node scripts/check-release-env.mjs && electron-vite build --mode production --outDir out-release && electron-builder --win --publish always"
   },
   "dependencies": {
     "@radix-ui/react-dropdown-menu": "^2.2.1",
