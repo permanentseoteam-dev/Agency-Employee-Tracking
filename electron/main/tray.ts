@@ -3,6 +3,8 @@
 import { app, Menu, nativeImage, Tray, type NativeImage } from 'electron'
 import trayLogo from '../../build/icon.png?asset'
 import type { TrackerStatus } from '../preload/api'
+import { log } from './log'
+import { TRAY_SIZE, withStatusDot } from './trayIcon'
 import { trayModel, type Tone } from './trayMenu'
 
 const COLORS: Record<Tone, [number, number, number]> = {
@@ -12,42 +14,30 @@ const COLORS: Record<Tone, [number, number, number]> = {
   signedOut: [220, 38, 38] // red-600
 }
 
-/**
- * The logo as a 32×32 bitmap (16 px at 2×) with an anti-aliased status dot, white
- * rim included, in the bottom-right corner, blended over the logo.
- */
-function logoWithDot([r, g, b]: [number, number, number]): NativeImage {
-  const size = 32
-  const buf = Buffer.from(
-    nativeImage.createFromPath(trayLogo).resize({ width: size, height: size, quality: 'best' }).toBitmap()
-  )
-  const c = 24.5
-  const clamp = (v: number) => Math.min(1, Math.max(0, v))
-  for (let y = 16; y < size; y++) {
-    for (let x = 16; x < size; x++) {
-      const dist = Math.hypot(x - c, y - c)
-      const outer = clamp(7.5 - dist) // coverage of the whole disc
-      if (outer === 0) continue
-      const inner = clamp(5.5 - dist) // coverage of the coloured centre
-      const i = (y * size + x) * 4
-      // BGRA, premultiplied: the dot (white rim around the colour) over the logo.
-      const over = (dot: number, base: number) => Math.round(dot * inner + 255 * (outer - inner) + base * (1 - outer))
-      buf[i] = over(b, buf[i])
-      buf[i + 1] = over(g, buf[i + 1])
-      buf[i + 2] = over(r, buf[i + 2])
-      buf[i + 3] = Math.round(255 * outer + buf[i + 3] * (1 - outer))
-    }
+// The logo is read once and kept: a state change never touches the disk, and a
+// logo that can't be read leaves the plain status dot instead of an error.
+let logo: Buffer | null | undefined
+function logoBitmap(): Buffer | null {
+  if (logo === undefined) {
+    const bmp = nativeImage.createFromPath(trayLogo).resize({ width: TRAY_SIZE, height: TRAY_SIZE, quality: 'best' }).toBitmap()
+    logo = bmp.length === TRAY_SIZE * TRAY_SIZE * 4 ? bmp : null
+    if (!logo) log.warn(`tray: could not read the logo at ${trayLogo}; showing the status dot only`)
   }
-  return nativeImage.createFromBitmap(buf, { width: size, height: size, scaleFactor: 2 })
+  return logo
 }
 
 const icons = new Map<Tone, NativeImage>()
 function icon(tone: Tone): NativeImage {
-  if (!icons.has(tone)) icons.set(tone, logoWithDot(COLORS[tone]))
+  if (!icons.has(tone)) {
+    const bitmap = withStatusDot(logoBitmap(), COLORS[tone])
+    icons.set(tone, nativeImage.createFromBitmap(bitmap, { width: TRAY_SIZE, height: TRAY_SIZE, scaleFactor: 2 }))
+  }
   return icons.get(tone)!
 }
 
 export function createTray(handlers: { open(): void; quit(): void }): (s: TrackerStatus) => void {
+  // Every state's icon is made up front, while the logo file is surely there.
+  for (const tone of Object.keys(COLORS) as Tone[]) icon(tone)
   const tray = new Tray(icon('off'))
   tray.setToolTip('PSEO Tracker')
   tray.on('click', handlers.open)
