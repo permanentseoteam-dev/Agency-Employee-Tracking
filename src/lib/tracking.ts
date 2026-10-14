@@ -1,4 +1,5 @@
 // Pure helpers for the tracking screens (My Stats, Live Board, Reports).
+import { toCsv } from './csv'
 import { addDays, isoWeekday, toDateKey, DEFAULT_TZ } from './dates'
 import { formatDuration } from './format'
 
@@ -80,10 +81,6 @@ export function decimalHours(seconds: number): string {
   return (seconds / 3600).toFixed(2)
 }
 
-function csvCell(value: string): string {
-  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
-}
-
 /** The report exactly as shown on screen, plus decimal hours and a total line. */
 export function reportCsv(rows: ReportRow[], periodLabel: string): string {
   const header = ['Employee', 'Team', periodLabel, 'Active', 'Idle', 'Active hours', 'Idle hours']
@@ -98,6 +95,5 @@ export function reportCsv(rows: ReportRow[], periodLabel: string): string {
   ])
   const t = reportTotals(rows)
   lines.push(['Total', '', '', formatDuration(t.active_s), formatDuration(t.idle_s), decimalHours(t.active_s), decimalHours(t.idle_s)])
-  // CRLF and a BOM so Excel opens it as UTF-8.
-  return '﻿' + [header, ...lines].map((cols) => cols.map(csvCell).join(',')).join('\r\n') + '\r\n'
+  return toCsv([header, ...lines])
 }

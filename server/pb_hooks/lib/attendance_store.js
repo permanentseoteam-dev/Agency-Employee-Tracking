@@ -16,6 +16,7 @@ function loadSettings(app) {
     grace_minutes: rec.getInt('grace_minutes'),
     half_day_min_hours: rec.getFloat('half_day_min_hours'),
     full_day_min_hours: rec.getFloat('full_day_min_hours'),
+    late_penalty_pkr: rec.getInt('late_penalty_pkr'),
     timezone: rec.getString('timezone') || 'Asia/Karachi'
   }
 }
@@ -105,4 +106,4 @@ function recomputeDays(app, settings, days) {
   return written
 }
 
-module.exports = { loadSettings, recomputeDays }
+module.exports = { loadSettings, recomputeDays, select }

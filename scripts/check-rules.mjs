@@ -275,6 +275,43 @@ try {
     pbMgrA.collection('notifications').update(noteId, { read_at: new Date().toISOString() })
   )
 
+  // --- payroll route and the finalized lock (payroll.pb.js) ----------------------
+  const runPayroll = (pb, month = '2026-10') => pb.send('/api/payroll/run', { method: 'POST', body: { month } })
+  await denied('employee cannot run payroll', () => runPayroll(pbEmpA))
+  await denied('manager cannot run payroll', () => runPayroll(pbMgrA))
+  await denied('payroll cannot be run for a future month', () => runPayroll(pbAdmin, '2099-01'))
+  await denied('a run cannot be created already finalized', () =>
+    pbAdmin.collection('payroll_runs').create({ month: '2026-08', status: 'finalized' })
+  )
+  let run = { items: 0 }
+  await allowed('admin runs payroll (reusing the draft made above)', async () => {
+    run = await runPayroll(pbAdmin)
+  })
+  check('one line per employee with a salary (not someone who left in September)', run.items === 5, JSON.stringify(run))
+  const line = await pbAdmin.collection('payroll_items').getFirstListItem(`run = "${run.run}" && user = "${empA.id}"`)
+  check('employees cannot read payroll', (await pbEmpA.collection('payroll_items').getFullList()).length === 0)
+  await allowed('admin sets an adjustment and note on a draft line', () =>
+    pbAdmin.collection('payroll_items').update(line.id, { adjustment_pkr: -5000, note: 'Advance' })
+  )
+  const adjusted = await pbAdmin.collection('payroll_items').getOne(line.id)
+  check('net follows the adjustment', adjusted.net === adjusted.base - adjusted.deductions - 5000, JSON.stringify(adjusted))
+  await denied('the counted figures cannot be edited', () => pbAdmin.collection('payroll_items').update(line.id, { deductions: 0 }))
+  await runPayroll(pbAdmin)
+  const recounted = await pbAdmin.collection('payroll_items').getFirstListItem(`run = "${run.run}" && user = "${empA.id}"`)
+  check('recounting a draft keeps adjustments and notes', recounted.adjustment_pkr === -5000 && recounted.note === 'Advance')
+  await allowed('admin finalizes the run', () => pbAdmin.collection('payroll_runs').update(run.run, { status: 'finalized' }))
+  await denied('a finalized run cannot be reopened', () => pbAdmin.collection('payroll_runs').update(run.run, { status: 'draft' }))
+  await denied('a finalized run cannot be deleted', () => pbAdmin.collection('payroll_runs').delete(run.run))
+  await denied('a finalized line cannot be edited', () => pbAdmin.collection('payroll_items').update(recounted.id, { adjustment_pkr: 0 }))
+  await denied('a finalized line cannot be deleted', () => pbAdmin.collection('payroll_items').delete(recounted.id))
+  await denied('lines cannot be added to a finalized run', () =>
+    pbAdmin.collection('payroll_items').create({ run: run.run, user: admin.id, base: 1 })
+  )
+  await denied('a finalized month cannot be recounted', () => runPayroll(pbAdmin))
+  await denied('not even a superuser can edit a finalized line', () =>
+    root.collection('payroll_items').update(recounted.id, { adjustment_pkr: 0 })
+  )
+
   // --- leave balances view -------------------------------------------------------
   const myBal = await pbEmpA.collection('leave_balances').getFullList()
   const mySick = myBal.find((b) => b.leave_type === sick.id)
@@ -325,6 +362,15 @@ try {
   await denied('short temporary password is rejected', () => invite(pbAdmin, { email: 'x2@test.local', password: 'short' }))
   const hireSalary = await pbAdmin.collection('salaries').getFirstListItem(`user = "${hireId}"`)
   check('invite also creates the salary record', hireSalary.monthly_salary_pkr === 70000)
+  let noSalaryHire = null
+  await allowed('an employee can be added before their salary is known', async () => {
+    noSalaryHire = await pbAdmin.send('/api/org/invite', {
+      method: 'POST',
+      body: { email: 'no.salary@test.local', full_name: 'No Salary Yet', password: 'temp-pass-1', monthly_salary_pkr: '' }
+    })
+  })
+  check('their salary is stored as 0 (not set)',
+    (await pbAdmin.collection('salaries').getFirstListItem(`user = "${noSalaryHire?.id}"`).catch(() => null))?.monthly_salary_pkr === 0)
   const pbHire = await as('new.hire@test.local').catch(() => null)
   // as() uses PASS; the hire has a temporary password, so sign in directly
   const hire = new PocketBase(URL)

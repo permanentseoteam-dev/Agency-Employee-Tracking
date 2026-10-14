@@ -227,7 +227,7 @@ Shorthand used in the table:
 | Collection | List / View | Create | Update | Delete |
 |---|---|---|---|---|
 | `users` | auth | locked (invite route) | admin, or `id = @request.auth.id && @request.body.role:isset = false && @request.body.team:isset = false && @request.body.active:isset = false` | locked |
-| `salaries`, `payroll_runs`, `payroll_items` | admin | admin | admin | admin |
+| `salaries`, `payroll_runs`, `payroll_items` | admin | admin | admin (hooks: a finalized run and its items are locked; only a draft item's adjustment and note change) | admin (not when finalized) |
 | `activity_segments` | own \|\| staff | self-create | locked | locked |
 | `presence` | own \|\| staff | self-create | own | locked |
 | `attendance` | own \|\| staff | locked (hook) | locked (hook) | locked |
@@ -396,7 +396,14 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - migration `1791960000`: the owner may only set `read_at` (the first schema let a notification be handed to someone else with made-up text)
   - Notification bell: unread badge, the latest 30, mark read on click (opens Approvals or My Leaves), mark all as read; live through a realtime subscription filtered to the current user
   - `check:rules` 87 of 87; end-to-end 16 of 16 (the manager's bell goes up 0.2 s after a new request)
-- **Next:** M10b (calendar month view and events), M11 (payroll), M12 (packaging), or M8 (paused).
+- **M11 done** (2026-10-14, committed but not pushed):
+  - `lib/payroll.js`: per-day rate = salary ÷ working days (weekends and holidays excluded); deductions = (absent + unpaid leave + ½ × half days) × rate + late × penalty, rounded to whole rupees; net = salary − deductions + adjustment. Unpaid leave is counted per working day inside the month (a request may span two months; 0.5 for a half day). No pro-rating: joiners and leavers are flagged for an adjustment
+  - `POST /api/payroll/run` (admins, current month or earlier): recounts the month's attendance first, then builds the draft; recounting a draft keeps adjustments and notes; people with no salary are left out and named. Database side in `lib/payroll_store.js`
+  - lock hooks in `payroll.pb.js`: runs start as drafts; a finalized run and its lines can't be edited, deleted, reopened, added to or recounted, by anyone including superusers; on a draft only the adjustment and note can change, and the server recomputes net
+  - Finance → Payroll (run a month, runs list, detail with totals, per-employee breakdown dialog, adjustment and note, CSV export, finalize) and Finance → Salaries (inline edit, totals, missing-salary warning)
+  - migration `1791970000`: a salary of 0 means "not set" (the required flag made adding an employee without a salary fail, an M3 bug)
+  - `check:rules` 108 of 108; end-to-end 26 of 26 (net 87,595 matches the hand calculation; 78,071 with a −9,524 adjustment; finalized run read-only in the app and the API)
+- **Next:** M10b (calendar month view and events), M12 (packaging), or M8 (paused).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**
