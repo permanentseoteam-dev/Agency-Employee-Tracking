@@ -10,7 +10,7 @@ const ROOT = resolve(import.meta.dirname, '..')
 const EXE = join(ROOT, 'server', 'pocketbase.exe')
 const MIGRATIONS = join(ROOT, 'server', 'pb_migrations')
 const HOOKS = join(ROOT, 'server', 'pb_hooks')
-const PORT = 8097
+const PORT = Number(process.env.CHECK_RULES_PORT) || 8097
 const URL = `http://127.0.0.1:${PORT}`
 const PASS = 'Test-pass-12345'
 
@@ -319,6 +319,97 @@ try {
   check('Sick balance: 8 − 1 approved = 7', mySick?.used === 1 && mySick?.remaining === 7, JSON.stringify(mySick))
   const mgrBal = await pbMgrA.collection('leave_balances').getFullList()
   check('manager A sees own + team A balances (inactive excluded)', mgrBal.length === 6, `got ${mgrBal.length}`)
+
+  // --- leave rules (leave.pb.js): counted days, overlap, quota, locks, routing ----
+  const casual = await root.collection('leave_types').getFirstListItem('name = "Casual"')
+  const apply = (pb, user, extra) => pb.collection('leave_requests').create({ user, leave_type: casual.id, ...extra })
+  await root.collection('holidays').create({ date: '2026-11-04', name: 'Test holiday' })
+  let week = null
+  await allowed('employee applies Mon–Fri with a holiday inside', async () => {
+    week = await apply(pbEmpA, empA.id, { start_date: '2026-11-02', end_date: '2026-11-06', days: 99, reason: 'Trip' })
+  })
+  check('the server counts the days (5 working days − 1 holiday = 4)', week?.days === 4, JSON.stringify(week))
+  const half = await apply(pbEmpA, empA.id, { start_date: '2026-11-09', end_date: '2026-11-09', half_day: true }).catch(() => null)
+  check('a half day counts 0.5', half?.days === 0.5, JSON.stringify(half))
+  await denied('a half day over two days is refused', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-11-10', end_date: '2026-11-11', half_day: true }))
+  await denied('a weekend-only request is refused (no working days)', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-11-14', end_date: '2026-11-15' }))
+  await denied('an end before the start is refused', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-11-12', end_date: '2026-11-11' }))
+  await denied('a request across the new year is refused', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-12-31', end_date: '2027-01-01' }))
+  await denied('a request overlapping your own pending leave is refused', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-11-05', end_date: '2026-11-05' }))
+  await denied('paid leave past the yearly quota is refused (4.5 pending + 10 > 10)', () =>
+    apply(pbEmpA, empA.id, { start_date: '2026-11-16', end_date: '2026-11-27' }))
+  const unpaid = await pbAdmin.collection('leave_types').create({ name: 'Unpaid', yearly_quota_days: 0, paid: false })
+  await allowed('unpaid leave has no quota', () =>
+    apply(pbEmpA, empA.id, { leave_type: unpaid.id, start_date: '2026-11-16', end_date: '2026-11-27' }))
+  await root.collection('users').update(empB.id, { joined_on: '2026-11-01' })
+  const pbEmpB = await as('emp.b@test.local')
+  await denied('leave before the joining date is refused', () =>
+    apply(pbEmpB, empB.id, { start_date: '2026-10-30', end_date: '2026-11-02' }))
+  await root.collection('users').update(empB.id, { joined_on: '' })
+
+  await denied('the employee cannot edit a sent request', () =>
+    pbEmpA.collection('leave_requests').update(week?.id ?? 'missing', { end_date: '2026-11-05' }))
+  await denied('the employee cannot change the dates while cancelling', () =>
+    pbEmpA.collection('leave_requests').update(half?.id ?? 'missing', { status: 'cancelled', end_date: '2026-11-10' }))
+  const cancelled = await pbEmpA.collection('leave_requests').update(half?.id ?? 'missing', { status: 'cancelled' }).catch(() => null)
+  check('an employee’s own cancel is not stamped as a decision', cancelled?.status === 'cancelled' && !cancelled.approver && !cancelled.decided_at)
+  await denied('a manager cannot change the days while deciding', () =>
+    pbMgrA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'approved', days: 1 }))
+  await denied('a manager cannot cancel a pending request (the employee does)', () =>
+    pbMgrA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'cancelled' }))
+  let approved = null
+  await allowed('manager A approves with a comment', async () => {
+    approved = await pbMgrA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'approved', comment: 'Enjoy', approver: admin.id })
+  })
+  check('the server sets the approver and decision time', approved?.approver === mgrA.id && !!approved?.decided_at, JSON.stringify(approved))
+  await denied('a manager cannot reverse a decision', () =>
+    pbMgrA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'rejected' }))
+  await denied('the employee cannot cancel approved leave', () =>
+    pbEmpA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'cancelled' }))
+  await allowed('admin reverses: approved → rejected', () =>
+    pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'rejected', comment: 'Busy week' }))
+  await allowed('admin reverses: rejected → approved', () =>
+    pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'approved' }))
+  await allowed('admin cancels approved leave', () =>
+    pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'cancelled' }))
+  check('the admin is now the approver', (await pbAdmin.collection('leave_requests').getOne(week?.id ?? 'missing')).approver === admin.id)
+  await denied('a cancelled request cannot be reopened', () =>
+    pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'approved' }))
+
+  await root.collection('users').update(mgrB.id, { team: teamA.id })
+  const pbMgrB = await as('mgr.b@test.local')
+  const mgrBReq = await apply(pbMgrB, mgrB.id, { start_date: '2026-11-03', end_date: '2026-11-03' })
+  await denied('a manager in another manager’s team still goes to the admins', () =>
+    pbMgrA.collection('leave_requests').update(mgrBReq.id, { status: 'approved' }))
+  await allowed('an admin decides that manager’s request', () =>
+    pbAdmin.collection('leave_requests').update(mgrBReq.id, { status: 'approved' }))
+  await root.collection('users').update(mgrB.id, { team: teamB.id })
+
+  const imported = await root.collection('leave_requests').create({
+    user: empB.id, leave_type: casual.id, start_date: '2026-11-10', end_date: '2026-11-10', status: 'approved'
+  })
+  check('a superuser import keeps its status and gets its days counted', imported.status === 'approved' && imported.days === 1, JSON.stringify(imported))
+
+  // Approving leave for a finished working day re-counts that day's attendance at once.
+  let pastDay = yesterday
+  while ([0, 6].includes(new Date(`${pastDay}T00:00:00Z`).getUTCDay())) {
+    pastDay = new Date(Date.parse(`${pastDay}T00:00:00Z`) - 86400000).toISOString().slice(0, 10)
+  }
+  await pbAdmin.send('/api/attendance/recompute', { method: 'POST', body: { date: pastDay } })
+  const sick1 = await apply(pbEmpA, empA.id, { start_date: pastDay, end_date: pastDay, reason: 'Fever' })
+  await pbMgrA.collection('leave_requests').update(sick1.id, { status: 'approved' })
+  const dayStatus = async () =>
+    (await pbAdmin.collection('attendance').getFirstListItem(`user = "${empA.id}" && date = "${pastDay}"`).catch(() => null))?.status
+  const onLeave = await dayStatus()
+  check('approving past leave marks that day On leave', onLeave === 'on_leave', `${pastDay}: ${onLeave}`)
+  await pbAdmin.collection('leave_requests').update(sick1.id, { status: 'rejected' })
+  const back = await dayStatus()
+  check('rejecting it again counts the day as absent', back === 'absent', `${pastDay}: ${back}`)
 
   // --- shared data -------------------------------------------------------------
   await denied('employee cannot change org settings', () =>

@@ -43,15 +43,16 @@ function groupByUser(rows) {
 
 /**
  * Recomputes (upserts) attendance for every person employed on each day, and removes
- * records for anyone outside their joined_on–left_on window. Returns the records written.
+ * records for anyone outside their joined_on–left_on window. `onlyUser` limits it to
+ * one person (e.g. after their leave is decided). Returns the records written.
  */
-function recomputeDays(app, settings, days) {
+function recomputeDays(app, settings, days, onlyUser) {
   const lib = require(`${__hooks}/lib/attendance.js`)
   const offset = lib.offsetFor(settings.timezone)
   const users = select(
     app,
-    'SELECT id, joined_on, left_on, CAST(active AS INTEGER) AS active FROM users',
-    {},
+    'SELECT id, joined_on, left_on, CAST(active AS INTEGER) AS active FROM users' + (onlyUser ? ' WHERE id = {:user}' : ''),
+    onlyUser ? { user: onlyUser } : {},
     { id: '', joined_on: '', left_on: '', active: 0 }
   )
   const collection = app.findCollectionByNameOrId('attendance')
@@ -78,7 +79,8 @@ function recomputeDays(app, settings, days) {
     const holidays = select(app, 'SELECT date FROM holidays WHERE date = {:day}', { day: day }, { date: '' }).map((h) => h.date)
 
     const existing = {}
-    for (const rec of app.findRecordsByFilter('attendance', 'date = {:day}', '', 0, 0, { day: day })) {
+    const existingFilter = onlyUser ? 'date = {:day} && user = {:user}' : 'date = {:day}'
+    for (const rec of app.findRecordsByFilter('attendance', existingFilter, '', 0, 0, { day: day, user: onlyUser || '' })) {
       existing[rec.getString('user')] = rec
     }
 
