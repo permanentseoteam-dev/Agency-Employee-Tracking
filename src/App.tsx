@@ -17,6 +17,8 @@ import { SalarySetup } from '@/features/finance/SalarySetup'
 import { EmployeeDetail } from '@/features/org/EmployeeDetail'
 import { Employees } from '@/features/org/Employees'
 import { InviteEmployee } from '@/features/org/InviteEmployee'
+import { Approvals } from '@/features/leave/Approvals'
+import { MyLeaves } from '@/features/leave/MyLeaves'
 import { OrgLayout } from '@/features/org/OrgLayout'
 import { TeamDetail } from '@/features/org/TeamDetail'
 import { Teams } from '@/features/org/Teams'
@@ -63,7 +65,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance'])
+const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance', '/my-leaves', '/approvals'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -119,6 +121,8 @@ const router = createHashRouter([
       },
       { path: 'my-stats', element: <MyStats /> },
       { path: 'my-attendance', element: <MyAttendance /> },
+      { path: 'my-leaves', element: <MyLeaves /> },
+      { path: 'approvals', element: <Approvals /> },
       { path: 'attendance', element: <AttendanceTable /> },
       { path: 'live', element: <LiveBoard /> },
       { path: 'reports', element: <Reports /> },

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { pb } from '@/lib/pb'
 import type { LeaveBalance, LeaveInput, LeaveRequest, LeaveStatus } from '@/lib/leave'
@@ -12,6 +13,33 @@ export const leaveKeys = {
 }
 
 const EXPAND = 'user,leave_type,approver'
+
+/**
+ * Keeps the leave lists fresh while a leave screen is open: any change to a request I
+ * can see (mine, my teams', or everyone's for an admin) refetches them.
+ */
+export function useLeaveLive() {
+  const qc = useQueryClient()
+  const userId = useSession((s) => s.user?.id ?? '')
+  useEffect(() => {
+    if (!userId) return
+    let unsubscribe: (() => Promise<void>) | undefined
+    let cancelled = false
+    pb.collection('leave_requests')
+      .subscribe('*', () => void qc.invalidateQueries({ queryKey: leaveKeys.all }))
+      .then((fn) => {
+        if (cancelled) void fn()
+        else unsubscribe = fn
+      })
+      .catch(() => {
+        /* offline: the refetch on reconnect catches up */
+      })
+    return () => {
+      cancelled = true
+      void unsubscribe?.()
+    }
+  }, [qc, userId])
+}
 
 /** My own requests, newest first (every status). */
 export function useMyLeaves() {
