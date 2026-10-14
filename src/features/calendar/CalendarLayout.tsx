@@ -1,12 +1,14 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 
-// The month view joins these tabs in M10b.
-const TABS = [{ to: '/calendar/holidays', label: 'Holidays' }]
+const TABS = [
+  { to: '/calendar/month', label: 'Month' },
+  { to: '/calendar/holidays', label: 'Holidays' }
+]
 
 export function CalendarLayout() {
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Calendar">
         {TABS.map((t) => (
           <NavLink

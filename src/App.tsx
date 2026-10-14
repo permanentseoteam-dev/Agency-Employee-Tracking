@@ -9,6 +9,7 @@ import { AttendanceTable } from '@/features/attendance/AttendanceTable'
 import { MyAttendance } from '@/features/attendance/MyAttendance'
 import { CalendarLayout } from '@/features/calendar/CalendarLayout'
 import { HolidayManager } from '@/features/calendar/HolidayManager'
+import { MonthCalendar } from '@/features/calendar/MonthCalendar'
 import { FinanceLayout } from '@/features/finance/FinanceLayout'
 import { PayrollDetail } from '@/features/finance/PayrollDetail'
 import { PayrollRuns } from '@/features/finance/PayrollRuns'
@@ -101,7 +102,8 @@ const router = createHashRouter([
         path: 'calendar',
         element: <CalendarLayout />,
         children: [
-          { index: true, element: <Navigate to="/calendar/holidays" replace /> },
+          { index: true, element: <Navigate to="/calendar/month" replace /> },
+          { path: 'month', element: <MonthCalendar /> },
           { path: 'holidays', element: <HolidayManager /> }
         ]
       },

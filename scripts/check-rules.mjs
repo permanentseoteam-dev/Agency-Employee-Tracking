@@ -337,6 +337,23 @@ try {
     pbAdmin.collection('holidays').create({ date: '25-12-2026', name: 'x' })
   )
 
+  // --- calendar events (admins write; everyone reads; events.pb.js checks times) ---
+  const event = { title: 'Town hall', starts_at: '2026-10-16 10:00:00.000Z', ends_at: '2026-10-16 11:00:00.000Z' }
+  await denied('employee cannot add events', () => pbEmpA.collection('events').create(event))
+  await denied('manager cannot add events', () => pbMgrA.collection('events').create(event))
+  let townHall = null
+  await allowed('admin can add a company-wide event', async () => {
+    townHall = await pbAdmin.collection('events').create(event)
+  })
+  await allowed('admin can add a team event', () => pbAdmin.collection('events').create({ ...event, title: 'Team A sync', team: teamA.id }))
+  check('everyone can read events', (await pbEmpA.collection('events').getFullList()).length === 2)
+  await denied('an event cannot end before it starts', () =>
+    pbAdmin.collection('events').create({ ...event, ends_at: '2026-10-16 09:00:00.000Z' })
+  )
+  await denied('an event cannot be moved to end before it starts', () =>
+    pbAdmin.collection('events').update(townHall?.id ?? 'missing', { ends_at: '2026-10-16 10:00:00.000Z' })
+  )
+
   // --- organization routes (invite.pb.js) ---------------------------------------
   const invite = (pb, extra = {}) =>
     pb.send('/api/org/invite', {

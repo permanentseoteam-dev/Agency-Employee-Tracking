@@ -403,7 +403,12 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - Finance → Payroll (run a month, runs list, detail with totals, per-employee breakdown dialog, adjustment and note, CSV export, finalize) and Finance → Salaries (inline edit, totals, missing-salary warning)
   - migration `1791970000`: a salary of 0 means "not set" (the required flag made adding an employee without a salary fail, an M3 bug)
   - `check:rules` 108 of 108; end-to-end 26 of 26 (net 87,595 matches the hand calculation; 78,071 with a −9,524 adjustment; finalized run read-only in the app and the API)
-- **Next:** M10b (calendar month view and events), M12 (packaging), or M8 (paused).
+- **M10b done** (2026-10-14, committed but not pushed):
+  - Calendar → Month (now the default tab): a Monday–Sunday month grid with holidays, approved leave on working days only ("who's off", ½ for a half day; pending leave is not shown) and events with their Karachi times; "+N more" and a day view with everything on that day; team filter for admins and managers
+  - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
+  - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
+  - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
+- **Next:** M12 (packaging and release), or M8 (paused).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**
