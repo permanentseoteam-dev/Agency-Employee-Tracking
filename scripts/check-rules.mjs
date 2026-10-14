@@ -102,11 +102,13 @@ try {
   const pbMgrA = await as('mgr.a@test.local')
   const pbEmpA = await as('emp.a@test.local')
 
+  // Segments must pass segments.pb.js (not in the future, at most 6 min, no overlap), so use recent times.
+  const base = Date.now() - 60 * 60000
   const seg = (user, minute) => ({
     user,
     state: 'active',
-    started_at: `2026-10-14 05:${String(minute).padStart(2, '0')}:00.000Z`,
-    ended_at: `2026-10-14 05:${String(minute + 5).padStart(2, '0')}:00.000Z`
+    started_at: new Date(base + minute * 60000).toISOString(),
+    ended_at: new Date(base + (minute + 5) * 60000).toISOString()
   })
 
   // --- login ------------------------------------------------------------------
@@ -160,6 +162,10 @@ try {
     pbEmpA.collection('activity_segments').update(own.id, { state: 'idle' })
   )
   await denied('employee cannot delete own segment', () => pbEmpA.collection('activity_segments').delete(own.id))
+  await denied('overlapping segment is rejected', () => pbEmpA.collection('activity_segments').create(seg(empA.id, 2)))
+  await denied('segment from a clock set 1 hour ahead is rejected', () =>
+    pbEmpA.collection('activity_segments').create(seg(empA.id, 120))
+  )
   await root.collection('activity_segments').create(seg(empB.id, 20))
   check('employee sees only own segments', (await pbEmpA.collection('activity_segments').getFullList()).length === 1)
   check('manager A sees team A segments only', (await pbMgrA.collection('activity_segments').getFullList()).length === 1)

@@ -16,16 +16,23 @@ function currentUser(): UserRecord | null {
   return pb.authStore.isValid ? (pb.authStore.record as unknown as UserRecord) : null
 }
 
-// Tell the main process who is signed in, so the tracker (M5) writes as that user.
+// Tell the main process who is signed in, so the tracker writes as that user.
 function shareWithMain(): void {
   const user = currentUser()
-  window.tracker?.setSession(user ? { token: pb.authStore.token, userId: user.id, role: user.role } : null)
+  window.tracker?.setSession(
+    user ? { token: pb.authStore.token, userId: user.id, role: user.role, consented: !!user.tracking_consent_at } : null
+  )
 }
 
 export const useSession = create<SessionState>((set) => {
   pb.authStore.onChange(() => {
     set({ user: currentUser() })
     shareWithMain()
+  })
+  // The tracker found the token dead (expired, password reset, deactivated): show Login.
+  // Its segments stay queued and sync after the next sign-in.
+  window.tracker?.onSessionExpired(() => {
+    if (pb.authStore.token) pb.authStore.clear()
   })
 
   return {

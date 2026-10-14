@@ -59,7 +59,7 @@ export function Settings() {
             <input
               type="checkbox"
               className="mt-0.5 size-4 accent-indigo-600"
-              disabled={!autostart?.supported}
+              disabled={!autostart?.supported || autostart.locked}
               checked={autostart?.enabled ?? false}
               onChange={(e) => void window.tracker.setAutostart(e.target.checked).then(setAutostart)}
             />
@@ -68,7 +68,9 @@ export function Settings() {
               <span className="block text-slate-500">
                 {autostart && !autostart.supported
                   ? 'Available in the installed app only.'
-                  : 'Recommended, so your working time is recorded from the moment you log in.'}
+                  : autostart?.locked
+                    ? 'Always on for employees, so your working time is recorded from the moment you log in.'
+                    : 'Recommended, so your working time is recorded from the moment you log in.'}
               </span>
             </span>
           </label>

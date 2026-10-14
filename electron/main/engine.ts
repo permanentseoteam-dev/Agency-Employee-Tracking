@@ -1,0 +1,299 @@
+// Runs the tracker (plan §4.1): polls powerMonitor every 15 s, feeds the state
+// machine, queues the closed segments, keeps today's totals and the presence
+// heartbeat. All decisions about time live in tracker.ts.
+import { powerMonitor } from 'electron'
+import { dayRangeUtc, toDateKey } from '../../src/lib/dates'
+import type { TrackerSettings, TrackerStatus } from '../preload/api'
+import { log } from './log'
+import { expire, identity, isSignedIn, onSessionChange, pb, refresh } from './session'
+import { DEFAULT_SETTINGS, persisted, type DayTotals } from './store'
+import { SyncQueue } from './syncQueue'
+import { inShift, POLL_MS, TrackerMachine, type Segment } from './tracker'
+
+const HEARTBEAT_MS = 60_000
+
+const machine = new TrackerMachine()
+let pollTimer: ReturnType<typeof setInterval> | null = null
+/** The user whose segment is open in the machine. */
+let trackingUser: string | null = null
+let paused: 'locked' | 'suspended' | null = null
+const statusListeners = new Set<(s: TrackerStatus) => void>()
+let lastStatusJson = ''
+
+export const queue = new SyncQueue({
+  storage: {
+    load: () => persisted().get('queue'),
+    save: (items) => persisted().set('queue', items)
+  },
+  client: () => {
+    const id = identity()
+    if (!id || !isSignedIn()) return null
+    return {
+      userId: id.userId,
+      create: (item) => pb.collection('activity_segments').create(item, { requestKey: null })
+    }
+  },
+  verifySession: () => refresh(),
+  onAuthLost: () => expire(),
+  log
+})
+
+export function settings(): TrackerSettings {
+  return persisted().get('settings') ?? DEFAULT_SETTINGS
+}
+
+// ---- today's totals --------------------------------------------------------
+// Every segment seen today, by id: closed here, or already on the server
+// (recorded on another day's run of the app). Summing by id never double counts.
+
+function todayTotals(userId: string): DayTotals {
+  const date = toDateKey(Date.now(), settings().timezone)
+  const t = persisted().get('today')
+  if (t && t.userId === userId && t.date === date) return t
+  return { userId, date, seen: {} }
+}
+
+function remember(userId: string, entries: { id: string; state: 'active' | 'idle'; seconds: number; startedAt: number }[]): void {
+  const t = todayTotals(userId)
+  const tz = settings().timezone
+  let changed = false
+  for (const e of entries) {
+    if (toDateKey(e.startedAt, tz) !== t.date || t.seen[e.id]) continue
+    t.seen[e.id] = { s: e.state, d: e.seconds }
+    changed = true
+  }
+  if (changed || persisted().get('today')?.date !== t.date) persisted().set('today', t)
+}
+
+/** Adds what the server already has for today (e.g. after a reinstall or a sign-in on this PC). */
+async function loadTodayFromServer(userId: string): Promise<void> {
+  const { start } = dayRangeUtc(toDateKey(Date.now(), settings().timezone), settings().timezone)
+  try {
+    const rows = await pb.collection('activity_segments').getFullList({
+      filter: pb.filter('user = {:user} && started_at >= {:start}', { user: userId, start }),
+      fields: 'id,state,started_at,ended_at',
+      requestKey: null
+    })
+    remember(
+      userId,
+      rows.map((r) => {
+        const s = Date.parse(r.started_at.replace(' ', 'T'))
+        return { id: r.id, state: r.state, startedAt: s, seconds: Math.round((Date.parse(r.ended_at.replace(' ', 'T')) - s) / 1000) }
+      })
+    )
+    pushStatus()
+  } catch (err) {
+    log.warn('could not load today’s totals from the server:', (err as Error).message)
+  }
+}
+
+export function today(): { date: string; active_s: number; idle_s: number } {
+  const id = identity()
+  const date = toDateKey(Date.now(), settings().timezone)
+  if (!id) return { date, active_s: 0, idle_s: 0 }
+  const t = todayTotals(id.userId)
+  let active = 0
+  let idle = 0
+  for (const v of Object.values(t.seen)) {
+    if (v.s === 'active') active += v.d
+    else idle += v.d
+  }
+  if (trackingUser === id.userId) {
+    const open = machine.openSeconds(Date.now())
+    if (open?.state === 'active') active += open.seconds
+    if (open?.state === 'idle') idle += open.seconds
+  }
+  return { date, active_s: active, idle_s: idle }
+}
+
+// ---- recording ---------------------------------------------------------------
+
+function record(segments: Segment[], userId: string | null): void {
+  if (!userId || segments.length === 0) return
+  const added = segments.map((s) => ({
+    seg: s,
+    item: queue.add({
+      user: userId,
+      state: s.state,
+      started_at: new Date(s.startedAt).toISOString(),
+      ended_at: new Date(s.endedAt).toISOString()
+    })
+  }))
+  remember(
+    userId,
+    added.map(({ seg, item }) => ({
+      id: item.id,
+      state: seg.state,
+      startedAt: seg.startedAt,
+      seconds: Math.round((seg.endedAt - seg.startedAt) / 1000)
+    }))
+  )
+}
+
+function idleSeconds(): number {
+  try {
+    return powerMonitor.getSystemIdleTime()
+  } catch {
+    return 0
+  }
+}
+
+/** Closes the open segment, if any (lock, suspend, sign-in as someone else, quit). */
+function closeOpen(): void {
+  const before = machine.state
+  record(machine.stop(Date.now(), idleSeconds(), settings()), trackingUser)
+  if (before) log.info(`tracking: ${before} → stopped`)
+}
+
+function canTrack(): boolean {
+  const id = identity()
+  return !!id && id.consented && !paused
+}
+
+function poll(): void {
+  const id = identity()
+  if (trackingUser && trackingUser !== id?.userId) closeOpen()
+  trackingUser = id?.userId ?? null
+
+  if (canTrack()) {
+    const before = machine.state
+    record(machine.tick(Date.now(), idleSeconds(), settings()), trackingUser)
+    if (machine.state !== before) log.info(`tracking: ${before ?? 'stopped'} → ${machine.state ?? 'stopped (outside shift)'}`)
+  } else if (machine.state) {
+    closeOpen()
+  }
+  void heartbeat()
+  pushStatus()
+}
+
+// ---- presence heartbeat ------------------------------------------------------
+
+let presence: { userId: string; id: string } | null = null
+let lastBeat: { status: string; at: number } | null = null
+
+function presenceStatus(): 'active' | 'idle' | 'offline' {
+  if (paused === 'locked') return 'idle'
+  if (!canTrack() || !machine.state) return 'offline'
+  return machine.state
+}
+
+async function heartbeat(force = false): Promise<void> {
+  const id = identity()
+  if (!id || !isSignedIn()) return
+  const status = presenceStatus()
+  const now = Date.now()
+  if (!force && lastBeat?.status === status && (status === 'offline' || now - lastBeat.at < HEARTBEAT_MS)) return
+  lastBeat = { status, at: now }
+
+  const t = today()
+  const data = { status, last_seen: new Date(now).toISOString(), today_active_s: t.active_s, today_idle_s: t.idle_s }
+  const col = pb.collection('presence')
+  try {
+    if (presence?.userId !== id.userId) {
+      try {
+        const row = await col.getFirstListItem(pb.filter('user = {:user}', { user: id.userId }), { requestKey: null })
+        presence = { userId: id.userId, id: row.id }
+      } catch (err) {
+        if ((err as { status?: number }).status !== 404) throw err
+        const row = await col.create({ user: id.userId, ...data }, { requestKey: null })
+        presence = { userId: id.userId, id: row.id }
+        return
+      }
+    }
+    await col.update(presence.id, data, { requestKey: null })
+  } catch (err) {
+    const s = (err as { status?: number }).status
+    lastBeat = null // send again on the next poll
+    if (s === 404) presence = null
+    else if (s === 401) expire()
+  }
+}
+
+// ---- status for the tray and the renderer -----------------------------------
+
+export function status(): TrackerStatus {
+  const id = identity()
+  let reason: TrackerStatus['reason'] = 'tracking'
+  if (!id) reason = 'no_user'
+  else if (!id.consented) reason = 'no_consent'
+  else if (paused) reason = paused
+  else if (!machine.state) reason = inShift(Date.now(), settings()) ? 'starting' : 'outside_shift'
+  return {
+    state: reason === 'tracking' ? (machine.state ?? 'active') : 'off',
+    reason,
+    signedIn: isSignedIn(),
+    role: id?.role ?? '',
+    pending: id ? queue.pending(id.userId).length : 0,
+    today: today()
+  }
+}
+
+export function onStatus(fn: (s: TrackerStatus) => void): () => void {
+  statusListeners.add(fn)
+  return () => statusListeners.delete(fn)
+}
+
+function pushStatus(): void {
+  const s = status()
+  const json = JSON.stringify(s)
+  if (json === lastStatusJson) return
+  lastStatusJson = json
+  for (const fn of statusListeners) fn(s)
+}
+
+// ---- lifecycle ---------------------------------------------------------------
+
+export function startEngine(): void {
+  powerMonitor.on('lock-screen', () => {
+    closeOpen()
+    paused = 'locked'
+    void heartbeat(true)
+    pushStatus()
+  })
+  powerMonitor.on('unlock-screen', () => {
+    paused = null
+    poll()
+  })
+  powerMonitor.on('suspend', () => {
+    closeOpen()
+    paused = 'suspended'
+    pushStatus()
+  })
+  powerMonitor.on('resume', () => {
+    paused = null
+    poll()
+    void queue.flush()
+  })
+
+  let lastSignedInUser: string | null = null
+  onSessionChange(() => {
+    const id = identity()
+    const user = isSignedIn() ? (id?.userId ?? null) : null
+    if (user && user !== lastSignedInUser) {
+      void loadTodayFromServer(user)
+      void queue.flush()
+      lastBeat = null
+    }
+    lastSignedInUser = user
+    poll()
+  })
+  queue.onChange(pushStatus)
+
+  pollTimer = setInterval(poll, POLL_MS)
+  poll()
+  log.info(`tracker started (${queue.pending().length} segment(s) waiting to sync)`)
+}
+
+/** Windows is ending the session: close the open segment on disk right away (synchronous). */
+export function stopNow(): void {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = null
+  closeOpen()
+}
+
+/** Quit: close the open segment, then give the queue and presence a moment to reach the server. */
+export async function shutdown(timeoutMs = 3000): Promise<void> {
+  stopNow()
+  const wait = new Promise((r) => setTimeout(r, timeoutMs))
+  await Promise.race([Promise.all([queue.flush(), heartbeat(true)]), wait])
+}

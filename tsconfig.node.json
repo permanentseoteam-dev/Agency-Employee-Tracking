@@ -14,5 +14,5 @@
     "resolveJsonModule": true,
     "esModuleInterop": true
   },
-  "include": ["electron/**/*", "electron.vite.config.ts", "vitest.config.ts"]
+  "include": ["electron/**/*", "src/lib/dates.ts", "src/lib/format.ts", "electron.vite.config.ts", "vitest.config.ts"]
 }

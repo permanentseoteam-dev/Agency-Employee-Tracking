@@ -245,7 +245,7 @@ The custom routes `/api/org/invite`, `/api/org/reset-password`, `/api/payroll/ru
 ```
 F:\agency-tracker
 ├─ electron/
-│  ├─ main/      index.ts, tracker.ts, syncQueue.ts, session.ts, tray.ts, updater.ts, log.ts, ipc.ts
+│  ├─ main/      index.ts, tracker.ts, engine.ts, syncQueue.ts, session.ts, tray.ts, updater.ts, log.ts, ipc.ts
 │  └─ preload/   index.ts
 ├─ src/
 │  ├─ lib/       pb.ts (PocketBase client), format.ts (formatDuration → "5h 23m"), dates.ts, roles.ts
@@ -367,7 +367,15 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - Rules → Leave types: add, edit, delete
   - live rule changes reach everyone's app and the tracker side (main process) over IPC
   - end-to-end 14 of 14 pass
-- **Next: M5**, the tracking engine (main process: idle detection, segments, offline sync queue, tray, presence).
+- **M5 done** (2026-10-14, committed but not pushed):
+  - `tracker.ts` is the pure state machine (idle backdated to the last input, 5-minute roll, shift hours and working days, gaps between polls not counted); `engine.ts` feeds it from `powerMonitor` every 15 s and closes segments on lock, suspend and shutdown
+  - `syncQueue.ts`: segments saved to disk first, created with a client-made id; a duplicate id counts as synced, a `segments.pb.js` rejection is logged and dropped, offline and server errors back off up to 5 min. PocketBase answers a create with a dead token with a bare 400, so that case re-checks the session instead of dropping the segment
+  - `segments.pb.js` rejects segments that end before they start, run over 6 min, end more than 2 min in the future, are over 30 days old, or overlap
+  - presence heartbeat every minute (and on every status change), today's totals counted by segment id so they never double count
+  - tray with a status-coloured icon, today's time and Quit for managers and admins only; close-to-tray; one instance per PC; start at login (always on for employees)
+  - main-process session: token refreshed at startup and every 12 h; on expiry the renderer goes to Login and segments keep queuing until the next sign-in. Signing out also keeps tracking as the last user (no pause button)
+  - `check:rules` 72 of 72; end-to-end on the built app: segments land, offline sync with no duplicates and matching totals, expired session queues and syncs after sign-in, a 1-hour-ahead segment is rejected and logged, a second launch exits
+- **Next: M6**, the tracking screens (My Stats, Live Board, Reports).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

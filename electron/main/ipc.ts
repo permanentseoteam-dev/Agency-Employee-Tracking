@@ -1,18 +1,15 @@
-import { app, ipcMain, shell } from 'electron'
-import type { AutostartState, SessionInfo, TrackerSettings } from '../preload/api'
+import { BrowserWindow, ipcMain, shell } from 'electron'
+import type { SessionInfo, TrackerSettings } from '../preload/api'
+import { autostartState, ensureAutostart, setAutostart } from './autostart'
+import { onStatus, status, today } from './engine'
 import { log, logsFolder } from './log'
+import { onSessionExpired, setFromRenderer } from './session'
+import { persisted } from './store'
 
-let session: SessionInfo | null = null
-let settings: TrackerSettings | null = null
-
-/** The signed-in user, handed over by the renderer. The tracker (M5) writes as this user. */
-export function currentSession(): SessionInfo | null {
-  return session
-}
-
-/** The org rules, kept current by the renderer (including live changes by an admin). */
-export function currentSettings(): TrackerSettings | null {
-  return settings
+function sanitizeSession(raw: unknown): SessionInfo | null {
+  const s = raw as Partial<SessionInfo> | null
+  if (!s || typeof s.token !== 'string' || typeof s.userId !== 'string') return null
+  return { token: s.token, userId: s.userId, role: String(s.role ?? 'employee'), consented: s.consented === true }
 }
 
 function sanitizeSettings(raw: unknown): TrackerSettings | null {
@@ -24,13 +21,12 @@ function sanitizeSettings(raw: unknown): TrackerSettings | null {
     shift_end: s.shift_end,
     work_days: s.work_days.filter((d): d is number => Number.isInteger(d)),
     idle_threshold_minutes: s.idle_threshold_minutes,
-    timezone: typeof s.timezone === 'string' ? s.timezone : 'Asia/Karachi'
+    timezone: typeof s.timezone === 'string' && s.timezone ? s.timezone : 'Asia/Karachi'
   }
 }
 
-function autostartState(): AutostartState {
-  if (!app.isPackaged) return { supported: false, enabled: false }
-  return { supported: true, enabled: app.getLoginItemSettings().openAtLogin }
+function broadcast(channel: string, payload?: unknown): void {
+  for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
 }
 
 export function registerIpc(): void {
@@ -38,31 +34,30 @@ export function registerIpc(): void {
     log.error('[renderer]', String(message))
   })
 
-  ipcMain.on('session:set', (_event, next: SessionInfo | null) => {
-    const changed = session?.userId !== next?.userId
-    session = next && typeof next.token === 'string' && typeof next.userId === 'string' ? next : null
-    if (changed) log.info(session ? `signed in as ${session.userId} (${session.role})` : 'signed out')
+  ipcMain.on('session:set', (_event, raw: unknown) => {
+    setFromRenderer(sanitizeSession(raw))
+    ensureAutostart()
   })
 
   ipcMain.on('settings:set', (_event, raw: unknown) => {
     const next = sanitizeSettings(raw)
     if (!next) return
-    const before = JSON.stringify(settings)
-    settings = next
-    if (before !== JSON.stringify(next)) {
-      log.info(
-        `rules: shift ${next.shift_start}-${next.shift_end}, days [${next.work_days.join(',')}], ` +
-          `idle after ${next.idle_threshold_minutes} min`
-      )
-    }
+    const before = JSON.stringify(persisted().get('settings'))
+    if (before === JSON.stringify(next)) return
+    persisted().set('settings', next)
+    log.info(
+      `rules: shift ${next.shift_start}-${next.shift_end}, days [${next.work_days.join(',')}], ` +
+        `idle after ${next.idle_threshold_minutes} min`
+    )
   })
+
+  ipcMain.handle('tracker:today', () => today())
+  ipcMain.handle('tracker:status', () => status())
+  onStatus((s) => broadcast('tracker:status', s))
+  onSessionExpired(() => broadcast('session:expired'))
 
   ipcMain.handle('autostart:get', () => autostartState())
-
-  ipcMain.handle('autostart:set', (_event, enabled: unknown) => {
-    if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: enabled === true })
-    return autostartState()
-  })
+  ipcMain.handle('autostart:set', (_event, enabled: unknown) => setAutostart(enabled === true))
 
   ipcMain.handle('logs:open', async () => {
     await shell.openPath(logsFolder())
