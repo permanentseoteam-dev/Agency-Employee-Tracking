@@ -188,38 +188,44 @@ Things to know:
 - It is plain JavaScript run by PocketBase's built-in engine. It is **not Node.js**, so `npm` packages and `fetch` aren't available (use `$http.send` for outside HTTP calls).
 - Code runs **synchronously**: no `async`/`await` needed.
 - `$app` is the app: use it to find, save and delete records and to run SQL.
-- Each handler runs on its own. Put `require(...)` **inside** the handler, not at the top of the file.
+- **Each handler runs in its own isolated context.** A function or variable at the top of a `.pb.js` file is *not* visible inside the handlers. Put shared code in `pb_hooks/lib/*.js` (CommonJS, `module.exports`) and `require(...)` it **inside** each handler. If you forget, a route fails with a generic 400 "Something went wrong".
 - Hook handlers must call `e.next()` to continue the normal processing.
+- `pb_hooks/package.json` (`"type": "commonjs"`) lets Vitest load the same `lib/*.js` files. Tests are `lib/*.test.mjs`.
 
 ### A custom API route (example: add employee)
+A shortened version of `server/pb_hooks/invite.pb.js`:
 ```js
-// server/pb_hooks/invite.pb.js
 routerAdd("POST", "/api/org/invite", (e) => {
-  if (e.auth?.get("role") !== "admin") {
-    throw new ForbiddenError("Only admins can add employees.")
-  }
-  const body = e.requestInfo().body   // { email, full_name, team, role, password, monthly_salary_pkr }
-  let id
-  $app.runInTransaction((txApp) => {  // user + salary are saved together or not at all
-    const rec = new Record(txApp.findCollectionByNameOrId("users"))
-    rec.set("email", body.email)
-    rec.set("full_name", body.full_name)
-    rec.set("team", body.team)
-    rec.set("role", body.role || "employee")
-    rec.set("must_change_password", true)
-    rec.setPassword(body.password)
-    txApp.save(rec)                   // throws on validation errors (e.g. duplicate email)
+  const org = require(`${__hooks}/lib/org.js`)   // shared helpers, required inside the handler
+  org.requireAdmin(e)                             // 403 unless an active app admin
+  const result = org.validateInvite(e.requestInfo().body)
+  if (result.error) throw new BadRequestError(result.error)
+  const d = result.data
+  let id = ""
+  e.app.runInTransaction((txApp) => {             // user + salary are saved together or not at all
+    const user = new Record(txApp.findCollectionByNameOrId("users"))
+    user.setEmail(d.email)
+    user.setPassword(d.password)
+    user.set("full_name", d.full_name)
+    user.set("role", d.role)
+    user.set("active", true)
+    user.set("must_change_password", true)
+    txApp.save(user)
 
     const salary = new Record(txApp.findCollectionByNameOrId("salaries"))
-    salary.set("user", rec.id)
-    salary.set("monthly_salary_pkr", body.monthly_salary_pkr || 0)
+    salary.set("user", user.id)
+    salary.set("monthly_salary_pkr", d.monthly_salary_pkr)
     txApp.save(salary)
-    id = rec.id
+    id = user.id
   })
   return e.json(200, { id })
-}, $apis.requireAuth("users"))        // must be logged in; the role check above limits it to admins
+}, $apis.requireAuth("users"))
 ```
 From the app: `await pb.send('/api/org/invite', { method: 'POST', body: { ... } })`.
+
+Other organization routes in the same file:
+- `POST /api/org/reset-password` sets a new temporary password, which also signs the person out everywhere.
+- `POST /api/org/set-active` deactivates or reactivates. Deactivating calls `refreshTokenKey()`, so open sessions end immediately.
 
 ### Reacting to record changes (example: notifications)
 ```js

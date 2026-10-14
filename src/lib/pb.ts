@@ -10,6 +10,7 @@ export type Role = 'admin' | 'manager' | 'employee'
 
 export interface UserRecord {
   id: string
+  updated: string
   email?: string
   full_name: string
   avatar: string

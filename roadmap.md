@@ -69,7 +69,7 @@ Holidays and leave approval come before attendance because the attendance hook r
 **Goal:** the admin can build the org.
 - `features/org/`: Teams (CRUD, one manager each), TeamDetail, Employees list, EmployeeDetail (profile, team, designation, salary from `salaries`, with attendance and leave summary stubbed until M7/M8), InviteEmployee.
 - Hook `server/pb_hooks/invite.pb.js`: `POST /api/org/invite` (admins only, checked with `e.auth.get("role")`). It creates a `users` record with a temporary password, team, role and `must_change_password = true`, plus the matching `salaries` record. It rejects duplicate emails.
-- Same file: `POST /api/org/reset-password` (admins only). It sets a new temporary password and `must_change_password = true`. EmployeeDetail gets a **Reset password** button and a **Deactivate** action, which sets `active = false` and `left_on`.
+- Same file: `POST /api/org/reset-password` (admins only). It sets a new temporary password and `must_change_password = true`. Also `POST /api/org/set-active` (admins only, not on yourself), which sets `active` and `left_on` and signs the person out at once. EmployeeDetail gets **Reset password**, **Deactivate** and **Reactivate**.
 - **Done when:** the admin adds an employee, the employee logs in with the temporary password, sets their own, and appears in their team. A reset password forces a change on the next login, and a deactivated employee can't log in.
 
 ## M4 — Rules

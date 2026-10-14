@@ -249,6 +249,73 @@ try {
   await denied('bad date format is rejected', () =>
     pbAdmin.collection('holidays').create({ date: '25-12-2026', name: 'x' })
   )
+
+  // --- organization routes (invite.pb.js) ---------------------------------------
+  const invite = (pb, extra = {}) =>
+    pb.send('/api/org/invite', {
+      method: 'POST',
+      body: {
+        email: 'new.hire@test.local',
+        full_name: 'New Hire',
+        password: 'temp-pass-1',
+        team: teamA.id,
+        role: 'employee',
+        joined_on: '2026-10-14',
+        monthly_salary_pkr: 70000,
+        ...extra
+      }
+    })
+  await denied('employee cannot add employees', () => invite(pbEmpA))
+  await denied('manager cannot add employees', () => invite(pbMgrA))
+  let hireId = ''
+  await allowed('admin adds an employee', async () => {
+    hireId = (await invite(pbAdmin)).id
+  })
+  await denied('duplicate email is rejected', () => invite(pbAdmin, { email: 'NEW.HIRE@test.local' }))
+  await denied('short temporary password is rejected', () => invite(pbAdmin, { email: 'x2@test.local', password: 'short' }))
+  const hireSalary = await pbAdmin.collection('salaries').getFirstListItem(`user = "${hireId}"`)
+  check('invite also creates the salary record', hireSalary.monthly_salary_pkr === 70000)
+  const pbHire = await as('new.hire@test.local').catch(() => null)
+  // as() uses PASS; the hire has a temporary password, so sign in directly
+  const hire = new PocketBase(URL)
+  hire.autoCancellation(false)
+  await hire.collection('users').authWithPassword('new.hire@test.local', 'temp-pass-1')
+  check('new hire signs in with the temporary password', !pbHire && hire.authStore.isValid)
+  check('new hire must change the password', hire.authStore.record.must_change_password === true)
+  check('new hire is in team A', hire.authStore.record.team === teamA.id)
+
+  await denied('employee cannot reset passwords', () =>
+    pbEmpA.send('/api/org/reset-password', { method: 'POST', body: { userId: hireId, password: 'another-pass-1' } })
+  )
+  await allowed('admin resets a password', () =>
+    pbAdmin.send('/api/org/reset-password', { method: 'POST', body: { userId: hireId, password: 'another-pass-1' } })
+  )
+  await denied('reset signs out the old session', () => hire.collection('users').authRefresh())
+  await allowed('new temporary password works', () =>
+    hire.collection('users').authWithPassword('new.hire@test.local', 'another-pass-1')
+  )
+
+  await denied('manager cannot deactivate people', () =>
+    pbMgrA.send('/api/org/set-active', { method: 'POST', body: { userId: hireId, active: false } })
+  )
+  await denied('admin cannot deactivate themselves', () =>
+    pbAdmin.send('/api/org/set-active', { method: 'POST', body: { userId: admin.id, active: false } })
+  )
+  await allowed('admin deactivates an employee', () =>
+    pbAdmin.send('/api/org/set-active', { method: 'POST', body: { userId: hireId, active: false, left_on: '2026-10-31' } })
+  )
+  await denied('deactivation signs them out immediately', () => hire.collection('users').authRefresh())
+  await denied('deactivated employee cannot log in', () =>
+    hire.collection('users').authWithPassword('new.hire@test.local', 'another-pass-1')
+  )
+  const gone = await pbAdmin.collection('users').getOne(hireId)
+  check('leaving date is recorded', gone.left_on === '2026-10-31' && gone.active === false)
+  await allowed('admin reactivates the employee', () =>
+    pbAdmin.send('/api/org/set-active', { method: 'POST', body: { userId: hireId, active: true } })
+  )
+  await allowed('reactivated employee can log in', () =>
+    hire.collection('users').authWithPassword('new.hire@test.local', 'another-pass-1')
+  )
 } catch (e) {
   failed++
   console.error('ERROR', e?.status ?? '', e?.message ?? e, e?.response ? JSON.stringify(e.response) : '')

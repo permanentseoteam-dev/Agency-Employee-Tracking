@@ -355,7 +355,14 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - My Profile (with photo upload) and Settings (theme, start with Windows, logs folder)
   - route guard by role, and a crash screen that logs errors
   - 20 of 20 end-to-end checks pass on the built app
-- **Next: M3**, Organization (teams, employees, invite, reset password, deactivate).
+- **M3 done** (2026-10-14):
+  - Organization → Employees: search, team filter, inactive toggle
+  - Add employee, with a generated temporary password and copyable sign-in details
+  - employee detail: edit details, salary, reset password, deactivate/reactivate
+  - Teams and team detail: create, edit, set the manager, member list, delete when empty
+  - routes `/api/org/invite`, `/reset-password`, `/set-active`
+  - `check:rules` 70 of 70 and end-to-end 13 of 13 pass
+- **Next: M4**, Rules (shift, grace, thresholds, idle time, late penalty, leave types).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

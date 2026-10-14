@@ -1,10 +1,16 @@
 import { useEffect } from 'react'
-import { createHashRouter, RouterProvider, useRouteError } from 'react-router-dom'
+import { createHashRouter, Navigate, RouterProvider, useRouteError } from 'react-router-dom'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { ChangePassword } from '@/features/auth/ChangePassword'
 import { Login } from '@/features/auth/Login'
 import { TrackingNotice } from '@/features/auth/TrackingNotice'
+import { EmployeeDetail } from '@/features/org/EmployeeDetail'
+import { Employees } from '@/features/org/Employees'
+import { InviteEmployee } from '@/features/org/InviteEmployee'
+import { OrgLayout } from '@/features/org/OrgLayout'
+import { TeamDetail } from '@/features/org/TeamDetail'
+import { Teams } from '@/features/org/Teams'
 import { Placeholder } from '@/features/Placeholder'
 import { MyProfile } from '@/features/profile/MyProfile'
 import { Settings } from '@/features/profile/Settings'
@@ -41,6 +47,9 @@ function CrashScreen() {
   )
 }
 
+/** Sidebar sections that have real screens; the rest show a placeholder until their module. */
+const BUILT = new Set(['/org'])
+
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
 const router = createHashRouter([
@@ -49,10 +58,22 @@ const router = createHashRouter([
     element: <Gate />,
     errorElement: <CrashScreen />,
     children: [
-      ...NAV.map((item) => ({
+      ...NAV.filter((item) => !BUILT.has(item.path)).map((item) => ({
         path: item.path.slice(1),
         element: <Placeholder title={item.label} module={item.module} />
       })),
+      {
+        path: 'org',
+        element: <OrgLayout />,
+        children: [
+          { index: true, element: <Navigate to="/org/employees" replace /> },
+          { path: 'employees', element: <Employees /> },
+          { path: 'employees/new', element: <InviteEmployee /> },
+          { path: 'employees/:id', element: <EmployeeDetail /> },
+          { path: 'teams', element: <Teams /> },
+          { path: 'teams/:id', element: <TeamDetail /> }
+        ]
+      },
       { path: 'profile', element: <MyProfile /> },
       { path: 'settings', element: <Settings /> },
       { path: '*', element: null }
