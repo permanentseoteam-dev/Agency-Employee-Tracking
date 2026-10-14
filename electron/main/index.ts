@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, shell } from 'electron'
+import { registerIpc } from './ipc'
 import { initLog, log } from './log'
 
 const here = import.meta.dirname
@@ -44,12 +45,9 @@ function createWindow(): BrowserWindow {
   return win
 }
 
-ipcMain.on('log:renderer-error', (_event, message: unknown) => {
-  log.error('[renderer]', String(message))
-})
-
 app.whenReady().then(() => {
   log.info(`Agency Tracker ${app.getVersion()} starting`)
+  registerIpc()
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

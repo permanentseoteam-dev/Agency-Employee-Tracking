@@ -349,8 +349,13 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - 30-day logins
   - daily backups scheduled
   - `npm run check:rules`: 49 of 49 checks pass
-- **Your step:** create the PocketBase superuser and the first app admin (see the M1 hand-off).
-- **Next: M2**, auth, the app shell and roles.
+- **M2 done** (2026-10-14):
+  - login, the forced password change and the one-time tracking notice
+  - the app shell (sidebar, top bar, profile menu, role switcher and a placeholder bell)
+  - My Profile (with photo upload) and Settings (theme, start with Windows, logs folder)
+  - route guard by role, and a crash screen that logs errors
+  - 20 of 20 end-to-end checks pass on the built app
+- **Next: M3**, Organization (teams, employees, invite, reset password, deactivate).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**
