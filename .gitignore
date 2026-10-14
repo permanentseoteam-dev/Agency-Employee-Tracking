@@ -5,6 +5,7 @@ dist/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # PocketBase: binary is downloaded, data never committed
 server/pocketbase.exe

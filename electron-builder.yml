@@ -1,0 +1,33 @@
+# Windows installer and auto-update (roadmap M12). Build with `npm run dist`,
+# publish with `npm run release` (needs GH_TOKEN). See docs/deployment.md.
+appId: com.permanentseo.agencytracker
+productName: Agency Tracker
+copyright: Copyright © 2026 Permanent SEO
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  artifactName: Agency-Tracker-Setup-${version}.${ext}
+nsis:
+  # Per-user, one click: no admin rights needed, and updates install silently.
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Agency Tracker
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+# Installers only, in a public repo, so the app can update without a token.
+publish:
+  provider: github
+  owner: permanentseoteam-dev
+  repo: agency-tracker-releases
+  releaseType: release

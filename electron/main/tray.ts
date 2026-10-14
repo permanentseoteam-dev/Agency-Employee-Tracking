@@ -1,6 +1,6 @@
 // Tray icon and menu (plan §4.1): Open, today's time, status, and Quit for
 // managers and admins only. The icon colour follows the tracker state.
-import { Menu, nativeImage, Tray, type NativeImage } from 'electron'
+import { app, Menu, nativeImage, Tray, type NativeImage } from 'electron'
 import type { TrackerStatus } from '../preload/api'
 import { trayModel, type Tone } from './trayMenu'
 
@@ -53,7 +53,7 @@ export function createTray(handlers: { open(): void; quit(): void }): (s: Tracke
       tray.setImage(icon(m.tone))
       lastTone = m.tone
     }
-    tray.setToolTip(`Agency Tracker – ${m.status}\n${m.today}`)
+    tray.setToolTip(`Agency Tracker ${app.getVersion()} – ${m.status}\n${m.today}`)
 
     const key = JSON.stringify(m)
     if (key === lastMenu) return

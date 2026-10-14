@@ -271,7 +271,7 @@ F:\agency-tracker
 │     ├─ invite.pb.js, segments.pb.js, attendance.pb.js, payroll.pb.js,
 │     │  notifications.pb.js, reports.pb.js
 │     └─ lib/  attendance.js, payroll.js, segments.js   (pure CommonJS, tested by Vitest)
-├─ docs/      pocketbase-guide.md
+├─ docs/      pocketbase-guide.md, deployment.md
 ├─ electron.vite.config.ts
 ├─ electron-builder.yml
 ├─ roadmap.md
@@ -325,7 +325,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
 ---
 
 ## 9. Open items / needed from you
-- **Production hosting** (decide by M12): an always-on office PC with Cloudflare Tunnel or Tailscale, or an Oracle Cloud Always Free VM. Either way, daily backups go to a free off-site S3 bucket (Cloudflare R2 or Backblaze B2), so a crashed or corrupted server loses at most a day of data. The office-PC option also needs `pb_data` on a non-C: drive, a UPS and the NSSM graceful stop. See [docs/pocketbase-guide.md §7](docs/pocketbase-guide.md).
+- **Production hosting** (decided in M12: the office PC with Tailscale, backups copied to the E: drive; see [docs/deployment.md](docs/deployment.md)). Original note: an always-on office PC with Cloudflare Tunnel or Tailscale, or an Oracle Cloud Always Free VM. Either way, daily backups go to a free off-site S3 bucket (Cloudflare R2 or Backblaze B2), so a crashed or corrupted server loses at most a day of data. The office-PC option also needs `pb_data` on a non-C: drive, a UPS and the NSSM graceful stop. See [docs/pocketbase-guide.md §7](docs/pocketbase-guide.md).
 - **Optional SMTP** for "forgot password" emails: a Gmail app password or the Brevo free plan.
 - **Role definitions:** full per-screen permissions come later, in `src/lib/roles.ts` and the API rules. The data locks in §5 apply from the start.
 - **Defaults to confirm:**
@@ -408,7 +408,13 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
-- **Next:** M12 (packaging and release), or M8 (paused).
+- **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/agency-tracker-releases`), backups copied to the E: drive.
+  - `electron-builder.yml`: per-user one-click NSIS installer with desktop and Start menu shortcuts, app icon (`scripts/make-icon.mjs` → `build/`), publish to the releases repo. `npm run dist` builds, `npm run release` publishes (needs `GH_TOKEN`); `scripts/check-release-env.mjs` refuses a build whose `VITE_PB_URL` is localhost, a raw IP or unset (`.env.production`)
+  - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version
+  - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (nightly copy of PocketBase's 02:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)
+  - verified on this PC: the packaged app signs in, tracks, reaches the server and registers start-with-Windows (locked for employees); a 0.1.0 install found, downloaded and installed 0.1.1 by itself and restarted as 0.1.1; backup → copy to the backup drive → restore drill passed. Test installs and startup entries were removed afterwards
+  - **still to do by you before go-live:** create the releases repo and a `GH_TOKEN`, set up the office PC with docs/deployment.md, then tick the go-live checklist at the end of that guide (clean-PC install, reboot autostart, data on the production server, a published update, a restore from E:)
+- **Remaining module:** M8 (leave approval, paused).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

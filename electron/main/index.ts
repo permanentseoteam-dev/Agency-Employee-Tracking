@@ -6,6 +6,7 @@ import { registerIpc } from './ipc'
 import { initLog, log } from './log'
 import { startSessionRefresh } from './session'
 import { createTray } from './tray'
+import { startUpdater } from './updater'
 
 const here = import.meta.dirname
 
@@ -86,6 +87,9 @@ if (!app.requestSingleInstanceLock()) {
     showWindow()
   })
 
+  // Windows groups the app's notifications and taskbar entry under this id (matches electron-builder's appId).
+  app.setAppUserModelId('com.permanentseo.agencytracker')
+
   app.whenReady().then(() => {
     log.info(`Agency Tracker ${app.getVersion()} starting`)
     registerIpc()
@@ -99,6 +103,8 @@ if (!app.requestSingleInstanceLock()) {
 
     // The renderer always loads (it hands the session to the tracker); started at login it stays hidden.
     win = createWindow(!process.argv.includes(HIDDEN_ARG))
+
+    startUpdater(() => status().state !== 'off')
   })
 
   // Close the open segment and give the queue a moment to sync before exiting.
