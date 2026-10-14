@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { ChangePassword } from '@/features/auth/ChangePassword'
 import { Login } from '@/features/auth/Login'
 import { TrackingNotice } from '@/features/auth/TrackingNotice'
+import { CalendarLayout } from '@/features/calendar/CalendarLayout'
+import { HolidayManager } from '@/features/calendar/HolidayManager'
 import { EmployeeDetail } from '@/features/org/EmployeeDetail'
 import { Employees } from '@/features/org/Employees'
 import { InviteEmployee } from '@/features/org/InviteEmployee'
@@ -54,7 +56,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports'])
+const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -87,6 +89,14 @@ const router = createHashRouter([
           { path: 'employees/:id', element: <EmployeeDetail /> },
           { path: 'teams', element: <Teams /> },
           { path: 'teams/:id', element: <TeamDetail /> }
+        ]
+      },
+      {
+        path: 'calendar',
+        element: <CalendarLayout />,
+        children: [
+          { index: true, element: <Navigate to="/calendar/holidays" replace /> },
+          { path: 'holidays', element: <HolidayManager /> }
         ]
       },
       { path: 'my-stats', element: <MyStats /> },

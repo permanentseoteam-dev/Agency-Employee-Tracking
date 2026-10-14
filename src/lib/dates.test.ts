@@ -3,6 +3,7 @@ import {
   addDays,
   dayRangeUtc,
   formatDate,
+  formatDayKey,
   formatTime,
   isoWeekday,
   toDateKey,
@@ -48,5 +49,11 @@ describe('dates (Asia/Karachi)', () => {
 
   it('rejects invalid input', () => {
     expect(() => toDateKey('not a date')).toThrow(RangeError)
+  })
+})
+
+describe('formatDayKey', () => {
+  it('shows the weekday and date of a day key', () => {
+    expect(formatDayKey('2026-08-14')).toBe('Fri 14 Aug 2026')
   })
 })

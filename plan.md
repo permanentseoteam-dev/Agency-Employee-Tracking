@@ -380,7 +380,12 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - Live Board: one card per person with status, today's time and last check-in; realtime through a `presence` subscription; Offline after 2 minutes without a heartbeat; search, team and status filters. A manager sees only the teams they manage
   - Reports: `GET /api/reports/activity` (`reports.pb.js`, grouped SQL by day, week or month in Karachi time); filters for range, team and employee; CSV export with the same rows and total as the screen plus decimal hours. Managers are limited to their teams and employees are refused
   - end-to-end 17 of 17: idle reaches the board in under a second, the CSV matches the screen, and a manager sees only their team on both screens
-- **Next: M10a**, holidays (then M8 leave, M7 attendance).
+- **M10a done** (2026-10-14, committed but not pushed):
+  - Calendar → Holidays: a year view of holidays; admins add a single day or a range of up to 14 days (e.g. Eid), rename, move and delete
+  - a date that is already a holiday is refused with the clashing holiday named; holidays on a non-working day are marked "Day off anyway"
+  - everyone sees the list; employees, managers and an admin using "View as" lower roles get no edit controls (the API rules lock writes to admins)
+  - end-to-end 12 of 12
+- **Next: M8**, leave approval (apply, approvals, balances).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

@@ -98,3 +98,10 @@ export function formatTime(value: DateInput, tz: string = DEFAULT_TZ): string {
   const p = zonedParts(value, tz)
   return `${pad(p.hour)}:${pad(p.minute)}`
 }
+
+/** "Fri 14 Aug 2026" for a "YYYY-MM-DD" day key (no timezone shift: it is already a local day). */
+export function formatDayKey(dateKey: string): string {
+  return new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(`${dateKey}T12:00:00Z`))
+    .replace(',', '')
+}
