@@ -1,0 +1,11 @@
+node_modules/
+out/
+dist/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
+# PocketBase: binary is downloaded, data never committed
+server/pocketbase.exe
+server/pb_data/
