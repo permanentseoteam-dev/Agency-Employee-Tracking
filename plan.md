@@ -385,7 +385,13 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - a date that is already a holiday is refused with the clashing holiday named; holidays on a non-working day are marked "Day off anyway"
   - everyone sees the list; employees, managers and an admin using "View as" lower roles get no edit controls (the API rules lock writes to admins)
   - end-to-end 12 of 12
-- **Next: M8**, leave approval (apply, approvals, balances).
+- **M8 paused** (2026-10-14): the user stopped the M8 design run and asked to continue with the other modules one at a time. Attendance already reads approved leave, so it works without M8.
+- **M7 done** (2026-10-14, committed but not pushed):
+  - `lib/attendance.js`: `statusFor(day, settings, segments, leaves, holidays)` in the plan's order (holiday or weekend → on leave → absent → half day → late → present); first activity exactly at shift start + grace is still on time; idle time alone counts as absent
+  - `attendance.pb.js`: nightly cron `0 20 * * *` (01:00 PKT) counts the 7 days just finished, so segments that synced late still count; `POST /api/attendance/recompute` (admins only, one date or a range of up to 31 days, finished days only). Both upsert records only between `joined_on` and `left_on`. The database side lives in `lib/attendance_store.js`, shared by both
+  - Attendance grid (employees × days, team filter, row totals, hover details, Recompute for admins) and My Attendance (daily status, first/last activity, month totals)
+  - `check:rules` 77 of 77; end-to-end 29 of 29, including grace boundaries, leave, holiday, weekend, the employment window, manager scope and the nightly job
+- **Next: M9**, notifications. It is built on leave requests, so M8 may need to come first.
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

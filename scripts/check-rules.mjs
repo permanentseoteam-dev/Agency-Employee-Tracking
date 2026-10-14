@@ -194,6 +194,21 @@ try {
     pbEmpA.collection('notifications').create({ user: empA.id, type: 'x' })
   )
 
+  // --- attendance recompute route (admins only) ----------------------------------
+  const yesterday = new Date(Date.now() + 5 * 3600000 - 86400000).toISOString().slice(0, 10) // Karachi
+  const recompute = (pb) => pb.send('/api/attendance/recompute', { method: 'POST', body: { date: yesterday } })
+  await denied('employee cannot recompute attendance', () => recompute(pbEmpA))
+  await denied('manager cannot recompute attendance', () => recompute(pbMgrA))
+  await allowed('admin can recompute attendance', () => recompute(pbAdmin))
+  const myAttendance = await pbEmpA.collection('attendance').getFullList()
+  check('employee sees only own attendance', myAttendance.length === 1 && myAttendance[0].user === empA.id, JSON.stringify(myAttendance))
+  const teamAttendance = await pbMgrA.collection('attendance').getFullList()
+  check(
+    'manager A sees team A attendance only (no record for someone who already left)',
+    teamAttendance.length === 2 && teamAttendance.every((r) => [mgrA.id, empA.id].includes(r.user)),
+    JSON.stringify(teamAttendance.map((r) => r.user))
+  )
+
   // --- leave ------------------------------------------------------------------
   const leave = (user, extra = {}) => ({
     user,
