@@ -94,7 +94,7 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     log.info(`PSEO Tracker ${app.getVersion()} starting`)
-    registerIpc()
+    registerIpc({ quit })
     startSessionRefresh()
     startEngine()
     ensureAutostart()

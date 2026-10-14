@@ -20,7 +20,8 @@ const api: TrackerApi = {
   },
   getAutostart: () => ipcRenderer.invoke('autostart:get'),
   setAutostart: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
-  openLogsFolder: () => ipcRenderer.invoke('logs:open')
+  openLogsFolder: () => ipcRenderer.invoke('logs:open'),
+  quit: () => ipcRenderer.invoke('app:quit')
 }
 
 contextBridge.exposeInMainWorld('tracker', api)

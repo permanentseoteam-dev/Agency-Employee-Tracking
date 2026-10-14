@@ -56,6 +56,8 @@ export interface TrackerApi {
   getAutostart(): Promise<AutostartState>
   setAutostart(enabled: boolean): Promise<AutostartState>
   openLogsFolder(): Promise<void>
+  /** Quits the app (managers and admins); resolves false when the main process refuses. */
+  quit(): Promise<boolean>
 }
 
 declare global {

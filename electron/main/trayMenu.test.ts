@@ -20,6 +20,15 @@ describe('trayModel', () => {
     expect(trayModel({ ...base, role }).canQuit).toBe(true)
   })
 
+  it('has Quit when no user is known yet (nothing is tracked)', () => {
+    expect(trayModel({ ...base, role: '', signedIn: false, state: 'off', reason: 'no_user' }).canQuit).toBe(true)
+  })
+
+  it('keeps Quit hidden for a known employee who signed out (tracking still queues)', () => {
+    expect(trayModel({ ...base, signedIn: false }).canQuit).toBe(false)
+    expect(trayModel({ ...base, signedIn: false, state: 'off', reason: 'outside_shift' }).canQuit).toBe(false)
+  })
+
   it('shows today’s time as Xh Ym', () => {
     expect(trayModel(base).today).toBe('Today: 5h 23m active · 0h 40m idle')
   })

@@ -45,11 +45,21 @@ export function createTray(handlers: { open(): void; quit(): void }): (s: Tracke
 
   let lastMenu = ''
   let lastTone: Tone = 'off'
+  let lastCanQuit: boolean | null = null
   return (s) => {
     const m = trayModel(s)
+    // A failed icon change must never stop the tooltip and menu (with Quit) from updating.
     if (m.tone !== lastTone) {
-      tray.setImage(icon(m.tone))
-      lastTone = m.tone
+      try {
+        tray.setImage(icon(m.tone))
+        lastTone = m.tone
+      } catch (err) {
+        log.warn(`tray: could not change the icon to ${m.tone}: ${String(err)}`)
+      }
+    }
+    if (m.canQuit !== lastCanQuit) {
+      log.info(`tray: Quit ${m.canQuit ? 'shown' : 'hidden'} (role ${s.role || 'none'})`)
+      lastCanQuit = m.canQuit
     }
     tray.setToolTip(`PSEO Tracker ${app.getVersion()} – ${m.status}\n${m.today}`)
 

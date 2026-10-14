@@ -1,5 +1,5 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { LogOut, Settings, User } from 'lucide-react'
+import { LogOut, Power, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABEL } from '@/lib/roles'
@@ -52,6 +52,12 @@ export function ProfileMenu() {
           >
             <LogOut className="size-4" aria-hidden /> Log out
           </DropdownMenu.Item>
+          {/* The stored role, not "View as": the main process checks it again. */}
+          {(user.role === 'manager' || user.role === 'admin') && window.tracker && (
+            <DropdownMenu.Item className={ITEM} onSelect={() => void window.tracker.quit()}>
+              <Power className="size-4" aria-hidden /> Quit PSEO Tracker
+            </DropdownMenu.Item>
+          )}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>

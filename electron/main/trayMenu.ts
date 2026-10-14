@@ -9,7 +9,10 @@ export interface TrayModel {
   today: string
   status: string
   pending: string
-  /** Quit is for managers and admins only; employees can't stop the tracker. */
+  /**
+   * Quit is for managers and admins; employees can't stop the tracker. With no user
+   * known at all (a new install or data folder) nothing is tracked, so anyone may quit.
+   */
   canQuit: boolean
 }
 
@@ -39,6 +42,6 @@ export function trayModel(s: TrackerStatus): TrayModel {
     today: `Today: ${formatDuration(s.today.active_s)} active · ${formatDuration(s.today.idle_s)} idle`,
     status: statusText(s),
     pending: s.pending > 0 ? `${s.pending} segment${s.pending === 1 ? '' : 's'} waiting to sync` : '',
-    canQuit: s.role === 'manager' || s.role === 'admin'
+    canQuit: s.role === 'manager' || s.role === 'admin' || s.reason === 'no_user'
   }
 }

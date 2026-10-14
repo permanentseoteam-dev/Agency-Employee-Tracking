@@ -5,6 +5,7 @@ import { onStatus, status, today } from './engine'
 import { log, logsFolder } from './log'
 import { onSessionExpired, setFromRenderer } from './session'
 import { persisted } from './store'
+import { trayModel } from './trayMenu'
 
 function sanitizeSession(raw: unknown): SessionInfo | null {
   const s = raw as Partial<SessionInfo> | null
@@ -29,7 +30,18 @@ function broadcast(channel: string, payload?: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
 }
 
-export function registerIpc(): void {
+export function registerIpc(handlers: { quit(): void }): void {
+  // Quit from the window follows the tray's rule, checked here from the main process's
+  // own session, never from what the renderer claims.
+  ipcMain.handle('app:quit', () => {
+    if (!trayModel(status()).canQuit) {
+      log.warn('quit refused: this user may not stop the tracker')
+      return false
+    }
+    handlers.quit()
+    return true
+  })
+
   ipcMain.on('log:renderer-error', (_event, message: unknown) => {
     log.error('[renderer]', String(message))
   })
