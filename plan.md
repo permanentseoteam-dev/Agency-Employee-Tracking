@@ -375,7 +375,12 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - tray with a status-coloured icon, today's time and Quit for managers and admins only; close-to-tray; one instance per PC; start at login (always on for employees)
   - main-process session: token refreshed at startup and every 12 h; on expiry the renderer goes to Login and segments keep queuing until the next sign-in. Signing out also keeps tracking as the last user (no pause button)
   - `check:rules` 72 of 72; end-to-end on the built app: segments land, offline sync with no duplicates and matching totals, expired session queues and syncs after sign-in, a 1-hour-ahead segment is rejected and logged, a second launch exits
-- **Next: M6**, the tracking screens (My Stats, Live Board, Reports).
+- **M6 done** (2026-10-14, committed but not pushed):
+  - My Stats: today's active and idle time straight from the tracker (including time not yet synced), a status badge, and this week by day
+  - Live Board: one card per person with status, today's time and last check-in; realtime through a `presence` subscription; Offline after 2 minutes without a heartbeat; search, team and status filters. A manager sees only the teams they manage
+  - Reports: `GET /api/reports/activity` (`reports.pb.js`, grouped SQL by day, week or month in Karachi time); filters for range, team and employee; CSV export with the same rows and total as the screen plus decimal hours. Managers are limited to their teams and employees are refused
+  - end-to-end 17 of 17: idle reaches the board in under a second, the CSV matches the screen, and a manager sees only their team on both screens
+- **Next: M10a**, holidays (then M8 leave, M7 attendance).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

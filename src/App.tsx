@@ -16,6 +16,9 @@ import { LeaveTypes } from '@/features/rules/LeaveTypes'
 import { RulesForm } from '@/features/rules/RulesForm'
 import { RulesLayout } from '@/features/rules/RulesLayout'
 import { MyProfile } from '@/features/profile/MyProfile'
+import { LiveBoard } from '@/features/tracking/LiveBoard'
+import { MyStats } from '@/features/tracking/MyStats'
+import { Reports } from '@/features/tracking/Reports'
 import { Settings } from '@/features/profile/Settings'
 import { NAV } from '@/lib/roles'
 import { useSession } from '@/stores/session'
@@ -51,7 +54,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org', '/rules'])
+const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -86,6 +89,9 @@ const router = createHashRouter([
           { path: 'teams/:id', element: <TeamDetail /> }
         ]
       },
+      { path: 'my-stats', element: <MyStats /> },
+      { path: 'live', element: <LiveBoard /> },
+      { path: 'reports', element: <Reports /> },
       { path: 'profile', element: <MyProfile /> },
       { path: 'settings', element: <Settings /> },
       { path: '*', element: null }
