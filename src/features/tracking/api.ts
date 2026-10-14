@@ -64,11 +64,14 @@ export function useMyWeek(monday: string) {
 /**
  * The people a manager or admin may watch: everyone active for an admin, the
  * members of the teams they manage for a manager (the presence rules match this).
+ * Kept live: a new hire, a deactivation or a team change shows without leaving the screen.
  */
 export function usePeople() {
   const user = useSession((s) => s.user)
-  return useQuery({
-    queryKey: trackingKeys.people(user?.id ?? ''),
+  const qc = useQueryClient()
+  const userId = user?.id ?? ''
+  const query = useQuery({
+    queryKey: trackingKeys.people(userId),
     enabled: !!user,
     queryFn: () =>
       pb.collection('users').getFullList<Employee>({
@@ -78,6 +81,30 @@ export function usePeople() {
         expand: 'team'
       })
   })
+
+  useEffect(() => {
+    if (!userId) return
+    const refresh = () => void qc.invalidateQueries({ queryKey: trackingKeys.people(userId) })
+    const unsubscribers: (() => Promise<void>)[] = []
+    let cancelled = false
+    for (const collection of ['users', 'teams']) {
+      pb.collection(collection)
+        .subscribe('*', refresh)
+        .then((fn) => {
+          if (cancelled) void fn()
+          else unsubscribers.push(fn)
+        })
+        .catch(() => {
+          /* offline: the refetch on reconnect catches up */
+        })
+    }
+    return () => {
+      cancelled = true
+      for (const fn of unsubscribers) void fn()
+    }
+  }, [qc, userId])
+
+  return query
 }
 
 /** Teams the caller can report on. */
