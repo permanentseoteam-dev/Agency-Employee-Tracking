@@ -6,6 +6,7 @@ import type { TrackerApi } from './api'
 const api: TrackerApi = {
   logError: (message) => ipcRenderer.send('log:renderer-error', message),
   setSession: (session) => ipcRenderer.send('session:set', session),
+  setSettings: (settings) => ipcRenderer.send('settings:set', settings),
   getAutostart: () => ipcRenderer.invoke('autostart:get'),
   setAutostart: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
   openLogsFolder: () => ipcRenderer.invoke('logs:open')

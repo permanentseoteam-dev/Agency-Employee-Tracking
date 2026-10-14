@@ -27,6 +27,7 @@ export interface UserRecord {
 
 export interface OrgSettings {
   id: string
+  updated: string
   shift_start: string
   shift_end: string
   work_days: number[]

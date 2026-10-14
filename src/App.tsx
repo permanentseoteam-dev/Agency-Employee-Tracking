@@ -12,6 +12,9 @@ import { OrgLayout } from '@/features/org/OrgLayout'
 import { TeamDetail } from '@/features/org/TeamDetail'
 import { Teams } from '@/features/org/Teams'
 import { Placeholder } from '@/features/Placeholder'
+import { LeaveTypes } from '@/features/rules/LeaveTypes'
+import { RulesForm } from '@/features/rules/RulesForm'
+import { RulesLayout } from '@/features/rules/RulesLayout'
 import { MyProfile } from '@/features/profile/MyProfile'
 import { Settings } from '@/features/profile/Settings'
 import { NAV } from '@/lib/roles'
@@ -48,7 +51,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org'])
+const BUILT = new Set(['/org', '/rules'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -62,6 +65,15 @@ const router = createHashRouter([
         path: item.path.slice(1),
         element: <Placeholder title={item.label} module={item.module} />
       })),
+      {
+        path: 'rules',
+        element: <RulesLayout />,
+        children: [
+          { index: true, element: <Navigate to="/rules/work" replace /> },
+          { path: 'work', element: <RulesForm /> },
+          { path: 'leave-types', element: <LeaveTypes /> }
+        ]
+      },
       {
         path: 'org',
         element: <OrgLayout />,

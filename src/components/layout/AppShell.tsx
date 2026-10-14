@@ -1,4 +1,5 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import { SettingsSync } from '@/features/rules/api'
 import { useRole } from '@/hooks/useRole'
 import { canOpen, landingFor, NAV, ROLE_LABEL } from '@/lib/roles'
 import { NotificationBell } from './NotificationBell'
@@ -25,6 +26,7 @@ export function AppShell() {
 
   return (
     <div className="flex h-full">
+      <SettingsSync />
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 dark:border-slate-800 dark:bg-slate-900">

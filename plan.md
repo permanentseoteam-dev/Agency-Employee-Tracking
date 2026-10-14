@@ -362,7 +362,12 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - Teams and team detail: create, edit, set the manager, member list, delete when empty
   - routes `/api/org/invite`, `/reset-password`, `/set-active`
   - `check:rules` 70 of 70 and end-to-end 13 of 13 pass
-- **Next: M4**, Rules (shift, grace, thresholds, idle time, late penalty, leave types).
+- **M4 done** (2026-10-14, committed but not pushed):
+  - Rules → Work rules: shift, working days, grace, full and half day, idle threshold, late penalty, with validation
+  - Rules → Leave types: add, edit, delete
+  - live rule changes reach everyone's app and the tracker side (main process) over IPC
+  - end-to-end 14 of 14 pass
+- **Next: M5**, the tracking engine (main process: idle detection, segments, offline sync queue, tray, presence).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**
