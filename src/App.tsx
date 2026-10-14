@@ -18,6 +18,8 @@ import { EmployeeDetail } from '@/features/org/EmployeeDetail'
 import { Employees } from '@/features/org/Employees'
 import { InviteEmployee } from '@/features/org/InviteEmployee'
 import { Approvals } from '@/features/leave/Approvals'
+import { ApprovalsLayout } from '@/features/leave/ApprovalsLayout'
+import { DecidedLeaves } from '@/features/leave/DecidedLeaves'
 import { MyLeaves } from '@/features/leave/MyLeaves'
 import { OrgLayout } from '@/features/org/OrgLayout'
 import { TeamDetail } from '@/features/org/TeamDetail'
@@ -122,7 +124,15 @@ const router = createHashRouter([
       { path: 'my-stats', element: <MyStats /> },
       { path: 'my-attendance', element: <MyAttendance /> },
       { path: 'my-leaves', element: <MyLeaves /> },
-      { path: 'approvals', element: <Approvals /> },
+      {
+        path: 'approvals',
+        element: <ApprovalsLayout />,
+        children: [
+          { index: true, element: <Navigate to="/approvals/pending" replace /> },
+          { path: 'pending', element: <Approvals /> },
+          { path: 'decided', element: <DecidedLeaves /> }
+        ]
+      },
       { path: 'attendance', element: <AttendanceTable /> },
       { path: 'live', element: <LiveBoard /> },
       { path: 'reports', element: <Reports /> },

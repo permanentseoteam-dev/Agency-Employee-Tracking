@@ -1,16 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
-import { Dialog } from '@/components/ui/Dialog'
-import { Field } from '@/components/ui/Input'
 import { Table, Td, Th } from '@/components/ui/Table'
-import { FormError } from '@/features/auth/AuthLayout'
 import { allowedMoves, type LeaveBalance, type LeaveRequest } from '@/lib/leave'
 import { dateRange, daysText } from '@/lib/notifications'
-import { errorMessage, useSession } from '@/stores/session'
-import { useDecideLeave, useLeaveBalances, useLeaveLive, usePendingApprovals } from './api'
-
-type Decision = 'approved' | 'rejected'
+import { useSession } from '@/stores/session'
+import { useLeaveBalances, useLeaveLive, usePendingApprovals } from './api'
+import { DecideDialog, type Move } from './DecideDialog'
 
 /** Pending leave from the people I can decide for (my teams, or everyone for an admin). */
 export function Approvals() {
@@ -18,14 +14,14 @@ export function Approvals() {
   const pending = usePendingApprovals()
   const balances = useLeaveBalances()
   useLeaveLive()
-  const [deciding, setDeciding] = useState<{ request: LeaveRequest; status: Decision } | null>(null)
+  const [deciding, setDeciding] = useState<{ request: LeaveRequest; status: Move } | null>(null)
   const requests = pending.data ?? []
 
   const balanceFor = (r: LeaveRequest): LeaveBalance | undefined =>
     (balances.data ?? []).find((b) => b.user === r.user && b.leave_type === r.leave_type)
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4">
+    <div className="space-y-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
         Waiting for a decision{requests.length ? ` (${requests.length})` : ''}
       </h2>
@@ -95,56 +91,5 @@ export function Approvals() {
 
       {deciding && <DecideDialog request={deciding.request} status={deciding.status} onClose={() => setDeciding(null)} />}
     </div>
-  )
-}
-
-function DecideDialog({ request, status, onClose }: { request: LeaveRequest; status: Decision; onClose: () => void }) {
-  const decide = useDecideLeave()
-  const [comment, setComment] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const approving = status === 'approved'
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    try {
-      await decide.mutateAsync({ id: request.id, status, comment })
-      onClose()
-    } catch (err) {
-      setError(errorMessage(err, 'Could not save the decision.'))
-    }
-  }
-
-  return (
-    <Dialog open onClose={onClose} title={approving ? 'Approve leave' : 'Reject leave'}>
-      <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <p className="text-sm">
-          <span className="font-medium">{request.expand?.user?.full_name ?? 'Someone'}</span> ·{' '}
-          {request.expand?.leave_type?.name ?? 'Leave'} · {dateRange(request.start_date, request.end_date)} ·{' '}
-          {daysText(request.days, request.half_day)}
-        </p>
-        <Field label="Comment (optional)" htmlFor="dc_comment">
-          <textarea
-            id="dc_comment"
-            rows={3}
-            maxLength={1000}
-            autoFocus
-            value={comment}
-            placeholder={approving ? 'e.g. Get well soon' : 'e.g. Busy week, please pick other dates'}
-            onChange={(e) => setComment(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-950"
-          />
-        </Field>
-        <FormError message={error} />
-        <div className="flex gap-2">
-          <Button type="submit" variant={approving ? 'primary' : 'danger'} loading={decide.isPending}>
-            {approving ? 'Approve' : 'Reject'}
-          </Button>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-        </div>
-      </form>
-    </Dialog>
   )
 }
