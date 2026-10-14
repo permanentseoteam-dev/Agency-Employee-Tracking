@@ -233,7 +233,7 @@ Shorthand used in the table:
 | `attendance` | own \|\| staff | locked (hook) | locked (hook) | locked |
 | `leave_requests` | own \|\| staff | self-create | (staff && user != @request.auth.id), or `user = @request.auth.id && status = "pending" && @request.body.status = "cancelled"` | locked |
 | `leave_balances` (view) | own \|\| staff | — | — | — |
-| `notifications` | own | locked (hook) | own | own |
+| `notifications` | own | locked (hook) | own, `read_at` only (migration `1791960000`) | own |
 | `teams`, `org_settings`, `leave_types`, `holidays`, `events` | auth | admin | admin | admin |
 
 The custom routes `/api/org/invite`, `/api/org/reset-password`, `/api/payroll/run` and finalize, and `/api/attendance/recompute` reject any caller whose `e.auth.get("role")` isn't `admin`. Server hooks write as the app itself, so locked rules don't block them. A rule left **empty/locked** means superusers only, so every rule that should be open must be set.
@@ -391,7 +391,12 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - `attendance.pb.js`: nightly cron `0 20 * * *` (01:00 PKT) counts the 7 days just finished, so segments that synced late still count; `POST /api/attendance/recompute` (admins only, one date or a range of up to 31 days, finished days only). Both upsert records only between `joined_on` and `left_on`. The database side lives in `lib/attendance_store.js`, shared by both
   - Attendance grid (employees × days, team filter, row totals, hover details, Recompute for admins) and My Attendance (daily status, first/last activity, month totals)
   - `check:rules` 77 of 77; end-to-end 29 of 29, including grace boundaries, leave, holiday, weekend, the employment window, manager scope and the nightly job
-- **Next: M9**, notifications. It is built on leave requests, so M8 may need to come first.
+- **M9 done** (2026-10-14, committed but not pushed):
+  - `notifications.pb.js` + `lib/notifications.js`: a new pending leave request notifies the requester's team manager; a manager's or admin's own request, or one with no active team manager, goes to the admins; nobody is notified about their own request. Approved or rejected (including an admin reversing a decision) notifies the employee; cancelling notifies nobody. The payload stores names, dates and days so old notifications still read correctly
+  - migration `1791960000`: the owner may only set `read_at` (the first schema let a notification be handed to someone else with made-up text)
+  - Notification bell: unread badge, the latest 30, mark read on click (opens Approvals or My Leaves), mark all as read; live through a realtime subscription filtered to the current user
+  - `check:rules` 87 of 87; end-to-end 16 of 16 (the manager's bell goes up 0.2 s after a new request)
+- **Next:** M10b (calendar month view and events), M11 (payroll), M12 (packaging), or M8 (paused).
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

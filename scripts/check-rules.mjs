@@ -246,6 +246,35 @@ try {
     pbEmpA.collection('leave_requests').update(reqA2.id, { status: 'cancelled' })
   )
 
+  // --- leave notifications (notifications.pb.js) ---------------------------------
+  const mgrNotes = await pbMgrA.collection('notifications').getFullList()
+  const adminNotes = await pbAdmin.collection('notifications').getFullList()
+  const empNotes = await pbEmpA.collection('notifications').getFullList()
+  check('manager A is notified of a team A request', mgrNotes.some((n) => n.type === 'leave_requested' && n.payload.request === reqA.id))
+  check('a manager’s own request goes to the admins, not to themselves',
+    adminNotes.some((n) => n.type === 'leave_requested' && n.payload.request === reqMgr.id) &&
+      !mgrNotes.some((n) => n.type === 'leave_requested' && n.payload.request === reqMgr.id))
+  check('the manager hears the admin’s decision on their own request',
+    mgrNotes.some((n) => n.type === 'leave_decided' && n.payload.request === reqMgr.id && n.payload.status === 'approved'))
+  const decided = empNotes.find((n) => n.type === 'leave_decided' && n.payload.request === reqA.id)
+  check('employee is notified of the decision', decided?.payload.status === 'approved', JSON.stringify(empNotes))
+  check('cancelling notifies nobody', !empNotes.some((n) => n.payload.request === reqA2.id))
+  check('everyone sees only their own notifications',
+    mgrNotes.every((n) => n.user === mgrA.id) && empNotes.every((n) => n.user === empA.id) && adminNotes.every((n) => n.user === admin.id))
+  const noteId = decided?.id ?? 'missing'
+  await allowed('employee can mark own notification read', () =>
+    pbEmpA.collection('notifications').update(noteId, { read_at: new Date().toISOString() })
+  )
+  await denied('employee cannot hand a notification to someone else', () =>
+    pbEmpA.collection('notifications').update(noteId, { user: mgrA.id })
+  )
+  await denied('employee cannot rewrite a notification', () =>
+    pbEmpA.collection('notifications').update(noteId, { payload: { status: 'approved', comment: 'fake' } })
+  )
+  await denied('manager cannot mark someone else’s notification read', () =>
+    pbMgrA.collection('notifications').update(noteId, { read_at: new Date().toISOString() })
+  )
+
   // --- leave balances view -------------------------------------------------------
   const myBal = await pbEmpA.collection('leave_balances').getFullList()
   const mySick = myBal.find((b) => b.leave_type === sick.id)
