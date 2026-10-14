@@ -29,6 +29,15 @@ export function liveStatus(p: PresenceRecord | undefined, now: number): LiveStat
   return p.status
 }
 
+/** What a board card shows: the live status, plus On leave for someone offline with approved leave today. */
+export type BoardStatus = LiveStatus | 'on_leave'
+
+/** Someone working despite approved leave still shows Active or Idle; only when offline does leave show. */
+export function boardStatus(p: PresenceRecord | undefined, now: number, onLeaveToday: boolean): BoardStatus {
+  const status = liveStatus(p, now)
+  return status === 'offline' && onLeaveToday ? 'on_leave' : status
+}
+
 /** Today's totals from a presence record; zero when the last heartbeat was on an earlier day. */
 export function presenceToday(p: PresenceRecord | undefined, now: number, tz = DEFAULT_TZ): { active_s: number; idle_s: number } {
   const seen = p ? instant(p.last_seen) : NaN

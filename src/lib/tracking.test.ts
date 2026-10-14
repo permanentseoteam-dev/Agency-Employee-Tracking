@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { liveStatus, presenceToday, reportCsv, reportTotals, totalsByDay, weekOf, type PresenceRecord, type ReportRow } from './tracking'
+import { boardStatus, liveStatus, presenceToday, reportCsv, reportTotals, totalsByDay, weekOf, type PresenceRecord, type ReportRow } from './tracking'
 
 const NOW = Date.parse('2026-10-14T05:00:00.000Z') // Wed 10:00 in Karachi
 const presence = (patch: Partial<PresenceRecord> = {}): PresenceRecord => ({
@@ -22,6 +22,19 @@ describe('liveStatus', () => {
     expect(liveStatus(presence({ last_seen: new Date(NOW - 121_000).toISOString() }), NOW)).toBe('offline')
     expect(liveStatus(undefined, NOW)).toBe('offline')
     expect(liveStatus(presence({ last_seen: '' }), NOW)).toBe('offline')
+  })
+})
+
+describe('boardStatus', () => {
+  it('shows On leave for someone offline with approved leave today', () => {
+    expect(boardStatus(undefined, NOW, true)).toBe('on_leave')
+    expect(boardStatus(presence({ last_seen: new Date(NOW - 121_000).toISOString() }), NOW, true)).toBe('on_leave')
+    expect(boardStatus(undefined, NOW, false)).toBe('offline')
+  })
+
+  it('keeps Active or Idle when someone on leave is working anyway', () => {
+    expect(boardStatus(presence({ status: 'active' }), NOW, true)).toBe('active')
+    expect(boardStatus(presence(), NOW, true)).toBe('idle')
   })
 })
 

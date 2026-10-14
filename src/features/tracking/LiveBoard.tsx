@@ -2,23 +2,27 @@ import { useMemo, useState } from 'react'
 import { Avatar } from '@/components/layout/Avatar'
 import { Card } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
-import { formatTime } from '@/lib/dates'
+import { useLeaveLive, useOnLeave } from '@/features/leave/api'
+import { formatTime, toDateKey } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
-import { liveStatus, presenceToday, type LiveStatus } from '@/lib/tracking'
+import { boardStatus, presenceToday, type BoardStatus } from '@/lib/tracking'
 import { cn } from '@/lib/cn'
 import { useNow, usePeople, usePresence, useTimezone } from './api'
-import { StatusBadge } from './StatusBadge'
+import { StatusBadge, STATUS_LABEL } from './StatusBadge'
 
-const ORDER: Record<LiveStatus, number> = { active: 0, idle: 1, offline: 2 }
+const ORDER: Record<BoardStatus, number> = { active: 0, idle: 1, on_leave: 2, offline: 3 }
+const FILTERS: BoardStatus[] = ['active', 'idle', 'on_leave', 'offline']
 
 export function LiveBoard() {
   const tz = useTimezone()
   const now = useNow()
   const people = usePeople()
   const presence = usePresence()
+  const onLeave = useOnLeave(toDateKey(now, tz))
+  useLeaveLive()
   const [team, setTeam] = useState('')
   const [search, setSearch] = useState('')
-  const [only, setOnly] = useState<LiveStatus | ''>('')
+  const [only, setOnly] = useState<BoardStatus | ''>('')
 
   const teams = useMemo(() => {
     const map = new Map<string, string>()
@@ -28,16 +32,17 @@ export function LiveBoard() {
 
   const cards = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const away = new Set(onLeave.data ?? [])
     return (people.data ?? [])
       .filter((p) => (!team || p.team === team) && (!q || p.full_name.toLowerCase().includes(q)))
       .map((p) => {
         const rec = presence.data?.[p.id]
-        return { person: p, rec, status: liveStatus(rec, now), today: presenceToday(rec, now, tz) }
+        return { person: p, rec, status: boardStatus(rec, now, away.has(p.id)), today: presenceToday(rec, now, tz) }
       })
       .sort((a, b) => ORDER[a.status] - ORDER[b.status] || a.person.full_name.localeCompare(b.person.full_name))
-  }, [people.data, presence.data, team, search, now, tz])
+  }, [people.data, presence.data, onLeave.data, team, search, now, tz])
 
-  const counts = { active: 0, idle: 0, offline: 0 }
+  const counts = { active: 0, idle: 0, on_leave: 0, offline: 0 }
   for (const c of cards) counts[c.status]++
   const shown = only ? cards.filter((c) => c.status === only) : cards
 
@@ -56,7 +61,7 @@ export function LiveBoard() {
           </Select>
         )}
         <div role="group" aria-label="Filter by status" className="ml-auto flex gap-2">
-          {(['active', 'idle', 'offline'] as const).map((s) => (
+          {FILTERS.map((s) => (
             <button
               key={s}
               type="button"
@@ -69,7 +74,7 @@ export function LiveBoard() {
                   : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
               )}
             >
-              <span className="capitalize">{s}</span> <span className="font-semibold tabular-nums" data-count={s}>{counts[s]}</span>
+              {STATUS_LABEL[s]} <span className="font-semibold tabular-nums" data-count={s}>{counts[s]}</span>
             </button>
           ))}
         </div>
@@ -116,7 +121,10 @@ export function LiveBoard() {
           ))}
         </div>
       )}
-      <p className="text-xs text-slate-500">Updates live. Someone is shown Offline when their app hasn’t checked in for 2 minutes.</p>
+      <p className="text-xs text-slate-500">
+        Updates live. Someone is shown Offline when their app hasn’t checked in for 2 minutes, and On leave when they are offline
+        with approved leave today.
+      </p>
     </div>
   )
 }

@@ -9,7 +9,8 @@ export const leaveKeys = {
   mine: (userId: string) => ['leave', 'mine', userId] as const,
   balances: (userId: string) => ['leave', 'balances', userId] as const,
   pending: (userId: string) => ['leave', 'pending', userId] as const,
-  decided: (userId: string, limit: number) => ['leave', 'decided', userId, limit] as const
+  decided: (userId: string, limit: number) => ['leave', 'decided', userId, limit] as const,
+  onDay: (day: string) => ['leave', 'on-day', day] as const
 }
 
 const EXPAND = 'user,leave_type,approver'
@@ -100,6 +101,21 @@ export function useDecidedLeaves(limit = 50) {
           expand: EXPAND
         })
       ).items
+  })
+}
+
+/** Ids of the people on approved leave on a day (the API rules decide whose: own, my teams, or everyone). */
+export function useOnLeave(day: string) {
+  return useQuery({
+    queryKey: leaveKeys.onDay(day),
+    enabled: !!day,
+    queryFn: async () =>
+      (
+        await pb.collection('leave_requests').getFullList<Pick<LeaveRequest, 'user'>>({
+          filter: pb.filter('status = "approved" && start_date <= {:day} && end_date >= {:day}', { day }),
+          fields: 'user'
+        })
+      ).map((r) => r.user)
   })
 }
 

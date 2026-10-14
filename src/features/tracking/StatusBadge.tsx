@@ -1,20 +1,15 @@
 import { Badge } from '@/components/ui/Badge'
-import type { LiveStatus } from '@/lib/tracking'
+import type { BoardStatus } from '@/lib/tracking'
 
-const LABEL: Record<LiveStatus, string> = { active: 'Active', idle: 'Idle', offline: 'Offline' }
-const TONE = { active: 'green', idle: 'amber', offline: 'neutral' } as const
+export const STATUS_LABEL: Record<BoardStatus, string> = { active: 'Active', idle: 'Idle', offline: 'Offline', on_leave: 'On leave' }
+const TONE = { active: 'green', idle: 'amber', offline: 'neutral', on_leave: 'blue' } as const
+const DOT = { active: 'bg-emerald-500', idle: 'bg-amber-500', offline: 'bg-slate-400', on_leave: 'bg-indigo-500' } as const
 
-export function StatusBadge({ status }: { status: LiveStatus }) {
+export function StatusBadge({ status }: { status: BoardStatus }) {
   return (
     <Badge tone={TONE[status]} data-status={status}>
-      <span
-        className={
-          'mr-1.5 size-1.5 rounded-full ' +
-          (status === 'active' ? 'bg-emerald-500' : status === 'idle' ? 'bg-amber-500' : 'bg-slate-400')
-        }
-        aria-hidden
-      />
-      {LABEL[status]}
+      <span className={'mr-1.5 size-1.5 rounded-full ' + DOT[status]} aria-hidden />
+      {STATUS_LABEL[status]}
     </Badge>
   )
 }
