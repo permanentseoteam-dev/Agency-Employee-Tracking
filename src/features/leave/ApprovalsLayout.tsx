@@ -3,7 +3,8 @@ import { cn } from '@/lib/cn'
 
 const TABS = [
   { to: '/approvals/pending', label: 'Pending' },
-  { to: '/approvals/decided', label: 'Decided' }
+  { to: '/approvals/decided', label: 'Decided' },
+  { to: '/approvals/balances', label: 'Team balances' }
 ]
 
 export function ApprovalsLayout() {

@@ -20,6 +20,7 @@ import { InviteEmployee } from '@/features/org/InviteEmployee'
 import { Approvals } from '@/features/leave/Approvals'
 import { ApprovalsLayout } from '@/features/leave/ApprovalsLayout'
 import { DecidedLeaves } from '@/features/leave/DecidedLeaves'
+import { TeamBalances } from '@/features/leave/TeamBalances'
 import { MyLeaves } from '@/features/leave/MyLeaves'
 import { OrgLayout } from '@/features/org/OrgLayout'
 import { TeamDetail } from '@/features/org/TeamDetail'
@@ -130,7 +131,8 @@ const router = createHashRouter([
         children: [
           { index: true, element: <Navigate to="/approvals/pending" replace /> },
           { path: 'pending', element: <Approvals /> },
-          { path: 'decided', element: <DecidedLeaves /> }
+          { path: 'decided', element: <DecidedLeaves /> },
+          { path: 'balances', element: <TeamBalances /> }
         ]
       },
       { path: 'attendance', element: <AttendanceTable /> },
