@@ -15,6 +15,8 @@
     "test": "vitest run",
     "pb": "server\\pocketbase.exe serve --dir server\\pb_data",
     "check:rules": "node scripts/check-rules.mjs",
+    "test:env": "node scripts/test-env/index.mjs",
+    "test:app": "node scripts/test-env/app.mjs",
     "icon": "electron scripts/make-icon.mjs",
     "dist": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish never",
     "release": "node scripts/check-release-env.mjs && electron-vite build --mode production && electron-builder --win --publish always"
