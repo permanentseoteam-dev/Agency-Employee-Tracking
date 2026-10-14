@@ -7,14 +7,61 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { app, nativeImage } from 'electron'
 
 const ROOT = resolve(import.meta.dirname, '..')
 const SOURCE = join(ROOT, 'build', 'logo-source.jpg')
 
-/** PNG bytes of the logo at `size` × `size` px. */
+const CRC = new Int32Array(256).map((_, n) => {
+  let c = n
+  for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+  return c
+})
+function crc32(buf) {
+  let c = -1
+  for (const b of buf) c = CRC[(c ^ b) & 0xff] ^ (c >>> 8)
+  return (c ^ -1) >>> 0
+}
+function chunk(type, data) {
+  const len = Buffer.alloc(4)
+  len.writeUInt32BE(data.length)
+  const body = Buffer.concat([Buffer.from(type, 'ascii'), data])
+  const crc = Buffer.alloc(4)
+  crc.writeUInt32BE(crc32(body))
+  return Buffer.concat([len, body, crc])
+}
+
+/**
+ * PNG bytes of the logo at `size` × `size` px, always 32-bit RGBA: Windows reads
+ * icon frames as 32-bit, and nativeImage.toPNG() drops the alpha channel of an
+ * opaque image (which made Explorer show garbage or a stale icon).
+ */
 function png(logo, size) {
-  return logo.resize({ width: size, height: size, quality: 'best' }).toPNG()
+  const bgra = logo.resize({ width: size, height: size, quality: 'best' }).toBitmap()
+  const rows = Buffer.alloc(size * (size * 4 + 1))
+  for (let y = 0; y < size; y++) {
+    const row = y * (size * 4 + 1) // first byte of each row: filter none
+    for (let x = 0; x < size; x++) {
+      const s = (y * size + x) * 4
+      const d = row + 1 + x * 4
+      rows[d] = bgra[s + 2]
+      rows[d + 1] = bgra[s + 1]
+      rows[d + 2] = bgra[s]
+      rows[d + 3] = bgra[s + 3]
+    }
+  }
+  const ihdr = Buffer.alloc(13)
+  ihdr.writeUInt32BE(size, 0)
+  ihdr.writeUInt32BE(size, 4)
+  ihdr[8] = 8 // bit depth
+  ihdr[9] = 6 // RGBA
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(rows, { level: 9 })),
+    chunk('IEND', Buffer.alloc(0))
+  ])
 }
 
 /** An .ico holding PNG images (supported since Windows Vista). */
