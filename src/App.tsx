@@ -43,7 +43,8 @@ function Gate() {
   if (!user) return <Login />
   if (user.must_change_password) return <ChangePassword />
   if (!user.tracking_consent_at) return <TrackingNotice />
-  return <AppShell />
+  // Keyed by account: a switch remounts the shell, so every live subscription restarts as the new user.
+  return <AppShell key={user.id} />
 }
 
 function CrashScreen() {

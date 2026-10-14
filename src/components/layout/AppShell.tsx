@@ -4,7 +4,7 @@ import { useRole } from '@/hooks/useRole'
 import { canOpen, landingFor, NAV, ROLE_LABEL } from '@/lib/roles'
 import { NotificationBell } from './NotificationBell'
 import { ProfileMenu } from './ProfileMenu'
-import { RoleSwitcher } from './RoleSwitcher'
+import { AccountSwitcher } from './AccountSwitcher'
 import { Sidebar } from './Sidebar'
 
 const TITLES: Record<string, string> = {
@@ -32,7 +32,7 @@ export function AppShell() {
         <header className="flex h-14 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 dark:border-slate-800 dark:bg-slate-900">
           <h1 className="text-lg font-semibold">{title}</h1>
           <div className="flex items-center gap-4">
-            <RoleSwitcher />
+            <AccountSwitcher />
             <NotificationBell />
             <ProfileMenu />
           </div>

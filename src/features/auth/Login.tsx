@@ -1,14 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
-import { pb, type UserRecord } from '@/lib/pb'
-import { useRoleStore } from '@/stores/role'
 import { useSession } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
 export function Login() {
   const login = useSession((s) => s.login)
-  const selectRole = useRoleStore((s) => s.select)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -20,8 +17,6 @@ export function Login() {
     setBusy(true)
     try {
       await login(email, password)
-      // Start each sign-in on the user's own role.
-      selectRole((pb.authStore.record as unknown as UserRecord).role)
     } catch (err) {
       const status = (err as { status?: number }).status
       setError(

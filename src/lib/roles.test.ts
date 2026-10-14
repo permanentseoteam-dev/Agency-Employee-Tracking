@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { canOpen, effectiveRole, landingFor, navFor, switchableRoles } from './roles'
+import { canOpen, landingFor, navFor, roleOf } from './roles'
 
 describe('roles', () => {
-  it('lets each role switch only to itself and lower roles', () => {
-    expect(switchableRoles('admin')).toEqual(['admin', 'manager', 'employee'])
-    expect(switchableRoles('manager')).toEqual(['manager', 'employee'])
-    expect(switchableRoles('employee')).toEqual(['employee'])
-    expect(switchableRoles(undefined)).toEqual(['employee'])
+  it('always shows the account’s own role (no viewing as another role)', () => {
+    expect(roleOf('admin')).toBe('admin')
+    expect(roleOf('manager')).toBe('manager')
+    expect(roleOf('employee')).toBe('employee')
   })
 
-  it('clamps a selected role the user may not use', () => {
-    expect(effectiveRole('admin', 'employee')).toBe('employee')
-    expect(effectiveRole('employee', 'admin')).toBe('employee')
-    expect(effectiveRole(undefined, 'manager')).toBe('manager')
+  it('treats a missing or unknown role as employee', () => {
+    expect(roleOf(undefined)).toBe('employee')
+    expect(roleOf('owner' as never)).toBe('employee')
   })
 
   it('shows more navigation for higher roles', () => {

@@ -55,16 +55,13 @@ export function hasRole(role: Role, minRole: Role): boolean {
   return RANK[role] >= RANK[minRole]
 }
 
-/** The roles a user may switch to: their stored role and the ones below it. */
-export function switchableRoles(storedRole: Role | undefined): Role[] {
-  if (!storedRole || !(storedRole in RANK)) return ['employee']
-  return ROLES.filter((r) => RANK[r] <= RANK[storedRole])
-}
-
-/** Clamp a selected role to what the stored role allows. */
-export function effectiveRole(selected: Role | undefined, storedRole: Role | undefined): Role {
-  const allowed = switchableRoles(storedRole)
-  return selected && allowed.includes(selected) ? selected : allowed[0]
+/**
+ * The role the app shows: always the signed-in account's own role (an unknown one
+ * counts as employee). Another role means another account, signed in with its
+ * email and password ("Switch account"); there is no viewing as another role.
+ */
+export function roleOf(storedRole: Role | undefined): Role {
+  return storedRole && storedRole in RANK ? storedRole : 'employee'
 }
 
 export function navFor(role: Role): NavItem[] {

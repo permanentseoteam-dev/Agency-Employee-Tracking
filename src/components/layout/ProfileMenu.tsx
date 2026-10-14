@@ -52,7 +52,7 @@ export function ProfileMenu() {
           >
             <LogOut className="size-4" aria-hidden /> Log out
           </DropdownMenu.Item>
-          {/* The stored role, not "View as": the main process checks it again. */}
+          {/* Managers and admins only; the main process checks the same rule again. */}
           {(user.role === 'manager' || user.role === 'admin') && window.tracker && (
             <DropdownMenu.Item className={ITEM} onSelect={() => void window.tracker.quit()}>
               <Power className="size-4" aria-hidden /> Quit PSEO Tracker
