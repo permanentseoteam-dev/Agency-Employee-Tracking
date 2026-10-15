@@ -23,6 +23,8 @@ export interface UserRecord {
   active: boolean
   must_change_password: boolean
   tracking_consent_at: string
+  /** Signed up with Create an account and not yet approved by an admin. */
+  pending_approval?: boolean
 }
 
 export interface OrgSettings {

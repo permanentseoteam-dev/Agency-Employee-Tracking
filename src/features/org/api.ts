@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { pb, type Role, type UserRecord } from '@/lib/pb'
 
@@ -47,6 +48,28 @@ export function useEmployees() {
     queryKey: orgKeys.employees,
     queryFn: () => pb.collection('users').getFullList<Employee>({ sort: 'full_name', expand: 'team' })
   })
+}
+
+/** Keeps Organization's lists live: a sign-up or any change to an account refetches them. */
+export function useOrgLive() {
+  const qc = useQueryClient()
+  useEffect(() => {
+    let unsubscribe: (() => Promise<void>) | undefined
+    let cancelled = false
+    pb.collection('users')
+      .subscribe('*', () => void qc.invalidateQueries({ queryKey: ['org'] }))
+      .then((fn) => {
+        if (cancelled) void fn()
+        else unsubscribe = fn
+      })
+      .catch(() => {
+        /* offline: the next refetch catches up */
+      })
+    return () => {
+      cancelled = true
+      void unsubscribe?.()
+    }
+  }, [qc])
 }
 
 export function useEmployee(id: string) {
@@ -111,6 +134,24 @@ export function useSetActive() {
   return useMutation({
     mutationFn: (body: { userId: string; active: boolean; left_on?: string }) =>
       pb.send('/api/org/set-active', { method: 'POST', body }),
+    onSuccess: invalidate
+  })
+}
+
+/** Approve a sign-up from Create an account (switches it on, joined today). */
+export function useApproveSignup() {
+  const invalidate = useOrgInvalidate()
+  return useMutation({
+    mutationFn: (userId: string) => pb.send('/api/org/approve', { method: 'POST', body: { userId } }),
+    onSuccess: invalidate
+  })
+}
+
+/** Reject a sign-up: the account is deleted. */
+export function useRejectSignup() {
+  const invalidate = useOrgInvalidate()
+  return useMutation({
+    mutationFn: (userId: string) => pb.send('/api/org/reject', { method: 'POST', body: { userId } }),
     onSuccess: invalidate
   })
 }

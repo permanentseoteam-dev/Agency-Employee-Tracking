@@ -57,6 +57,10 @@ export function daysText(days: number, halfDay: boolean): string {
 /** The bell's two lines for a notification. */
 export function notificationText(n: Pick<NotificationRecord, 'type' | 'payload'>): { title: string; detail: string } {
   if (!n.payload) return { title: 'Notification', detail: '' }
+  if (n.type === 'signup_pending') {
+    const r = n.payload as RegisteredPayload
+    return { title: 'New sign-up waiting for approval', detail: [r.name, r.email, 'approve or reject it in Organization'].filter(Boolean).join(' · ') }
+  }
   if (n.type === 'employee_registered') {
     const r = n.payload as RegisteredPayload
     return { title: 'New employee registered', detail: [r.name, r.email, 'set their team, role and salary'].filter(Boolean).join(' · ') }
@@ -82,7 +86,7 @@ export function notificationComment(n: Pick<NotificationRecord, 'payload'>): str
 export function notificationLink(n: Pick<NotificationRecord, 'type'>): string | null {
   if (n.type === 'leave_requested') return '/approvals'
   if (n.type === 'leave_decided') return '/my-leaves'
-  if (n.type === 'employee_registered') return '/org/employees'
+  if (n.type === 'employee_registered' || n.type === 'signup_pending') return '/org/employees'
   return null
 }
 

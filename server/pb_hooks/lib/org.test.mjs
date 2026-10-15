@@ -94,3 +94,22 @@ describe('validateRegister', () => {
     expect(org.passwordProblem('short')).toBe('The temporary password must be at least 8 characters.')
   })
 })
+
+describe('validateApprove', () => {
+  it('approves with today as the joining date by default', () => {
+    const { data } = org.validateApprove({ userId: 'u9' })
+    expect(data.userId).toBe('u9')
+    expect(data.joined_on).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('takes a chosen joining date', () => {
+    expect(org.validateApprove({ userId: 'u9', joined_on: '2026-10-20' }).data.joined_on).toBe('2026-10-20')
+  })
+
+  it.each([
+    [{}, 'Missing employee'],
+    [{ userId: 'u9', joined_on: '2026-02-30' }, 'joining date']
+  ])('rejects %o', (body, message) => {
+    expect(org.validateApprove(body).error).toContain(message)
+  })
+})

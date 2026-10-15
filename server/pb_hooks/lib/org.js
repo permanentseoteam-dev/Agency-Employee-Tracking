@@ -92,6 +92,16 @@ function validateRegister(body) {
   return { data: data }
 }
 
+/** Validates approving a sign-up: the person, and optionally their joining date (default today). */
+function validateApprove(body) {
+  const b = body || {}
+  const userId = str(b.userId)
+  if (!userId) return { error: 'Missing employee.' }
+  const joinedOn = str(b.joined_on) || todayKey()
+  if (!isDateKey(joinedOn)) return { error: 'The joining date is not a valid date.' }
+  return { data: { userId: userId, joined_on: joinedOn } }
+}
+
 /** Validates a deactivate / reactivate request. */
 function validateSetActive(body, actingUserId) {
   const b = body || {}
@@ -128,5 +138,6 @@ module.exports = {
   todayKey: todayKey,
   validateInvite: validateInvite,
   validateRegister: validateRegister,
+  validateApprove: validateApprove,
   validateSetActive: validateSetActive
 }

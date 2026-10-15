@@ -521,7 +521,7 @@ try {
     hire.collection('users').authWithPassword('new.hire@test.local', 'another-pass-1')
   )
 
-  // --- "Create an account" on the sign-in page (register.pb.js) -------------------
+  // --- "Create an account" (register.pb.js): waits for an admin; Approve / Reject -----
   // Exactly 5 guest calls before the rate-limit check: the 6th in a minute is refused.
   const guest = new PocketBase(URL)
   guest.autoCancellation(false)
@@ -529,38 +529,82 @@ try {
   const signup = { full_name: 'Sara Self', email: 'Sara.Self@test.local', password: 'own-pass-123', phone: '0300 1112223' }
   let selfId = ''
   await allowed('a guest registers', async () => {
-    selfId = (await register({ ...signup, role: 'admin', team: teamA.id, active: false, monthly_salary_pkr: 99 })).id
+    selfId = (await register({ ...signup, role: 'admin', team: teamA.id, active: true, pending_approval: false, monthly_salary_pkr: 99 })).id
   })
   const self = await root.collection('users').getOne(selfId)
-  const todayPk = new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10)
-  check('registered as an active employee, whatever the request said', self.role === 'employee' && self.active === true && self.team === '')
-  check('registered: email lowercased, joined today, no forced password change',
-    self.email === 'sara.self@test.local' && self.joined_on === todayPk && self.must_change_password === false && self.phone === '0300 1112223')
-  check('registration creates the salary record as 0 (not set)',
+  check('a sign-up waits for approval: switched off, employee, no team, whatever the request said',
+    self.active === false && self.pending_approval === true && self.role === 'employee' && self.team === '' && self.joined_on === '')
+  check('sign-up: email lowercased, phone kept, no forced password change',
+    self.email === 'sara.self@test.local' && self.phone === '0300 1112223' && self.must_change_password === false)
+  check('sign-up creates the salary record as 0 (not set)',
     (await root.collection('salaries').getFirstListItem(`user = "${selfId}"`).catch(() => null))?.monthly_salary_pkr === 0)
   await denied('registering an existing email is refused', () => register({ ...signup, email: 'SARA.SELF@test.local' }))
   await denied('registering with a short password is refused', () => register({ ...signup, email: 'x3@test.local', password: 'short' }))
   await denied('registering without a name is refused', () => register({ ...signup, email: 'x4@test.local', full_name: ' ' }))
-  await allowed('a second person registers', () => register({ ...signup, email: 'second.self@test.local', full_name: 'Second Self' }))
-  const selfPb = new PocketBase(URL)
-  selfPb.autoCancellation(false)
-  await allowed('a registered person can sign in right away', () =>
-    selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123')
-  )
-  await denied('a registered person cannot make themselves admin', () => selfPb.collection('users').update(selfId, { role: 'admin' }))
-  const regNotes = await root.collection('notifications').getFullList({ filter: `type = "employee_registered" && payload.user ?= "${selfId}"` })
-  check('every active admin is notified of the registration', regNotes.length === 1 && regNotes[0].user === admin.id)
-  check('the notification names the person', regNotes[0]?.payload?.name === 'Sara Self' && regNotes[0]?.payload?.email === 'sara.self@test.local')
+  let secondId = ''
+  await allowed('a second person registers', async () => {
+    secondId = (await register({ ...signup, email: 'second.self@test.local', full_name: 'Second Self' })).id
+  })
   let limited = 0
   try {
     await register({ ...signup, email: 'sixth@test.local' })
   } catch (e) {
     limited = e.status
   }
-  check('a 6th registration within a minute is refused (rate limit)', limited === 429, `status ${limited}`)
-  await allowed('the rate limit does not slow down sign-ins', async () => {
-    for (let i = 0; i < 4; i++) await selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123')
+  check('a 6th sign-up within a minute is refused (rate limit)', limited === 429, `status ${limited}`)
+
+  const selfPb = new PocketBase(URL)
+  selfPb.autoCancellation(false)
+  let waitingStatus = 0
+  try {
+    await selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123')
+  } catch (e) {
+    waitingStatus = e.status
+  }
+  check('a sign-up waiting for approval cannot sign in (403)', waitingStatus === 403, `status ${waitingStatus}`)
+  const regNotes = await root.collection('notifications').getFullList({ filter: `type = "signup_pending" && payload.user ?= "${selfId}"` })
+  check('every active admin is told a sign-up is waiting', regNotes.length === 1 && regNotes[0].user === admin.id && regNotes[0].payload?.name === 'Sara Self')
+
+  const approve = (pb, body) => pb.send('/api/org/approve', { method: 'POST', body })
+  const reject = (pb, body) => pb.send('/api/org/reject', { method: 'POST', body })
+  await denied('an employee cannot approve sign-ups', () => approve(pbEmpA, { userId: selfId }))
+  await denied('a manager cannot approve sign-ups', () => approve(pbMgrA, { userId: selfId }))
+  await denied('"Reactivate" cannot switch on a waiting sign-up', () =>
+    pbAdmin.send('/api/org/set-active', { method: 'POST', body: { userId: selfId, active: true } })
+  )
+  await allowed('an admin approves a sign-up', () => approve(pbAdmin, { userId: selfId }))
+  const signupApproved = await root.collection("users").getOne(selfId)
+  const todayPk = new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10)
+  check('approved: active, no longer waiting, joined today', signupApproved.active === true && signupApproved.pending_approval === false && signupApproved.joined_on === todayPk)
+  await allowed('an approved person signs in', () => selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123'))
+  await denied('they cannot make themselves admin', () => selfPb.collection('users').update(selfId, { role: 'admin' }))
+  await denied('they cannot mark themselves as waiting again', () => selfPb.collection('users').update(selfId, { pending_approval: true }))
+  await denied('approving twice is refused', () => approve(pbAdmin, { userId: selfId }))
+  await denied('an approved account cannot be "rejected"', () => reject(pbAdmin, { userId: selfId }))
+  await denied('an employee cannot reject sign-ups', () => reject(pbEmpA, { userId: secondId }))
+  await allowed('an admin rejects a sign-up', () => reject(pbAdmin, { userId: secondId }))
+  check('a rejected sign-up is deleted, with its salary record',
+    (await root.collection('users').getOne(secondId).catch((e) => e.status)) === 404 &&
+      (await root.collection('salaries').getFullList({ filter: `user = "${secondId}"` })).length === 0)
+
+  // --- the dashboard (superusers) only from the server PC (security.pb.js) ------------
+  // Requests through Funnel carry X-Forwarded-For; local ones don't.
+  const viaInternet = { 'X-Forwarded-For': '203.0.113.9', 'content-type': 'application/json' }
+  const suViaInternet = await fetch(`${URL}/api/collections/_superusers/auth-with-password`, {
+    method: 'POST',
+    headers: viaInternet,
+    body: JSON.stringify({ identity: 'root@test.local', password: PASS })
   })
+  check('superuser sign-in from the internet is refused', suViaInternet.status === 403, `status ${suViaInternet.status}`)
+  const suTokenViaInternet = await fetch(`${URL}/api/collections/users/records`, { headers: { ...viaInternet, Authorization: root.authStore.token } })
+  check('a superuser token used from the internet is refused', suTokenViaInternet.status === 403, `status ${suTokenViaInternet.status}`)
+  const userViaInternet = await fetch(`${URL}/api/collections/users/auth-with-password`, {
+    method: 'POST',
+    headers: viaInternet,
+    body: JSON.stringify({ identity: 'emp.a@test.local', password: PASS })
+  })
+  check('employees can still sign in from the internet', userViaInternet.status === 200, `status ${userViaInternet.status}`)
+  check('superusers still work on the server PC', (await root.collection('users').getList(1, 1)).totalItems > 0)
 } catch (e) {
   failed++
   console.error('ERROR', e?.status ?? '', e?.message ?? e, e?.response ? JSON.stringify(e.response) : '')

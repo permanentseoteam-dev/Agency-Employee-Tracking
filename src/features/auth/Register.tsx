@@ -2,18 +2,17 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
 import { pb } from '@/lib/pb'
-import { errorMessage, useSession } from '@/stores/session'
+import { errorMessage } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
 const MIN_PASSWORD = 8
 
 /**
- * "Create an account": a new employee registers themselves (register.pb.js) and is
- * signed straight in. The Gate then shows the tracking notice. Role, team and salary
- * are set by an admin afterwards; the admins get a notification.
+ * "Create an account": a new employee registers themselves (register.pb.js). The
+ * account waits for an admin's approval; once approved they sign in as usual and
+ * see the tracking notice. The admins get a notification.
  */
 export function Register({ onSignIn }: { onSignIn: () => void }) {
-  const login = useSession((s) => s.login)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -21,6 +20,7 @@ export function Register({ onSignIn }: { onSignIn: () => void }) {
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [created, setCreated] = useState(false)
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -37,7 +37,7 @@ export function Register({ onSignIn }: { onSignIn: () => void }) {
       const status = (err as { status?: number }).status
       setError(
         status === 0
-          ? 'Cannot reach the server. Check your connection, or run the office setup file from your admin.'
+          ? 'Cannot reach the server. Check your connection and try again.'
           : status === 429
             ? 'Too many sign-ups from this PC. Wait a minute and try again.'
             : errorMessage(err, 'The account could not be created. Please try again.')
@@ -45,17 +45,28 @@ export function Register({ onSignIn }: { onSignIn: () => void }) {
       setBusy(false)
       return
     }
-    try {
-      await login(email, password)
-    } catch {
-      // The account exists; only the automatic sign-in failed.
-      setError('Your account was created. Sign in with your email and password.')
-      setBusy(false)
-    }
+    setBusy(false)
+    setCreated(true)
+  }
+
+  if (created) {
+    return (
+      <AuthLayout title="Account created" subtitle="It now waits for your admin's approval.">
+        <div className="space-y-4" data-signup-done>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Your admin has been told. Once they approve your account, sign in here with <strong>{email.trim().toLowerCase()}</strong> and
+            the password you chose.
+          </p>
+          <Button className="w-full" onClick={onSignIn}>
+            Back to sign in
+          </Button>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
-    <AuthLayout title="Create an account" subtitle="For new staff. Your admin then sets your team and role.">
+    <AuthLayout title="Create an account" subtitle="For new staff. Your admin approves the account before you can sign in.">
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <Field label="Full name" htmlFor="full_name">
           <Input

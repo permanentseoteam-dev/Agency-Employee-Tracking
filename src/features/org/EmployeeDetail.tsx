@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, KeyRound, UserCheck, UserX } from 'lucide-react'
 import { Avatar } from '@/components/layout/Avatar'
 import { Badge } from '@/components/ui/Badge'
@@ -24,6 +24,7 @@ import {
   useUpdateEmployee,
   type Employee
 } from './api'
+import { SignupDecision } from './PendingSignups'
 import { CopyButton, TempPasswordInput } from './TempPasswordInput'
 
 export function EmployeeDetail() {
@@ -43,7 +44,9 @@ export function EmployeeDetail() {
 
 function EmployeeView({ employee }: { employee: Employee }) {
   const me = useSession((s) => s.user)!
+  const navigate = useNavigate()
   const isSelf = me.id === employee.id
+  const pending = !!employee.pending_approval
 
   return (
     <div className="space-y-6">
@@ -60,9 +63,27 @@ function EmployeeView({ employee }: { employee: Employee }) {
           </p>
         </div>
         <div className="ml-auto">
-          {employee.active ? <Badge tone="green">Active</Badge> : <Badge>Inactive since {employee.left_on || '—'}</Badge>}
+          {pending ? (
+            <Badge tone="amber">Waiting for approval</Badge>
+          ) : employee.active ? (
+            <Badge tone="green">Active</Badge>
+          ) : (
+            <Badge>Inactive since {employee.left_on || '—'}</Badge>
+          )}
         </div>
       </div>
+
+      {pending && (
+        <Card className="border-amber-300 dark:border-amber-700">
+          <CardContent className="space-y-3 pt-6">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              This person created an account on the sign-in page and can't sign in yet. Approve to switch the account on (joined
+              today), or reject to delete it.
+            </p>
+            <SignupDecision employee={employee} onDone={() => navigate('/org/employees')} />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -84,7 +105,7 @@ function EmployeeView({ employee }: { employee: Employee }) {
         </div>
         <div className="space-y-6">
           <SalaryCard employee={employee} />
-          <AccountCard employee={employee} isSelf={isSelf} />
+          {!pending && <AccountCard employee={employee} isSelf={isSelf} />}
         </div>
       </div>
     </div>

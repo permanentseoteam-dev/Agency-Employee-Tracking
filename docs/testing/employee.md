@@ -21,10 +21,10 @@ Sign in as an employee of the test company (Asma, Alpha team, unless a test says
 | E-11 | Switch account: same account | Switch account → asma@test.local | "You are already signed in as this account." |  |  |
 | E-12 | Switch account: another person | Switch account → chand@test.local / Test-pass-123 | The app now shows Chand (his pending Casual in My Leaves); the dialog warned that tracked time goes to him | ★ |  |
 | E-13 | No free role switching | Look at the top bar | Only the role label and Switch account; no "View as" dropdown |  |  |
-| E-100 | Create an account | Sign-in page → Create an account: name, email typed with some capitals, phone, the same password twice | Signed straight in → tracking notice → My Stats; Organization (as admin) lists them as an active employee with no team | ★ | – |
+| E-100 | Create an account | Sign-in page → Create an account: name, email typed with some capitals, phone, the same password twice | "Account created. It now waits for your admin's approval"; signing in before approval says the account is waiting for approval | ★ | ✓ |
 | E-101 | Create an account: checks | Try a too-short password, two different passwords, then an email that already has an account | A clear error for each; no account created |  | ✓ |
 | E-102 | Create an account: back | On Create an account click "Sign in" | Back on the sign-in form |  |  |
-| E-103 | Sign in with capitals | Sign in typing your email with capital letters | Signed in |  |  |
+| E-103 | Sign in after approval | After the admin approves (A-90), sign in typing the email with capital letters | Signed in → tracking notice → My Stats |  | ✓ |
 | E-104 | Too many sign-ups | Create 6 accounts from one PC within a minute | The 6th: "Too many sign-ups from this PC. Wait a minute and try again." |  | ✓ |
 
 ## 2. Tracking engine and tray
@@ -109,9 +109,9 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-93 | Can't decide own leave | (server check) Approve your own request | Refused |  | ✓ |
 | E-94 | Can't promote yourself | (server check) Change your own role or team | Refused |  | ✓ |
 | E-95 | Server unreachable | Signed out: disconnect the network. Signed in: disconnect, then send leave | Signed out: the connection panel replaces sign-in (no form). Signed in: "Cannot reach the server. Check your connection..."; nothing half-saved; tracking keeps queuing |  |  |
-| E-105 | Not on the agency network | Open the app on a PC without Tailscale (or with Tailscale signed out) | "Connect this PC to the agency network first", naming the office setup file; no sign-in or Create an account form | ★ |  |
-| E-106 | Other Tailscale account | Tailscale signed in to a different account | "This PC is on a different network"; tells them to run the office setup file |  |  |
-| E-107 | Server PC off | On the agency network, stop the server (dashboard or service) | "The server isn’t answering"; Check again works; when the server is back, the sign-in form appears by itself within about 5 s | ★ |  |
+| E-105 | No internet | Disconnect the PC from the internet, then open the app signed out | "Can't reach the server" (check the internet, or the server PC may be off); no form; when the connection is back, sign-in appears by itself | ★ |  |
+| E-106 | Any internet connection | On a PC outside the office (another Wi-Fi or mobile hotspot), with only the app installed | Sign in and Create an account work; no Tailscale or setup file needed | ★ |  |
+| E-107 | Server PC off | Stop the server (or switch off the server PC) while signed out | "Can't reach the server"; Check again works; when the server is back, the sign-in form appears by itself within about 5 s |  |  |
 | E-96 | Smallest window | Resize the window to its minimum (960 × 600) | Every screen still usable; nothing overlaps or is cut off |  |  |
 | E-97 | Dark mode everywhere | Switch to Dark and open every screen and dialog | Readable everywhere; no white boxes |  |  |
 | E-98 | Long text | Very long leave reason, very long designation | Wraps neatly; no broken layout |  |  |

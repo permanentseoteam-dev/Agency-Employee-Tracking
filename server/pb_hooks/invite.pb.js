@@ -99,11 +99,61 @@ routerAdd(
     } catch (_) {
       throw new NotFoundError('Employee not found.')
     }
+    if (user.getBool('pending_approval')) throw new BadRequestError('This account is waiting for approval: approve or reject it.')
     user.set('active', d.active)
     user.set('left_on', d.left_on)
     if (!d.active) user.refreshTokenKey()
     e.app.save(user)
     return e.json(200, { id: user.id, active: d.active })
+  },
+  $apis.requireAuth('users')
+)
+
+// Approve a sign-up from "Create an account" (register.pb.js): switch it on, with a
+// joining date (default today) so attendance doesn't count the days before it.
+routerAdd(
+  'POST',
+  '/api/org/approve',
+  (e) => {
+    const org = require(`${__hooks}/lib/org.js`)
+    org.requireAdmin(e)
+    const result = org.validateApprove(e.requestInfo().body)
+    if (result.error) throw new BadRequestError(result.error)
+
+    let user
+    try {
+      user = e.app.findRecordById('users', result.data.userId)
+    } catch (_) {
+      throw new NotFoundError('Employee not found.')
+    }
+    if (!user.getBool('pending_approval')) throw new BadRequestError('This account is not waiting for approval.')
+    user.set('active', true)
+    user.set('pending_approval', false)
+    user.set('joined_on', result.data.joined_on)
+    user.set('left_on', '')
+    e.app.save(user)
+    return e.json(200, { id: user.id })
+  },
+  $apis.requireAuth('users')
+)
+
+// Reject a sign-up: delete the account (its salary record goes with it).
+routerAdd(
+  'POST',
+  '/api/org/reject',
+  (e) => {
+    const org = require(`${__hooks}/lib/org.js`)
+    org.requireAdmin(e)
+    const userId = String((e.requestInfo().body || {}).userId || '')
+    let user
+    try {
+      user = e.app.findRecordById('users', userId)
+    } catch (_) {
+      throw new NotFoundError('Employee not found.')
+    }
+    if (!user.getBool('pending_approval')) throw new BadRequestError('Only accounts waiting for approval can be rejected.')
+    e.app.delete(user)
+    return e.json(200, { id: userId })
   },
   $apis.requireAuth('users')
 )

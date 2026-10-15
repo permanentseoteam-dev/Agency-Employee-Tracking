@@ -3,7 +3,7 @@
 This is how PSEO Tracker runs for the whole agency (roadmap M12), and the steps to set it up.
 
 - **Server:** an office PC runs the database (PocketBase) as the Windows service "PocketBase" from `D:\PSEOTracker`. On Tailscale it is called **agency-server**.
-- **Network:** staff PCs and laptops reach it over **Tailscale**, a free private network, under the agency's Tailscale account. The app connects to `http://agency-server:8090`. Nothing is opened to the internet: the firewall lets only Tailscale addresses reach port 8090.
+- **Network:** the app reaches the server over the normal internet at `https://agency-server.<your-tailnet>.ts.net`, published by Tailscale Funnel on this PC (only `/api`; Part B). Staff PCs need only the app. Sign-ups wait for an admin's approval.
 - **Backups:** PocketBase makes a backup zip every day at 13:00 (Pakistan time). A scheduled task copies it to `E:\PSEOTrackerBackups` at 13:30, or as soon as the PC is on again.
 - **Updates:** installers are published as GitHub Releases of this repo, `permanentseoteam-dev/Agency-Employee-Tracking`, and installed apps update themselves from there (Part D).
 
@@ -44,69 +44,46 @@ The script is safe to run again: finished steps are skipped or refreshed. Run it
 
 ---
 
-## Part B: the Tailscale admin console (once, about 5 minutes)
+## Part B: the public address (Tailscale Funnel)
 
-Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale account.
+The app reaches the server over the normal internet at `https://agency-server.<your-tailnet>.ts.net`. Tailscale Funnel on this PC provides that address, with a real HTTPS certificate and no router changes. Staff PCs and laptops need nothing but the app. Tailscale runs only on the server.
 
-1. **Keep the server connected.** Open **Machines**, then the **⋯** menu on `agency-server`, and choose **Disable key expiry**. Otherwise Tailscale signs the server out after 180 days.
-2. **Let staff PCs reach only the tracker.** Open **Access controls**, replace everything in the editor with the policy below, and click **Save**:
-   ```jsonc
-   {
-     // Only tailnet admins (you) may give devices the tag:staff label.
-     "tagOwners": {
-       "tag:staff": ["autogroup:admin"],
-     },
-     // The server's Tailscale address: replace 100.x.y.z with the one shown under Machines > agency-server.
-     "hosts": {
-       "agency-server": "100.x.y.z",
-     },
-     "grants": [
-       // Your own devices, signed in with the agency account, can reach everything.
-       {"src": ["autogroup:member"], "dst": ["*"], "ip": ["*"]},
-       // Staff PCs and laptops can reach only PSEO Tracker on the server, not each other or your files.
-       {"src": ["tag:staff"], "dst": ["host:agency-server"], "ip": ["tcp:8090"]},
-     ],
-   }
+**Turning it on (once):**
+1. Funnel must be allowed for the tailnet. The first `tailscale funnel` command prints a link for that; open it while signed in as the agency account and enable it.
+2. In PowerShell on this PC:
+   ```powershell
+   & 'C:\Program Files\Tailscale\tailscale.exe' funnel --bg --yes --https=443 --set-path=/api http://127.0.0.1:8090/api
    ```
-   If the server is ever set up again and gets a new Tailscale address, update `hosts`.
-3. **Make a key for staff PCs.** Open **Settings → Keys → Generate auth key**:
-   - **Reusable:** on
-   - **Expiration:** 90 days
-   - **Tags:** `tag:staff`
+   Only `/api` is published. The database dashboard (`/_/`) stays reachable only on this PC.
+3. Check with `tailscale funnel status`; it should list `/api` → `http://127.0.0.1:8090/api`. To switch it off: `tailscale funnel --https=443 off`.
 
-   Click **Generate** and copy the key, which starts with `tskey-auth-`. It is shown only once. Paste it into `F:\agency-tracker\.env.office` as one line, `TS_AUTHKEY=tskey-auth-…`. Git ignores that file. Then build the office setup file (Part C). Devices joined with the key are tagged, so they never need signing in again.
+**What protects the server once it's public:**
+- **Sign-ups wait for an admin:** "Create an account" makes an account that is switched off until you approve it (Part C).
+- **The dashboard is local-only:** superuser sign-in and superuser requests that arrive through Funnel are refused (`security.pb.js`). Funnel marks every request it carries with `X-Forwarded-For`.
+- **Rate limits per visitor:** 5 sign-ups and 30 sign-ins a minute (migration `1792000000`).
+- **Passwords and the server's API rules**, as before.
 
-   The key expires after 90 days. Then make a new one, replace it in `.env.office`, and build the office setup file again. PCs already set up keep working.
-4. **Optional check from your phone:** install the Tailscale app, sign in with the agency account, and open `http://agency-server:8090/api/health` in the phone's browser. It should say `API is healthy`. That proves other devices can reach the server.
+Notes: this PC must be on for anyone to sign in or register. Funnel traffic has bandwidth limits; this app's traffic is tiny. Tailscale's free plan says it isn't meant for business use.
+
+The office setup file and the Tailscale staff key (`.env.office`, `npm run office-setup`) are no longer needed for staff PCs. Keep them only if you ever want PCs on the private network again.
 
 ---
 
-## Part C: staff PCs and laptops (about 5 minutes each)
+## Part C: staff PCs and laptops (about 2 minutes each)
 
-**Before you start:** either add the employee in the app (**Organization → Add employee**) and note their email and temporary password, or let them create their own account in step 3.
+1. On the PC, download `PSEO-Tracker-Setup-<version>.exe` from the repo's **Releases** page on GitHub (or copy it by USB) and run it. Windows SmartScreen may warn the first time: click **More info**, then **Run anyway**. Nothing else needs installing.
+2. The employee either:
+   - **signs in** with the email and temporary password you gave them (**Organization → Add employee**), then chooses a new password, or
+   - clicks **Create an account** and enters their name, email and a password. They see "Account created. It now waits for your admin's approval".
+3. **Approving a sign-up:** you get the bell notification "New sign-up waiting for approval". Open **Organization → Employees**: the box **Waiting for approval** lists them.
+   - **Approve** switches the account on, with today as the joining date. Then open them and set their team, role, designation and salary.
+   - **Reject** deletes the sign-up.
+   - Until approved, signing in says the account is waiting, and they don't appear in attendance, payroll or the Live Board.
+4. After signing in they accept the tracking notice. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
 
-**The office setup file** is one file that does everything: `F:\agency-tracker\dist\office\PSEO-Tracker-Office-Setup-<version>.exe`.
-- Build it with `npm run office-setup`. It packs the newest `dist\PSEO-Tracker-Setup-<version>.exe`, the Tailscale installer and the key from `.env.office` ([build.mjs](../scripts/office-setup/build.mjs)).
-- **It contains the network key: keep it private.** Pass it on only by USB stick or a private Drive folder, never by email to outsiders, and never upload it to GitHub.
-- To check it on any PC without installing anything, run it with `/check`.
+From then on the app starts by itself (hidden in the tray) at every Windows sign-in and records active and idle time during shift hours. Employees can't turn that off. Without internet the app keeps recording and sends the time later. If the server can't be reached while signed out, the app shows "Can't reach the server" and opens sign-in by itself once it can.
 
-1. Copy the office setup file to the PC.
-2. On the PC, signed in to Windows **as the employee**, run it and click **Yes** when Windows asks. A window shows the progress ([setup-staff-pc.ps1](../scripts/staff-pc/setup-staff-pc.ps1)):
-   - installs Tailscale and joins the agency network. A PC whose Tailscale is signed in to another account is switched to the agency network.
-   - checks that `agency-server` answers
-   - installs PSEO Tracker for that Windows user and opens it
-
-   On success the window closes itself; on an error it stays open and shows what went wrong.
-
-**Fallback without the office file:** copy the folder `dist\staff-pc-setup` and double-click **Set up this PC.cmd**. It asks for the key when there is no `tailscale-key.txt` in the folder. Installing only `PSEO-Tracker-Setup-<version>.exe` (for example from GitHub) does **not** connect the PC. The app then shows **"Connect this PC to the agency network first"** instead of sign-in and Create an account, and tells the person to run the office setup file. A PC signed in to another Tailscale account sees "This PC is on a different network". If the server PC is off, the screen says "The server isn't answering". In every case the forms appear by themselves within a few seconds once the server can be reached.
-3. The employee signs in and chooses a new password, or clicks **Create an account** on the sign-in page and fills in their name, email and a password. Then they accept the tracking notice.
-4. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
-
-**People who create their own account** are employees straight away, with no team and no salary, and they are tracked from the start. You get a bell notification, "New employee registered". Open them under **Organization → Employees** and set their team, role, designation and salary. An account you don't recognise can be deactivated there. Only devices on the agency's Tailscale can reach the sign-in page's server, and it accepts at most 5 new accounts a minute from one PC.
-
-From then on the app starts by itself (hidden in the tray) at every Windows sign-in and records active and idle time during shift hours. Employees can't turn that off. Laptops work anywhere with internet. Without a connection they keep recording and send the time later.
-
-**When someone leaves:** deactivate them in the app (**Organization**), and remove their PC under **Machines** in the Tailscale admin console.
+**When someone leaves:** deactivate them in the app (**Organization**).
 
 ---
 

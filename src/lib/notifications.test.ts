@@ -43,6 +43,13 @@ describe('notificationText', () => {
     ).toEqual({ title: 'New employee registered', detail: 'Sara Self · sara@gmail.com · set their team, role and salary' })
   })
 
+  it('asks the admins to approve a sign-up', () => {
+    expect(
+      notificationText({ type: 'signup_pending', payload: { user: 'u9', name: 'Sara Self', email: 'sara@gmail.com' } })
+    ).toEqual({ title: 'New sign-up waiting for approval', detail: 'Sara Self · sara@gmail.com · approve or reject it in Organization' })
+    expect(notificationLink({ type: 'signup_pending' })).toBe('/org/employees')
+  })
+
   it('copes with unknown types and empty payloads', () => {
     expect(notificationText({ type: 'something_else', payload })).toEqual({ title: 'Notification', detail: '' })
     expect(notificationText({ type: 'leave_requested', payload: null }).title).toBe('Notification')

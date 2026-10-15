@@ -21,8 +21,12 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
       const status = (err as { status?: number }).status
       setError(
         status === 0
-          ? 'Cannot reach the server. Check your connection, or run the office setup file from your admin.'
-          : 'Email or password is incorrect, or your account is inactive.'
+          ? 'Cannot reach the server. Check your connection and try again.'
+          : status === 403
+            ? 'Your account is waiting for your admin’s approval, or it has been switched off. Ask your admin.'
+            : status === 429
+              ? 'Too many sign-in attempts. Wait a minute and try again.'
+              : 'Email or password is incorrect.'
       )
     } finally {
       setBusy(false)

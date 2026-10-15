@@ -1,10 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
-// "Create an account" on the sign-in page. Open to guests: anyone who can reach
-// the server (only devices on the agency's Tailscale) can register, and is an
-// active employee at once. Role, team, joining date and salary are always set
-// here, never taken from the request; the admins are notified so they can fill
-// in the rest under Organization. The 1791990000_register_rate_limit migration
-// allows 5 registrations a minute per address.
+// "Create an account" on the sign-in page. Open to guests, and the server is
+// reachable from the internet, so a new account starts switched off and waiting
+// for an admin (pending_approval): it can't sign in, and attendance, payroll and
+// the Live Board leave it out until an admin approves it (POST /api/org/approve).
+// Role, team, salary and status are always set here, never taken from the request.
+// Rate limit: 5 sign-ups a minute per visitor (migration 1792000000).
 // Each handler runs in its own isolated context: helpers come from require().
 
 routerAdd('POST', '/api/register', (e) => {
@@ -32,9 +32,9 @@ routerAdd('POST', '/api/register', (e) => {
     user.set('phone', d.phone)
     user.set('role', 'employee')
     user.set('team', '')
-    // Today, so attendance doesn't mark the days before they joined as absent.
-    user.set('joined_on', org.todayKey())
-    user.set('active', true)
+    user.set('joined_on', '') // set when an admin approves the account
+    user.set('active', false)
+    user.set('pending_approval', true)
     user.set('must_change_password', false) // they chose this password themselves
     txApp.save(user)
 
@@ -52,7 +52,7 @@ routerAdd('POST', '/api/register', (e) => {
     for (const admin of e.app.findRecordsByFilter('users', "role = 'admin' && active = true", '', 0, 0)) {
       const n = new Record(collection)
       n.set('user', admin.id)
-      n.set('type', 'employee_registered')
+      n.set('type', 'signup_pending')
       n.set('payload', { user: id, name: d.full_name, email: d.email })
       e.app.save(n)
     }

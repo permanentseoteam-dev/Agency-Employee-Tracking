@@ -8,20 +8,24 @@ import { Card } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { ROLE_LABEL } from '@/lib/roles'
-import { useEmployees, useTeams } from './api'
+import { useEmployees, useOrgLive, useTeams } from './api'
+import { PendingSignups } from './PendingSignups'
 
 export function Employees() {
   const navigate = useNavigate()
   const employees = useEmployees()
+  useOrgLive()
   const teams = useTeams()
   const [search, setSearch] = useState('')
   const [team, setTeam] = useState('')
   const [showInactive, setShowInactive] = useState(false)
 
+  const pending = useMemo(() => (employees.data ?? []).filter((e) => e.pending_approval), [employees.data])
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return (employees.data ?? []).filter(
       (e) =>
+        !e.pending_approval &&
         (showInactive || e.active) &&
         (!team || (team === 'none' ? !e.team : e.team === team)) &&
         (!q || `${e.full_name} ${e.email ?? ''} ${e.designation}`.toLowerCase().includes(q))
@@ -30,6 +34,7 @@ export function Employees() {
 
   return (
     <div className="space-y-4">
+      <PendingSignups people={pending} />
       <div className="flex flex-wrap items-center gap-3">
         <Input
           aria-label="Search employees"
@@ -99,7 +104,7 @@ export function Employees() {
         )}
       </Card>
       <p className="text-xs text-slate-500">
-        {rows.length} of {employees.data?.length ?? 0} people shown
+        {rows.length} of {(employees.data?.length ?? 0) - pending.length} people shown
       </p>
     </div>
   )

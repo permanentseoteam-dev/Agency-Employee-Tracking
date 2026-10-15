@@ -24,8 +24,9 @@ Sign in as Ayesha (admin). Admins can do everything; these tests cover what only
 | A-14 | Can't deactivate yourself | Try to deactivate Ayesha | Refused |  | ✓ |
 | A-15 | Change role or team | Make Chand a manager, or move him to Bravo | Takes effect after his next sign-in; his menu and data scope change |  |  |
 | A-16 | Long names | Add someone with a very long name and designation | Lists, cards and the detail page stay tidy |  |  |
-| A-90 | Someone creates their own account | After E-100 | The bell: "New employee registered" with their name and email; clicking it opens Organization → Employees, where they're active with no team and salary 0 | ★ | ✓ |
-| A-91 | Set up a registered person | Open them and set team, role, designation and salary | Saved; their manager sees them on the Live Board; payroll includes them once a salary is set |  |  |
+| A-90 | Approve a sign-up | After E-100 | The bell: "New sign-up waiting for approval"; Organization → Employees shows **Waiting for approval (1)**; Approve → active, joined today; the person can now sign in | ★ | ✓ |
+| A-91 | Reject a sign-up | Another person uses Create an account; click Reject, then "Yes, delete this sign-up" | The sign-up disappears and is deleted; signing in with it fails |  | ✓ |
+| A-93 | Dashboard stays local | From another network, try the dashboard address `https://agency-server.<tailnet>.ts.net/_/` and a superuser sign-in to `/api/collections/_superusers/auth-with-password` | The dashboard isn't published (404); the superuser sign-in is refused (403). On the server PC, http://127.0.0.1:8090/_/ works | ★ | ✓ |
 
 ## 2. Rules
 
