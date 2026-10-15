@@ -9,7 +9,7 @@ Sign in as Bilal (manager of Alpha). Sana manages Bravo; use her to check team b
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
 | M-01 | Sign in | Sign in as bilal@test.local | Lands on the Live Board; the top bar shows "Manager" | ★ |  |
-| M-02 | Manager menu | Look at the sidebar | My Stats, My Attendance, My Leaves, Calendar, Live Board, Approvals, Attendance, Reports; no Organization, Rules or Finance |  |  |
+| M-02 | Manager menu | Look at the sidebar | My Stats, My Attendance, My Leaves, Calendar, Live Board, Approvals, Attendance, Reports, Finance; no Organization or Rules |  |  |
 | M-03 | Own tracking and leave | Run E-20 to E-22, E-40 and E-50 to E-63 once as Bilal | Same results as for an employee |  |  |
 | M-04 | Quit from the tray | Right-click the tray icon → Quit | Quit is there; the app closes cleanly (no error) | ★ | – |
 | M-05 | Quit from the profile menu | Profile menu → Quit PSEO Tracker | The app closes cleanly |  |  |
@@ -42,6 +42,7 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 | M-25 | New requests arrive live | Keep Pending open while Asma applies | It appears without refreshing |  | ✓ |
 | M-26 | Can't change a decision | (server check) Reverse an approval as a manager | Refused: only an admin can |  | ✓ |
 | M-27 | Other teams and managers | (server check) Decide a Bravo request, or a manager's request in your team | Refused: managers' leave is decided by an admin |  | ✓ |
+| M-28 | Admin decisions are off limits | (server check) Decide the admin's own leave, or change the comment on a decision an admin made | Refused |  | ✓ |
 
 ## 4. Attendance and Reports
 
@@ -68,8 +69,8 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| M-50 | Admin pages blocked | (automated) Open the Organization, Rules or Finance address | Sent back to the Live Board | ★ |  |
-| M-51 | No salaries | (server check) Read salaries or payroll | Empty or refused |  | ✓ |
+| M-50 | Admin pages blocked | (automated) Open the Organization or Rules address; then the Finance Payroll or Salaries address | Organization and Rules: sent back to the Live Board. Payroll and Salaries: sent to My pay | ★ |  |
+| M-51 | Only own pay | Finance; (server check) read salaries or payroll | My pay shows Bilal's own salary and finalized months; nothing from his team |  | ✓ |
 | M-52 | No rule or calendar changes | (server check) Change rules, leave types, holidays, events or teams | Refused |  | ✓ |
 | M-53 | No staff admin | (server check) Add an employee, reset a password, deactivate someone | Refused |  | ✓ |
 | M-54 | Can't change own role or team | (server check) | Refused |  | ✓ |

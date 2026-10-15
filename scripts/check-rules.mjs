@@ -125,8 +125,13 @@ try {
   check('users token lasts 30 days', usersCol.authToken.duration === 2592000)
 
   // --- salaries & payroll -----------------------------------------------------
-  check('employee sees no salaries', (await pbEmpA.collection('salaries').getFullList()).length === 0)
-  check('manager sees no salaries', (await pbMgrA.collection('salaries').getFullList()).length === 0)
+  const empSalaries = await pbEmpA.collection('salaries').getFullList()
+  check('employee sees only their own salary', empSalaries.length === 1 && empSalaries[0].user === empA.id, `got ${empSalaries.length}`)
+  const mgrSalaries = await pbMgrA.collection('salaries').getFullList()
+  check('manager sees only their own salary', mgrSalaries.length === 1 && mgrSalaries[0].user === mgrA.id, `got ${mgrSalaries.length}`)
+  await denied('employee cannot change their own salary', () =>
+    pbEmpA.collection('salaries').update(empSalaries[0]?.id ?? 'missing', { monthly_salary_pkr: 999999 })
+  )
   check('admin sees all 5 salaries', (await pbAdmin.collection('salaries').getFullList()).length === 5)
   await denied('employee cannot create a payroll run', () =>
     pbEmpA.collection('payroll_runs').create({ month: '2026-10', status: 'draft' })
@@ -289,7 +294,11 @@ try {
   })
   check('one line per employee with a salary (not someone who left in September)', run.items === 5, JSON.stringify(run))
   const line = await pbAdmin.collection('payroll_items').getFirstListItem(`run = "${run.run}" && user = "${empA.id}"`)
-  check('employees cannot read payroll', (await pbEmpA.collection('payroll_items').getFullList()).length === 0)
+  check('an employee sees no draft payroll (run or line)',
+    (await pbEmpA.collection('payroll_items').getFullList()).length === 0 && (await pbEmpA.collection('payroll_runs').getFullList()).length === 0)
+  await denied('an employee cannot edit their own payroll line', () =>
+    pbEmpA.collection('payroll_items').update(line.id, { adjustment_pkr: 99999 })
+  )
   await allowed('admin sets an adjustment and note on a draft line', () =>
     pbAdmin.collection('payroll_items').update(line.id, { adjustment_pkr: -5000, note: 'Advance' })
   )
@@ -300,6 +309,11 @@ try {
   const recounted = await pbAdmin.collection('payroll_items').getFirstListItem(`run = "${run.run}" && user = "${empA.id}"`)
   check('recounting a draft keeps adjustments and notes', recounted.adjustment_pkr === -5000 && recounted.note === 'Advance')
   await allowed('admin finalizes the run', () => pbAdmin.collection('payroll_runs').update(run.run, { status: 'finalized' }))
+  const empLines = await pbEmpA.collection('payroll_items').getFullList({ expand: 'run' })
+  check('once finalized, the employee sees only their own line and its month',
+    empLines.length === 1 && empLines[0].user === empA.id && empLines[0].expand?.run?.status === 'finalized', JSON.stringify(empLines.map((l) => l.user)))
+  const mgrLines = await pbMgrA.collection('payroll_items').getFullList()
+  check('the manager sees only their own line, not their team’s', mgrLines.length === 1 && mgrLines[0].user === mgrA.id, `got ${mgrLines.length}`)
   await denied('a finalized run cannot be reopened', () => pbAdmin.collection('payroll_runs').update(run.run, { status: 'draft' }))
   await denied('a finalized run cannot be deleted', () => pbAdmin.collection('payroll_runs').delete(run.run))
   await denied('a finalized line cannot be edited', () => pbAdmin.collection('payroll_items').update(recounted.id, { adjustment_pkr: 0 }))
@@ -373,6 +387,8 @@ try {
     pbEmpA.collection('leave_requests').update(week?.id ?? 'missing', { status: 'cancelled' }))
   await allowed('admin reverses: approved → rejected', () =>
     pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'rejected', comment: 'Busy week' }))
+  await denied('a manager cannot rewrite the comment on an admin’s decision', () =>
+    pbMgrA.collection('leave_requests').update(week?.id ?? 'missing', { comment: 'Overruled' }))
   await allowed('admin reverses: rejected → approved', () =>
     pbAdmin.collection('leave_requests').update(week?.id ?? 'missing', { status: 'approved' }))
   await allowed('admin cancels approved leave', () =>
@@ -389,6 +405,11 @@ try {
   await allowed('an admin decides that manager’s request', () =>
     pbAdmin.collection('leave_requests').update(mgrBReq.id, { status: 'approved' }))
   await root.collection('users').update(mgrB.id, { team: teamB.id })
+  const adminReq = await apply(pbAdmin, admin.id, { start_date: '2026-11-05', end_date: '2026-11-05' })
+  await denied('a manager cannot decide the admin’s own leave', () =>
+    pbMgrA.collection('leave_requests').update(adminReq.id, { status: 'approved' }))
+  await allowed('the admin cancels their own pending request', () =>
+    pbAdmin.collection('leave_requests').update(adminReq.id, { status: 'cancelled' }))
 
   const imported = await root.collection('leave_requests').create({
     user: empB.id, leave_type: casual.id, start_date: '2026-11-10', end_date: '2026-11-10', status: 'approved'

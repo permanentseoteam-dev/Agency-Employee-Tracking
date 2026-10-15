@@ -216,7 +216,7 @@ export function PayrollDetail() {
   )
 }
 
-function Total({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+export function Total({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <Card className="px-4 py-3">
       <div className="text-xs text-slate-500">{label}</div>
@@ -239,7 +239,7 @@ function Row({ label, detail, amount, strong }: { label: string; detail?: string
   )
 }
 
-function LineDialog({ line, month, editable, onClose }: { line: PayrollLine; month: string; editable: boolean; onClose: () => void }) {
+export function LineDialog({ line, month, editable, onClose }: { line: PayrollLine; month: string; editable: boolean; onClose: () => void }) {
   const update = useUpdateLine()
   const b = breakdown(line)
   const [adjustment, setAdjustment] = useState(String(line.adjustment_pkr || ''))

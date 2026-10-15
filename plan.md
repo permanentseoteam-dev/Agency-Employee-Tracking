@@ -150,13 +150,13 @@ These settings live in a single `org_settings` record:
 - leave types, with name, yearly quota and paid or unpaid (in the `leave_types` collection)
 
 ### 4.5 Finance (Payroll)
-- Each employee has a fixed **monthly salary (PKR)**, stored in the admin-only `salaries` collection.
+- Each employee has a fixed **monthly salary (PKR)**, stored in the `salaries` collection: only admins change it; everyone else reads only their own.
 - **Per-day rate** = monthly salary ÷ working days in the month (weekends and holidays excluded).
 - **Deductions** = (absent days + unpaid-leave days + 0.5 × half days) × per-day rate + (late count × late penalty).
 - **Net** = monthly salary − deductions + adjustment.
 - **Adjustment (admin only):** each draft line has `adjustment_pkr` (plus or minus) and a `note`. The admin decides the final pay for anyone who joined or left mid-month, or for any other exception, for example −20,000 with the note "Left on the 18th". The app doesn't pro-rate automatically.
 - **Flow:** the admin picks a month. `POST /api/payroll/run` creates **draft** items. The admin reviews each employee's breakdown, then **finalizes**. A finalized run is locked: a hook rejects any change to it or its items.
-- **Screens:** Salary Setup, Payroll Runs, Payroll Detail.
+- **Screens:** Salary Setup, Payroll Runs, Payroll Detail (admins). Managers and employees see Finance → My pay: their own salary and their lines in finalized months, read-only.
 
 ### 4.6 Working Calendar
 - A month view showing:
@@ -227,7 +227,7 @@ Shorthand used in the table:
 | Collection | List / View | Create | Update | Delete |
 |---|---|---|---|---|
 | `users` | auth | locked (invite route) | admin, or `id = @request.auth.id && @request.body.role:isset = false && @request.body.team:isset = false && @request.body.active:isset = false` | locked |
-| `salaries`, `payroll_runs`, `payroll_items` | admin | admin | admin (hooks: a finalized run and its items are locked; only a draft item's adjustment and note change) | admin (not when finalized) |
+| `salaries`, `payroll_runs`, `payroll_items` | admin, or own: `salaries` own row; `payroll_items` own lines in finalized runs; `payroll_runs` finalized ones (migration `1792012000`) | admin | admin (hooks: a finalized run and its items are locked; only a draft item's adjustment and note change) | admin (not when finalized) |
 | `activity_segments` | own \|\| staff | self-create | locked | locked |
 | `presence` | own \|\| staff | self-create | own | locked |
 | `attendance` | own \|\| staff | locked (hook) | locked (hook) | locked |
@@ -316,7 +316,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
 7. Switch roles in the dropdown. The sidebar and landing page change.
 8. Use the profile menu: edit profile, toggle the theme, log out.
 9. Run `npm run build` to produce the installer. Install it, reboot, and confirm the app auto-starts and tracks against the production server.
-10. Signed in as an employee, call the API directly: listing `salaries` or `payroll_items` returns nothing, editing an `activity_segments` record is refused, and the tray has no Quit.
+10. Signed in as an employee, call the API directly: listing `salaries` or `payroll_items` returns only their own (finalized lines only), editing an `activity_segments` record is refused, and the tray has no Quit.
 11. As a manager, the Live Board, attendance and reports show only your own team. Your own leave request can't be approved by you.
 12. Set a PC clock 1 hour ahead and the segments are rejected and logged. Start the app twice and only one copy runs.
 13. Deactivate an employee and they can't log in. Reset a password and the employee is forced to change it at the next login.

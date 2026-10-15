@@ -6,6 +6,7 @@
 //   npm run test:env -- --stop    stop a test environment whose window is gone
 import { PASSWORD, startTestServer } from './server.mjs'
 import { NEW_HIRE_PASSWORD, PEOPLE, seed } from './seed.mjs'
+import { seedExtras } from './seed-extras.mjs'
 import { ensureTestBuild } from './build.mjs'
 import { clearState, readState, stopRecorded, writeState } from './state.mjs'
 
@@ -39,6 +40,7 @@ process.on('SIGTERM', stop)
 
 try {
   const info = await seed(server.api, { log: (m) => console.log('  seed ' + m) })
+  await seedExtras(server.api, info, { log: (m) => console.log('  seed ' + m) })
   writeState({ url: server.url, pid: server.pid, envPid: process.pid, dataDir: server.dataDir, today: info.today, apps: [] })
   ensureTestBuild(server.url, { force: process.argv.includes('--rebuild'), log: (m) => console.log('  ' + m) })
 } catch (err) {

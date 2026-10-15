@@ -82,7 +82,7 @@ Sign in as Ayesha (admin). Admins can do everything; these tests cover what only
 | A-66 | Finalize locks it | Finalize the run | Read-only: no adjustment edits, no delete, no reopen, no recount | ★ | ✓ |
 | A-67 | Future month refused | Run a month after this one | Refused |  | ✓ |
 | A-68 | Counted figures are locked | (server check) Edit deductions or base on a line | Refused; only adjustment and note can change on a draft |  | ✓ |
-| A-69 | Nobody else sees pay | (server check) A manager or employee reads salaries or payroll | Empty or refused |  | ✓ |
+| A-69 | Others see only their own pay | (server check) A manager or employee reads or changes salaries or payroll | Only their own salary and their own lines in finalized months; no drafts; changes refused |  | ✓ |
 
 ## 6. System and the installed app
 

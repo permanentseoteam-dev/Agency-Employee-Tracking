@@ -8,7 +8,8 @@ export const financeKeys = {
   runs: ['finance', 'runs'] as const,
   run: (id: string) => ['finance', 'run', id] as const,
   items: (runId: string) => ['finance', 'items', runId] as const,
-  salaries: ['finance', 'salaries'] as const
+  salaries: ['finance', 'salaries'] as const,
+  mine: (userId: string) => ['finance', 'mine', userId] as const
 }
 
 export type PayrollLine = PayrollItem & { expand?: { user?: Employee } }
@@ -90,6 +91,26 @@ export function useDeleteRun() {
   return useMutation({
     mutationFn: (id: string) => pb.collection('payroll_runs').delete(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all })
+  })
+}
+
+export type MyPayLine = PayrollLine & { expand?: { run?: PayrollRun } }
+
+/** One person's salary and their lines in finalized months, newest first (read-only for non-admins). */
+export function useMyPay(userId: string) {
+  return useQuery({
+    queryKey: financeKeys.mine(userId),
+    queryFn: async () => {
+      const [salaries, lines] = await Promise.all([
+        pb.collection('salaries').getList<Salary>(1, 1, { filter: pb.filter('user = {:u}', { u: userId }) }),
+        pb.collection('payroll_items').getFullList<MyPayLine>({
+          filter: pb.filter('user = {:u} && run.status = "finalized"', { u: userId }),
+          expand: 'run,user'
+        })
+      ])
+      const month = (l: MyPayLine) => l.expand?.run?.month ?? ''
+      return { salary: salaries.items[0] ?? null, lines: lines.sort((a, b) => month(b).localeCompare(month(a))) }
+    }
   })
 }
 

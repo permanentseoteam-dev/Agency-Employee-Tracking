@@ -36,7 +36,7 @@ Every account uses the password `Test-pass-123` unless shown. Dates are relative
 | Employee (Alpha) | Nadia New | newhire@test.local, password `Temp-pass-1` | First sign-in: forced password change, then the tracking notice |
 | Employee (left) | Faisal Left | faisal@test.local | Deactivated: must not be able to sign in |
 
-Seeded on top: teams Alpha and Bravo, the default rules (09:00–18:00, Mon–Fri, 15 min grace, 5 min idle), the last 9 working days of tracked time and attendance, one "Test Holiday" in those days, a company-wide "Company town hall" tomorrow and an "Alpha sprint review" for Alpha only. The seed lives in `scripts/test-env/seed.mjs`.
+Seeded on top: teams Alpha and Bravo, the default rules (09:00–18:00, Mon–Fri, 15 min grace, 5 min idle), the last 9 working days of tracked time and attendance, one "Test Holiday" in those days, a company-wide "Company town hall" tomorrow and an "Alpha sprint review" for Alpha only. Also an unpaid "Emergency" leave type, and finalized payroll for the three months before this one, so every role has pay to look at under Finance. The seed lives in `scripts/test-env/seed.mjs` and `seed-extras.mjs`.
 
 ## Before every update (about 20 minutes)
 

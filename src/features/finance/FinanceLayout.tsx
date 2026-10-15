@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom'
+import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 
 const TABS = [
@@ -6,7 +7,22 @@ const TABS = [
   { to: '/finance/salaries', label: 'Salaries' }
 ]
 
+const MY_PAY = '/finance/my-pay'
+
 export function FinanceLayout() {
+  const { role } = useRole()
+  const { pathname } = useLocation()
+
+  // Everyone sees Finance; only admins run payroll and set salaries. The rest see their own pay.
+  if (role !== 'admin') {
+    if (pathname !== MY_PAY) return <Navigate to={MY_PAY} replace />
+    return (
+      <div className="mx-auto max-w-6xl">
+        <Outlet />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Finance">

@@ -81,8 +81,9 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-65 | Sick leave sent afterwards | Apply Sick for a past working day | Allowed |  |  |
 | E-66 | Decision arrives live | Keep My Leaves open while the manager decides | The row updates by itself; the bell goes up by one |  |  |
 | E-67 | Rejection with a reason | Switch account to Danish, open My Leaves | The Annual request is Rejected with "Client deadline that week" |  |  |
+| E-68 | Emergency leave | Apply for leave → Leave type | "Emergency (unpaid)" is in the list; it has no yearly limit |  |  |
 
-## 5. Calendar, notifications, profile and settings
+## 5. Calendar, notifications, profile, settings and pay
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
@@ -98,13 +99,15 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-79 | Start with Windows | Settings, in an installed copy (Admin plan A-85) | On and locked for an employee |  | – |
 | E-80 | Logs folder | Settings → Open logs folder | Explorer opens the folder with main.log |  | – |
 | E-81 | Others' notifications are private | (server check) Read or change someone else's notification | Refused |  | ✓ |
+| E-82 | My pay | Open Finance as Asma | Lands on My pay: salary PKR 90,000 and the three months before this one, each with its net pay; clicking a month shows its breakdown; no Run payroll, Salaries or edit buttons | ★ |  |
+| E-83 | Only your own pay | Open the `#/finance/payroll` or `#/finance/salaries` address; (server check) read salaries or payroll | Sent back to My pay; only your own salary and your own lines in finalized months come back; nothing can be changed |  | ✓ |
 
 ## 6. Limits, resilience and display
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Calendar | ★ |  |
-| E-91 | Manager pages blocked | (automated) Open the Live Board, Approvals, Organization or Finance address | Sent back to My Stats |  |  |
+| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Calendar, Finance | ★ |  |
+| E-91 | Manager pages blocked | (automated) Open the Live Board, Approvals or Organization address | Sent back to My Stats |  |  |
 | E-92 | Other people's data is private | (server check) Read another person's attendance, leave, time, live status or salary | Refused or empty |  | ✓ |
 | E-93 | Can't decide own leave | (server check) Approve your own request | Refused |  | ✓ |
 | E-94 | Can't promote yourself | (server check) Change your own role or team | Refused |  | ✓ |

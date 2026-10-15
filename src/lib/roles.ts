@@ -45,7 +45,7 @@ export const NAV: NavItem[] = [
   { path: '/reports', label: 'Reports', icon: 'reports', minRole: 'manager', module: 'M6' },
   { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', module: 'M3' },
   { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'admin', module: 'M4' },
-  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'admin', module: 'M11' }
+  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', module: 'M11' }
 ]
 
 /** Pages every signed-in user can open, whatever role is selected. */
