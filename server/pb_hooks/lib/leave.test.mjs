@@ -98,6 +98,67 @@ describe('quotaProblem', () => {
   })
 })
 
+describe('leave per month', () => {
+  it('splits a request’s working days by month', () => {
+    // Thu 29 Oct – Tue 3 Nov 2026: Thu, Fri in October; Mon, Tue in November
+    expect(l.leaveByMonth('2026-10-29', '2026-11-03', false, MON_FRI, [])).toEqual({
+      '2026-10': { full: 2, half: 0 },
+      '2026-11': { full: 2, half: 0 }
+    })
+    expect(l.leaveByMonth('2026-10-29', '2026-11-03', false, MON_FRI, ['2026-11-02'])['2026-11']).toEqual({ full: 1, half: 0 })
+  })
+
+  it('counts a half day (short leave) once, on a working day only', () => {
+    expect(l.leaveByMonth('2026-10-20', '2026-10-20', true, MON_FRI, [])).toEqual({ '2026-10': { full: 0, half: 1 } })
+    expect(l.leaveByMonth('2026-10-24', '2026-10-24', true, MON_FRI, [])).toEqual({}) // Saturday
+  })
+
+  it('adds up other requests inside one month', () => {
+    const requests = [
+      { start_date: '2026-10-05', end_date: '2026-10-06', half_day: false },
+      { start_date: '2026-10-29', end_date: '2026-11-03', half_day: false },
+      { start_date: '2026-10-20', end_date: '2026-10-20', half_day: true },
+      { start_date: '2026-11-10', end_date: '2026-11-10', half_day: true }
+    ]
+    expect(l.monthTotals(requests, '2026-10', MON_FRI, [])).toEqual({ full: 4, half: 1 })
+    expect(l.monthTotals(requests, '2026-11', MON_FRI, [])).toEqual({ full: 2, half: 1 })
+  })
+})
+
+describe('monthlyLimitProblem', () => {
+  const limits = { full: 2, half: 3 }
+
+  it('allows leave up to each limit', () => {
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 1, half: 2 }, { full: 1, half: 0 })).toBeNull()
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 2, half: 2 }, { full: 0, half: 1 })).toBeNull()
+  })
+
+  it('refuses full days past the limit, saying what is left', () => {
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 1, half: 0 }, { full: 3, half: 0 })).toBe(
+      'Only 1 full day of leave left in October (limit 2 a month); this request needs 3.'
+    )
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 2, half: 0 }, { full: 1, half: 0 })).toBe(
+      'No full-day leave left in October (limit 2 a month).'
+    )
+  })
+
+  it('refuses half days (short leave) past their own limit', () => {
+    expect(l.monthlyLimitProblem(limits, '2026-11', { full: 0, half: 3 }, { full: 0, half: 1 })).toBe(
+      'No half-day (short) leave left in November (limit 3 a month).'
+    )
+  })
+
+  it('counts full days and half days separately', () => {
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 2, half: 0 }, { full: 0, half: 1 })).toBeNull()
+    expect(l.monthlyLimitProblem(limits, '2026-10', { full: 0, half: 3 }, { full: 2, half: 0 })).toBeNull()
+  })
+
+  it('0 means no limit', () => {
+    expect(l.monthlyLimitProblem({ full: 0, half: 0 }, '2026-10', { full: 20, half: 9 }, { full: 5, half: 1 })).toBeNull()
+    expect(l.monthlyLimitProblem({ full: 0, half: 1 }, '2026-10', { full: 20, half: 0 }, { full: 5, half: 0 })).toBeNull()
+  })
+})
+
 describe('decisionProblem', () => {
   it('lets the owner cancel only while pending', () => {
     expect(l.decisionProblem(EMP, EMP, 'pending', 'cancelled')).toBeNull()

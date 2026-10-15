@@ -23,11 +23,21 @@ export interface RegisteredPayload {
   email: string
 }
 
+/** An admin gave stars by hand (stars.pb.js); the stars are the rule's at that moment. */
+export interface StarsPayload {
+  record: string
+  rule_name: string
+  stars: number
+  date: string
+  note: string
+  given_by_name: string
+}
+
 export interface NotificationRecord {
   id: string
   user: string
   type: string
-  payload: LeavePayload | RegisteredPayload | null
+  payload: LeavePayload | RegisteredPayload | StarsPayload | null
   read_at: string
   created: string
 }
@@ -65,6 +75,11 @@ export function notificationText(n: Pick<NotificationRecord, 'type' | 'payload'>
     const r = n.payload as RegisteredPayload
     return { title: 'New employee registered', detail: [r.name, r.email, 'set their team, role and salary'].filter(Boolean).join(' · ') }
   }
+  if (n.type === 'stars_given') {
+    const s = n.payload as StarsPayload
+    const title = s.stars > 0 ? `You got ${s.stars} star${s.stars === 1 ? '' : 's'}` : 'A rule break was noted'
+    return { title, detail: [s.rule_name, dateRange(s.date, s.date), s.note, s.given_by_name && `by ${s.given_by_name}`].filter(Boolean).join(' · ') }
+  }
   const p = n.payload as LeavePayload
   const detail = [p.leave_type_name || 'Leave', dateRange(p.start_date, p.end_date), daysText(p.days, p.half_day)].join(' · ')
   if (n.type === 'leave_requested') {
@@ -87,6 +102,7 @@ export function notificationLink(n: Pick<NotificationRecord, 'type'>): string | 
   if (n.type === 'leave_requested') return '/approvals'
   if (n.type === 'leave_decided') return '/my-leaves'
   if (n.type === 'employee_registered' || n.type === 'signup_pending') return '/org/employees'
+  if (n.type === 'stars_given') return '/my-attendance'
   return null
 }
 

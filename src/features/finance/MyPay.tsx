@@ -19,8 +19,6 @@ export function MyPay() {
 
   const { salary, lines } = pay.data
   const latest = lines[0]
-  // Late days only matter where a line has some (pay for lateness is being replaced by stars).
-  const showLate = lines.some((l) => l.late_count > 0)
 
   return (
     <div className="space-y-4">
@@ -48,7 +46,6 @@ export function MyPay() {
                 <Th className="text-right">Absent</Th>
                 <Th className="text-right">Unpaid leave</Th>
                 <Th className="text-right">Half days</Th>
-                {showLate && <Th className="text-right">Late</Th>}
                 <Th className="text-right">Deductions</Th>
                 <Th className="text-right">Adjustment</Th>
                 <Th className="text-right">Net pay</Th>
@@ -68,7 +65,6 @@ export function MyPay() {
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.absent_days || '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.unpaid_leave_days || '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.half_days || '–'}</Td>
-                  {showLate && <Td className="whitespace-nowrap text-right tabular-nums">{i.late_count || '–'}</Td>}
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.deductions ? formatPkr(-i.deductions) : '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums" title={i.note || undefined}>
                     {formatAdjustment(i.adjustment_pkr)}
@@ -81,8 +77,8 @@ export function MyPay() {
         )}
       </Card>
       <p className="text-xs text-slate-500">
-        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate
-        {showLate && ' + late × late penalty'}. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
+        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate. Late
+        days cost nothing: they give stars instead. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
       </p>
 
       {open && <LineDialog line={open} month={open.expand?.run?.month ?? ''} editable={false} onClose={() => setOpen(null)} />}

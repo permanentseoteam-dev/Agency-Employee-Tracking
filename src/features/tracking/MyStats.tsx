@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Table, Td, Th } from '@/components/ui/Table'
-import { formatDate } from '@/lib/dates'
+import { addDays, formatDate } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
-import { totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
+import { monthWeeks, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
 import { cn } from '@/lib/cn'
-import { todayKey, useMyWeek, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
+import { todayKey, useMySegments, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
 import { StatusBadge } from './StatusBadge'
 
 const REASON: Record<TrackerStatus['reason'], string> = {
@@ -16,6 +16,16 @@ const REASON: Record<TrackerStatus['reason'], string> = {
   suspended: 'Paused while the PC sleeps.',
   no_consent: 'Waiting for the tracking notice.',
   no_user: 'Not signed in.'
+}
+
+const MONTH = new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+const DAY = new Intl.DateTimeFormat('en-GB', { day: 'numeric', timeZone: 'UTC' })
+const DAY_MONTH = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+const at = (d: string) => new Date(d + 'T12:00:00Z')
+
+/** "5 – 11 Oct", or "1 Oct" for a one-day week. */
+function weekLabel(from: string, to: string): string {
+  return from === to ? DAY_MONTH.format(at(from)) : `${DAY.format(at(from))} – ${DAY_MONTH.format(at(to))}`
 }
 
 function Stat({ label, value, className }: { label: string; value: string; className?: string }) {
@@ -32,7 +42,10 @@ export function MyStats() {
   const status = useTrackerStatus()
   const today = todayKey(tz)
   const days = weekOf(today)
-  const week = useMyWeek(days[0])
+  const weeks = monthWeeks(today)
+  const monthStart = weeks[0].from
+  // One query covers both cards: from this week's Monday or the 1st, whichever is earlier.
+  const week = useMySegments(days[0] < monthStart ? days[0] : monthStart)
 
   const byDay = useMemo(() => {
     const t = totalsByDay(week.data ?? [], tz)
@@ -41,10 +54,10 @@ export function MyStats() {
     return t
   }, [week.data, status, today, tz])
 
-  const weekTotal = days.reduce(
-    (sum, d) => ({ active_s: sum.active_s + (byDay[d]?.active_s ?? 0), idle_s: sum.idle_s + (byDay[d]?.idle_s ?? 0) }),
-    { active_s: 0, idle_s: 0 }
-  )
+  const weekTotal = sumDays(byDay, days[0], days[6])
+  const monthTotal = sumDays(byDay, monthStart, today)
+  let daysWorked = 0
+  for (let d = monthStart; d <= today; d = addDays(d, 1)) if ((byDay[d]?.active_s ?? 0) > 0) daysWorked++
   const live: LiveStatus = status?.state === 'active' ? 'active' : status?.state === 'idle' ? 'idle' : 'offline'
   const note = status && !status.signedIn ? 'Signed out – your time is saved and syncs after you sign in.' : status ? REASON[status.reason] : ''
 
@@ -102,6 +115,50 @@ export function MyStats() {
               </tr>
             </tbody>
           </Table>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle>This month</CardTitle>
+          <span className="text-sm text-slate-500">{MONTH.format(at(today))}</span>
+        </CardHeader>
+        {week.isError ? (
+          <p className="p-5 text-sm text-red-600">Could not load this month.</p>
+        ) : (
+          <>
+            <CardContent className="grid grid-cols-2 gap-6 sm:grid-cols-3">
+              <Stat label="Active" value={formatDuration(monthTotal.active_s)} className="text-emerald-700 dark:text-emerald-400" />
+              <Stat label="Idle" value={formatDuration(monthTotal.idle_s)} className="text-amber-700 dark:text-amber-400" />
+              <Stat label="Days with activity" value={String(daysWorked)} />
+            </CardContent>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Week</Th>
+                  <Th className="text-right">Active</Th>
+                  <Th className="text-right">Idle</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {weeks.map((w) => {
+                  const total = sumDays(byDay, w.from, w.to)
+                  return (
+                    <tr key={w.from} className={w.from <= today && today <= w.to ? 'bg-indigo-50/60 dark:bg-indigo-950/30' : undefined}>
+                      <Td>{weekLabel(w.from, w.to)}</Td>
+                      <Td className="text-right tabular-nums">{w.from > today ? '—' : formatDuration(total.active_s)}</Td>
+                      <Td className="text-right tabular-nums">{w.from > today ? '—' : formatDuration(total.idle_s)}</Td>
+                    </tr>
+                  )
+                })}
+                <tr className="font-semibold">
+                  <Td>Month total</Td>
+                  <Td className="text-right tabular-nums" data-month-total="active">{formatDuration(monthTotal.active_s)}</Td>
+                  <Td className="text-right tabular-nums" data-month-total="idle">{formatDuration(monthTotal.idle_s)}</Td>
+                </tr>
+              </tbody>
+            </Table>
+          </>
         )}
       </Card>
     </div>

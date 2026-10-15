@@ -7,6 +7,7 @@ import { cn } from '@/lib/cn'
 import { formatDayKey, formatTime, toDateKey, DEFAULT_TZ } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
 import { useSession } from '@/stores/session'
+import { StarsCard } from '@/features/stars/StarsList'
 import { useMonthAttendance } from './api'
 import { MonthPicker } from './MonthPicker'
 import { AttendanceBadge, STATUS_CLASS } from './status'
@@ -87,6 +88,7 @@ export function MyAttendance() {
           </Table>
         )}
       </Card>
+      <StarsCard userId={user.id} month={month} attendance={records.data ?? []} />
       <p className="text-xs text-slate-500">
         Counted every night at 01:00 from your tracked time. Late means your first activity came after the shift start plus the
         grace period; Half day means less active time than the half-day minimum.

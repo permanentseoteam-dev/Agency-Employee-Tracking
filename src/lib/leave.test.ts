@@ -4,6 +4,8 @@ import {
   balanceRows,
   countLeaveDays,
   formatDays,
+  leaveByMonth,
+  monthUse,
   quotaLeft,
   validateLeave,
   type LeaveContext,
@@ -128,6 +130,49 @@ describe('allowedMoves', () => {
 
   it('never lets an employee decide', () => {
     expect(allowedMoves(emp, { user: 'e2', status: 'pending' })).toEqual([])
+  })
+})
+
+describe('monthly leave limits', () => {
+  const request = (id: string, start: string, end: string, half_day = false, status: 'approved' | 'pending' | 'rejected' = 'approved') => ({
+    id,
+    leave_type: 'sick',
+    start_date: start,
+    end_date: end,
+    days: 1,
+    status,
+    half_day
+  })
+
+  it('splits a request by month and counts a half day once', () => {
+    expect(leaveByMonth('2026-10-29', '2026-11-03', false, MON_FRI, new Set())).toEqual({
+      '2026-10': { full: 2, half: 0 },
+      '2026-11': { full: 2, half: 0 }
+    })
+    expect(leaveByMonth('2026-10-20', '2026-10-20', true, MON_FRI, new Set())).toEqual({ '2026-10': { full: 0, half: 1 } })
+  })
+
+  it('counts approved and pending requests in the month, not rejected ones', () => {
+    const mine = [
+      request('a', '2026-10-05', '2026-10-06'),
+      request('b', '2026-10-12', '2026-10-12', true, 'pending'),
+      request('c', '2026-10-13', '2026-10-14', false, 'rejected')
+    ]
+    expect(monthUse(mine, '2026-10', MON_FRI, new Set())).toEqual({ full: 2, half: 1 })
+  })
+
+  it('refuses a request past the limit with the server’s wording', () => {
+    const mine = [request('a', '2026-10-05', '2026-10-06')]
+    const limits = { full: 2, half: 1 }
+    expect(validateLeave(input({ start_date: '2026-10-19', end_date: '2026-10-19' }), ctx({ mine, limits })).errors.end_date).toBe(
+      'No full-day leave left in October (limit 2 a month).'
+    )
+    expect(validateLeave(input({ start_date: '2026-10-19', end_date: '2026-10-19', half_day: true }), ctx({ mine, limits })).errors).toEqual({})
+  })
+
+  it('0 means no limit', () => {
+    const mine = [request('a', '2026-10-05', '2026-10-09')]
+    expect(validateLeave(input(), ctx({ mine, limits: { full: 0, half: 0 } })).errors).toEqual({})
   })
 })
 

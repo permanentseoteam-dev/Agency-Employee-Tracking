@@ -12,7 +12,7 @@ export type TrackerStatus = Awaited<ReturnType<Window['tracker']['getStatus']>>
 export const trackingKeys = {
   people: (userId: string) => ['tracking', 'people', userId] as const,
   presence: ['tracking', 'presence'] as const,
-  week: (userId: string, monday: string) => ['tracking', 'week', userId, monday] as const,
+  mine: (userId: string, from: string) => ['tracking', 'mine', userId, from] as const,
   report: (params: ReportParams) => ['tracking', 'report', params] as const
 }
 
@@ -45,17 +45,17 @@ export function useNow(intervalMs = 15_000): number {
   return now
 }
 
-/** My own segments from Monday of this week. */
-export function useMyWeek(monday: string) {
+/** My own segments from a day on (My Stats: this week and this month). */
+export function useMySegments(from: string) {
   const user = useSession((s) => s.user)
   const tz = useTimezone()
   return useQuery({
-    queryKey: trackingKeys.week(user?.id ?? '', monday),
+    queryKey: trackingKeys.mine(user?.id ?? '', from),
     enabled: !!user,
     refetchInterval: 60_000,
     queryFn: () =>
       pb.collection('activity_segments').getFullList<SegmentRow>({
-        filter: pb.filter('user = {:u} && started_at >= {:start}', { u: user!.id, start: dayRangeUtc(monday, tz).start }),
+        filter: pb.filter('user = {:u} && started_at >= {:start}', { u: user!.id, start: dayRangeUtc(from, tz).start }),
         fields: 'state,started_at,ended_at'
       })
   })

@@ -1,7 +1,8 @@
 /// <reference path="../pb_data/types.d.ts" />
 // Leave approval (plan §4.3). The API rules decide who may touch a request; these
 // hooks keep the content honest whatever client sends it: the server counts the
-// days, refuses overlaps and paid leave past the quota, locks a sent request, and
+// days, refuses overlaps, paid leave past the yearly quota and leave past the
+// monthly limits in Rules, locks a sent request, and
 // stamps who decided and when. Superusers (dashboard fixes, imports) are trusted.
 // Each handler runs in its own isolated context: helpers come from require().
 
@@ -52,6 +53,8 @@ onRecordCreateRequest((e) => {
     result.days
   )
   if (quota) throw new BadRequestError(quota)
+  const monthly = ls.monthlyProblem(e.app, e.auth.id, start, end, halfDay, settings, true, rec.id)
+  if (monthly) throw new BadRequestError(monthly)
 
   rec.set('days', result.days)
   rec.set('status', 'pending')
@@ -95,7 +98,8 @@ onRecordUpdateRequest((e) => {
     // Count again with today's holidays and work days, then re-check against approved leave only.
     const start = old.getString('start_date')
     const end = old.getString('end_date')
-    const days = lib.countDays(start, end, old.getBool('half_day'), store.loadSettings(e.app).work_days, ls.holidaysBetween(e.app, start, end))
+    const settings = store.loadSettings(e.app)
+    const days = lib.countDays(start, end, old.getBool('half_day'), settings.work_days, ls.holidaysBetween(e.app, start, end))
     if (days === 0) throw new BadRequestError('No working days are left in these dates (holidays were added). Reject the request instead.')
     const other = ls.overlapping(e.app, requesterId, start, end, false, rec.id)
     if (other) throw new BadRequestError(ls.overlapMessage(other).replace('your', 'their'))
@@ -111,6 +115,8 @@ onRecordUpdateRequest((e) => {
       )
       if (quota) throw new BadRequestError(quota.replace('left this year', 'left for them this year'))
     }
+    const monthly = ls.monthlyProblem(e.app, requesterId, start, end, old.getBool('half_day'), settings, false, rec.id)
+    if (monthly) throw new BadRequestError(monthly.replace(' left in ', ' left for them in '))
     rec.set('days', days)
   }
 

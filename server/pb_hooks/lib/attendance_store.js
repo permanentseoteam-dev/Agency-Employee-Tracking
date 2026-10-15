@@ -16,7 +16,8 @@ function loadSettings(app) {
     grace_minutes: rec.getInt('grace_minutes'),
     half_day_min_hours: rec.getFloat('half_day_min_hours'),
     full_day_min_hours: rec.getFloat('full_day_min_hours'),
-    late_penalty_pkr: rec.getInt('late_penalty_pkr'),
+    monthly_full_leaves: rec.getInt('monthly_full_leaves'),
+    monthly_half_leaves: rec.getInt('monthly_half_leaves'),
     timezone: rec.getString('timezone') || 'Asia/Karachi'
   }
 }

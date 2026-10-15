@@ -53,8 +53,11 @@ export function validateRules(r: RulesInput): RulesErrors {
   if (!Number.isInteger(r.idle_threshold_minutes) || r.idle_threshold_minutes < 1 || r.idle_threshold_minutes > 60) {
     errors.idle_threshold_minutes = 'Enter whole minutes between 1 and 60.'
   }
-  if (!Number.isInteger(r.late_penalty_pkr) || r.late_penalty_pkr < 0) {
-    errors.late_penalty_pkr = 'Enter a whole number of rupees, 0 or more.'
+  if (!Number.isInteger(r.monthly_full_leaves) || r.monthly_full_leaves < 0 || r.monthly_full_leaves > 31) {
+    errors.monthly_full_leaves = 'Enter whole days between 0 and 31 (0 = no limit).'
+  }
+  if (!Number.isInteger(r.monthly_half_leaves) || r.monthly_half_leaves < 0 || r.monthly_half_leaves > 31) {
+    errors.monthly_half_leaves = 'Enter a whole number between 0 and 31 (0 = no limit).'
   }
   return errors
 }

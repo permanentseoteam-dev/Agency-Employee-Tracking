@@ -50,6 +50,16 @@ describe('notificationText', () => {
     expect(notificationLink({ type: 'signup_pending' })).toBe('/org/employees')
   })
 
+  it('tells someone an admin gave them stars', () => {
+    const stars = { record: 's1', rule_name: 'Phone in meetings', stars: 2, date: '2026-10-14', note: 'Client call', given_by_name: 'Ayesha' }
+    expect(notificationText({ type: 'stars_given', payload: stars })).toEqual({
+      title: 'You got 2 stars',
+      detail: 'Phone in meetings · 14 Oct 2026 · Client call · by Ayesha'
+    })
+    expect(notificationText({ type: 'stars_given', payload: { ...stars, stars: 0, note: '' } }).title).toBe('A rule break was noted')
+    expect(notificationLink({ type: 'stars_given' })).toBe('/my-attendance')
+  })
+
   it('copes with unknown types and empty payloads', () => {
     expect(notificationText({ type: 'something_else', payload })).toEqual({ title: 'Notification', detail: '' })
     expect(notificationText({ type: 'leave_requested', payload: null }).title).toBe('Notification')

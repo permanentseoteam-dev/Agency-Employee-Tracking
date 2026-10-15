@@ -10,6 +10,7 @@ import { useSession } from '@/stores/session'
 import { useDecidedLeaves, useLeaveLive } from './api'
 import { DecideDialog, MOVE_LABEL, type Move } from './DecideDialog'
 import { LeaveStatusBadge } from './LeaveStatusBadge'
+import { byKind, LeaveKindFilter, type LeaveKind } from './LeaveKindFilter'
 
 /** The latest decided requests I can see. Admins can reverse a decision or cancel approved leave here. */
 export function DecidedLeaves() {
@@ -19,17 +20,20 @@ export function DecidedLeaves() {
   const decided = useDecidedLeaves()
   useLeaveLive()
   const [changing, setChanging] = useState<{ request: LeaveRequest; status: Move } | null>(null)
-  const requests = decided.data ?? []
+  const [kind, setKind] = useState<LeaveKind>('all')
+  const all = decided.data ?? []
+  const requests = byKind(all, kind)
 
   return (
     <div className="space-y-4">
+      {all.length > 0 && <LeaveKindFilter value={kind} onChange={setKind} />}
       <Card>
         {decided.isLoading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : decided.isError ? (
           <p className="p-6 text-sm text-red-600">Could not load the decisions.</p>
         ) : requests.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">No decisions yet.</p>
+          <p className="p-6 text-sm text-slate-500">{all.length ? 'No requests of this kind.' : 'No decisions yet.'}</p>
         ) : (
           <Table>
             <thead>

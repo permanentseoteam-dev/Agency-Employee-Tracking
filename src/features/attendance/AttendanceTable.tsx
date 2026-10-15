@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, Star } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { useHolidays } from '@/features/calendar/api'
 import { useOrgSettings } from '@/features/rules/api'
+import { useStarRecords, useStarRules } from '@/features/stars/api'
+import { StarsDialog } from '@/features/stars/StarsList'
 import { useRole } from '@/hooks/useRole'
 import {
   COUNTED,
@@ -20,6 +22,7 @@ import {
 import { cn } from '@/lib/cn'
 import { formatDayKey, formatTime, isoWeekday, toDateKey, DEFAULT_TZ } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
+import { starLines, starsByUser } from '@/lib/stars'
 import { errorMessage } from '@/stores/session'
 import { useAttendancePeople, useMonthAttendance, useRecompute } from './api'
 import { MonthPicker } from './MonthPicker'
@@ -45,11 +48,14 @@ export function AttendanceTable() {
   const [team, setTeam] = useState('')
   const [search, setSearch] = useState('')
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null)
+  const [starsFor, setStarsFor] = useState<string | null>(null)
 
   const people = useAttendancePeople(month)
   const records = useMonthAttendance(month)
   const holidays = useHolidays()
   const recompute = useRecompute()
+  const starRules = useStarRules()
+  const starRecords = useStarRecords(month)
   const days = monthDays(month)
   const range = recomputeRange(month, today)
 
@@ -62,6 +68,12 @@ export function AttendanceTable() {
     }
     return map
   }, [records.data])
+
+  const stars = useMemo(
+    () => starsByUser(starLines(records.data ?? [], starRules.data ?? [], starRecords.data ?? [])),
+    [records.data, starRules.data, starRecords.data]
+  )
+  const starsAvailable = !!starRules.data && !!starRecords.data
 
   const teams = useMemo(() => {
     const map = new Map<string, string>()
@@ -161,6 +173,11 @@ export function AttendanceTable() {
                       {STATUS_CODE[s]}
                     </th>
                   ))}
+                  {starsAvailable && (
+                    <th title="Stars this month (rule breaks)" className="w-10 min-w-10 border-b border-l border-slate-200 py-1 text-center font-semibold text-amber-600 dark:border-slate-800">
+                      <Star className="mx-auto size-3.5" aria-label="Stars" />
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -201,6 +218,18 @@ export function AttendanceTable() {
                           {counts[s] || <span className="font-normal text-slate-300 dark:text-slate-600">0</span>}
                         </td>
                       ))}
+                      {starsAvailable && (
+                        <td data-stars={stars[p.id] ?? 0} className="border-b border-l border-slate-100 p-0.5 text-center dark:border-slate-800/60">
+                          <button
+                            type="button"
+                            title={`Stars for ${p.full_name}`}
+                            onClick={() => setStarsFor(p.id)}
+                            className="h-6 w-full rounded font-semibold tabular-nums text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-950/40"
+                          >
+                            {stars[p.id] ?? 0}
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}
@@ -222,6 +251,16 @@ export function AttendanceTable() {
         </span>
         <span>– not counted yet</span>
       </div>
+      {starsFor && (people.data ?? []).some((p) => p.id === starsFor) && (
+        <StarsDialog
+          person={(people.data ?? []).find((p) => p.id === starsFor)!}
+          month={month}
+          maxDate={today}
+          attendance={records.data ?? []}
+          admin={isAdmin}
+          onClose={() => setStarsFor(null)}
+        />
+      )}
       <p className="text-xs text-slate-500">
         Attendance is counted every night at 01:00 for the days just finished. Late means the first activity came after the shift start plus the grace
         minutes.

@@ -46,6 +46,37 @@ function takenDays(app, userId, leaveTypeId, year, includePending, exceptId) {
   return rows.length ? Number(rows[0].taken) || 0 : 0
 }
 
+/**
+ * Why a request goes over the monthly limits in Rules (settings.monthly_full_leaves /
+ * monthly_half_leaves, 0 = no limit), or null. Counts the person's other approved leave,
+ * plus pending when `includePending`, in each month the request touches; any leave type.
+ */
+function monthlyProblem(app, userId, start, end, halfDay, settings, includePending, exceptId) {
+  const lib = require(`${__hooks}/lib/leave.js`)
+  const store = require(`${__hooks}/lib/attendance_store.js`)
+  const limits = { full: settings.monthly_full_leaves, half: settings.monthly_half_leaves }
+  if (!(limits.full > 0) && !(limits.half > 0)) return null
+  const statuses = includePending ? "('approved', 'pending')" : "('approved')"
+  const adding = lib.leaveByMonth(start, end, halfDay, settings.work_days, holidaysBetween(app, start, end))
+  for (const month of Object.keys(adding).sort()) {
+    const range = { from: month + '-01', to: month + '-31' }
+    const others = store
+      .select(
+        app,
+        'SELECT start_date, end_date, CAST(half_day AS INTEGER) AS half_day FROM leave_requests' +
+          ' WHERE user = {:user} AND id != {:except} AND status IN ' + statuses +
+          ' AND start_date <= {:to} AND end_date >= {:from}',
+        { user: userId, except: exceptId || '', from: range.from, to: range.to },
+        { start_date: '', end_date: '', half_day: 0 }
+      )
+      .map((r) => ({ start_date: r.start_date, end_date: r.end_date, half_day: !!r.half_day }))
+    const taken = lib.monthTotals(others, month, settings.work_days, holidaysBetween(app, range.from, range.to))
+    const problem = lib.monthlyLimitProblem(limits, month, taken, adding[month])
+    if (problem) return problem
+  }
+  return null
+}
+
 /** "20 Oct 2026" or "20 Oct – 22 Oct 2026", for messages. */
 function rangeText(start, end) {
   const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -76,4 +107,4 @@ function recountAttendance(app, rec, before) {
   }
 }
 
-module.exports = { holidaysBetween, overlapping, takenDays, overlapMessage, recountAttendance }
+module.exports = { holidaysBetween, overlapping, takenDays, monthlyProblem, overlapMessage, recountAttendance }

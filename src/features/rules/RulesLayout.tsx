@@ -3,7 +3,8 @@ import { cn } from '@/lib/cn'
 
 const TABS = [
   { to: '/rules/work', label: 'Work rules' },
-  { to: '/rules/leave-types', label: 'Leave types' }
+  { to: '/rules/leave-types', label: 'Leave types' },
+  { to: '/rules/stars', label: 'Stars' }
 ]
 
 export function RulesLayout() {

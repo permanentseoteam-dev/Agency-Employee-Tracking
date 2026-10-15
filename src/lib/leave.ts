@@ -86,10 +86,12 @@ export interface LeaveContext {
   workDays: number[]
   holidays: Set<string>
   types: LeaveTypeInfo[]
-  /** The person's own requests (any status); used for overlap and quota. */
-  mine: Pick<LeaveRequest, 'id' | 'leave_type' | 'start_date' | 'end_date' | 'days' | 'status'>[]
+  /** The person's own requests (any status); used for overlap, quota and the monthly limits. */
+  mine: (Pick<LeaveRequest, 'id' | 'leave_type' | 'start_date' | 'end_date' | 'days' | 'status'> & { half_day?: boolean })[]
   joinedOn?: string
   leftOn?: string
+  /** Leave per month from Rules (org_settings.monthly_full_leaves / monthly_half_leaves); 0 = no limit. */
+  limits?: MonthUse
 }
 
 export type LeaveErrors = Partial<Record<keyof LeaveInput, string>>
@@ -132,7 +134,70 @@ export function validateLeave(input: LeaveInput, ctx: LeaveContext): { errors: L
           : `Only ${formatDays(left)} of ${type.name} leave left this year; this request needs ${days}.`
     }
   }
+
+  if (ctx.limits && days > 0 && !errors.start_date && !errors.end_date && !errors.half_day) {
+    const adding = leaveByMonth(start, end, halfDay, ctx.workDays, ctx.holidays)
+    for (const month of Object.keys(adding).sort()) {
+      const problem = monthlyLimitProblem(ctx.limits, month, monthUse(ctx.mine, month, ctx.workDays, ctx.holidays), adding[month])
+      if (problem) {
+        if (halfDay) errors.half_day = problem
+        else errors.end_date = problem
+        break
+      }
+    }
+  }
   return { errors, days }
+}
+
+/** Leave in one month for the monthly limits: full = working days, half = half-day (short) leaves. */
+export interface MonthUse {
+  full: number
+  half: number
+}
+
+/** A request's leave per month ("YYYY-MM" → use); a request may run into the next month. */
+export function leaveByMonth(start: string, end: string, halfDay: boolean, workDays: number[], holidays: Set<string>): Record<string, MonthUse> {
+  const out: Record<string, MonthUse> = {}
+  if (!isDateKey(start) || !isDateKey(end) || end < start) return out
+  const working = daysBetween(start, halfDay ? start : end).filter((d) => workDays.includes(isoWeekday(d)) && !holidays.has(d))
+  for (const d of working) {
+    const m = (out[d.slice(0, 7)] ??= { full: 0, half: 0 })
+    if (halfDay) m.half = 1
+    else m.full++
+  }
+  return out
+}
+
+/** What the person's approved and pending requests already use in a month. */
+export function monthUse(mine: LeaveContext['mine'], month: string, workDays: number[], holidays: Set<string>): MonthUse {
+  const use = { full: 0, half: 0 }
+  for (const r of mine) {
+    if (!isActive(r)) continue
+    const m = leaveByMonth(r.start_date, r.end_date, !!r.half_day, workDays, holidays)[month]
+    if (m) {
+      use.full += m.full
+      use.half += m.half
+    }
+  }
+  return use
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/** Why a request goes over a monthly limit (the server's wording), or null. limits: 0 = no limit. */
+export function monthlyLimitProblem(limits: MonthUse, month: string, taken: MonthUse, adding: MonthUse): string | null {
+  const name = MONTH_NAMES[Number(month.slice(5, 7)) - 1] ?? month
+  const check = (max: number, used: number, add: number, kind: string, one: string, many: string) => {
+    if (!(max > 0) || !(add > 0) || used + add <= max) return null
+    const left = Math.max(0, max - used)
+    const rule = ` (limit ${max} a month)`
+    if (left === 0) return `No ${kind} leave left in ${name}${rule}.`
+    return `Only ${left} ${left === 1 ? one : many} of leave left in ${name}${rule}; this request needs ${add}.`
+  }
+  return (
+    check(limits.full, taken.full, adding.full, 'full-day', 'full day', 'full days') ??
+    check(limits.half, taken.half, adding.half, 'half-day (short)', 'half day', 'half days')
+  )
 }
 
 /** Paid days still available in a year: quota − (approved + pending). Unpaid types have no limit. */

@@ -44,7 +44,8 @@ export const NAV: NavItem[] = [
   { path: '/attendance', label: 'Attendance', icon: 'grid', minRole: 'manager', module: 'M7' },
   { path: '/reports', label: 'Reports', icon: 'reports', minRole: 'manager', module: 'M6' },
   { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', module: 'M3' },
-  { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'admin', module: 'M4' },
+  // Everyone reads the rules (work hours, leave, stars); only an admin changes them.
+  { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'employee', module: 'M4' },
   { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', module: 'M11' }
 ]
 

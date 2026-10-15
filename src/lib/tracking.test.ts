@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { boardStatus, liveStatus, presenceToday, reportCsv, reportTotals, totalsByDay, weekOf, type PresenceRecord, type ReportRow } from './tracking'
+import {
+  boardStatus,
+  liveStatus,
+  monthWeeks,
+  presenceToday,
+  reportCsv,
+  reportTotals,
+  sumDays,
+  totalsByDay,
+  weekOf,
+  type PresenceRecord,
+  type ReportRow
+} from './tracking'
 
 const NOW = Date.parse('2026-10-14T05:00:00.000Z') // Wed 10:00 in Karachi
 const presence = (patch: Partial<PresenceRecord> = {}): PresenceRecord => ({
@@ -53,6 +65,31 @@ describe('weekOf', () => {
   it('runs Monday to Sunday', () => {
     expect(weekOf('2026-10-14')).toEqual(['2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17', '2026-10-18'])
     expect(weekOf('2026-10-18')[0]).toBe('2026-10-12')
+  })
+})
+
+describe('monthWeeks', () => {
+  it('splits the month into Monday–Sunday weeks, clipped to the month', () => {
+    // October 2026 starts on a Thursday and ends on a Saturday.
+    expect(monthWeeks('2026-10-15')).toEqual([
+      { from: '2026-10-01', to: '2026-10-04' },
+      { from: '2026-10-05', to: '2026-10-11' },
+      { from: '2026-10-12', to: '2026-10-18' },
+      { from: '2026-10-19', to: '2026-10-25' },
+      { from: '2026-10-26', to: '2026-10-31' }
+    ])
+  })
+
+  it('handles a month that starts on a Monday', () => {
+    // February 2027: Mon 1 – Sun 28, exactly four weeks.
+    expect(monthWeeks('2027-02-10')).toHaveLength(4)
+  })
+})
+
+describe('sumDays', () => {
+  it('adds up the days from–to', () => {
+    const byDay = { '2026-10-01': { active_s: 100, idle_s: 10 }, '2026-10-04': { active_s: 50, idle_s: 5 }, '2026-10-05': { active_s: 7, idle_s: 1 } }
+    expect(sumDays(byDay, '2026-10-01', '2026-10-04')).toEqual({ active_s: 150, idle_s: 15 })
   })
 })
 

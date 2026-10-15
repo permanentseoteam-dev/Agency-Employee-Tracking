@@ -51,6 +51,27 @@ export function weekOf(dateKey: string): string[] {
   return Array.from({ length: 7 }, (_, i) => addDays(monday, i))
 }
 
+/** The month containing the day, split into Monday–Sunday weeks clipped to the month. */
+export function monthWeeks(dateKey: string): { from: string; to: string }[] {
+  const month = dateKey.slice(0, 7)
+  const out: { from: string; to: string }[] = []
+  for (let d = `${month}-01`; d.slice(0, 7) === month; d = addDays(d, 1)) {
+    if (!out.length || isoWeekday(d) === 1) out.push({ from: d, to: d })
+    else out[out.length - 1].to = d
+  }
+  return out
+}
+
+/** Active and idle seconds from–to (inclusive) out of totalsByDay. */
+export function sumDays(byDay: Record<string, { active_s: number; idle_s: number }>, from: string, to: string): { active_s: number; idle_s: number } {
+  const sum = { active_s: 0, idle_s: 0 }
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    sum.active_s += byDay[d]?.active_s ?? 0
+    sum.idle_s += byDay[d]?.idle_s ?? 0
+  }
+  return sum
+}
+
 export interface SegmentRow {
   state: 'active' | 'idle'
   started_at: string

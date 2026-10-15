@@ -37,6 +37,9 @@ export interface OrgSettings {
   full_day_min_hours: number
   half_day_min_hours: number
   idle_threshold_minutes: number
-  late_penalty_pkr: number
+  /** Leave per month, any leave type; 0 = no limit. */
+  monthly_full_leaves: number
+  /** Half-day (short) leaves per month; 0 = no limit. */
+  monthly_half_leaves: number
   timezone: string
 }

@@ -30,6 +30,7 @@ import { Placeholder } from '@/features/Placeholder'
 import { LeaveTypes } from '@/features/rules/LeaveTypes'
 import { RulesForm } from '@/features/rules/RulesForm'
 import { RulesLayout } from '@/features/rules/RulesLayout'
+import { StarRules } from '@/features/rules/StarRules'
 import { MyProfile } from '@/features/profile/MyProfile'
 import { LiveBoard } from '@/features/tracking/LiveBoard'
 import { MyStats } from '@/features/tracking/MyStats'
@@ -90,7 +91,8 @@ const router = createHashRouter([
         children: [
           { index: true, element: <Navigate to="/rules/work" replace /> },
           { path: 'work', element: <RulesForm /> },
-          { path: 'leave-types', element: <LeaveTypes /> }
+          { path: 'leave-types', element: <LeaveTypes /> },
+          { path: 'stars', element: <StarRules /> }
         ]
       },
       {

@@ -608,6 +608,86 @@ try {
     (await root.collection('users').getOne(secondId).catch((e) => e.status)) === 404 &&
       (await root.collection('salaries').getFullList({ filter: `user = "${secondId}"` })).length === 0)
 
+  // --- stars instead of the late penalty (stars.pb.js) ---------------------------------
+  const refusal = async (fn) => {
+    try {
+      await fn()
+      return ''
+    } catch (e) {
+      return e.response?.message ?? e.message
+    }
+  }
+  const karachiDay = (offsetDays) => new Date(Date.now() + 5 * 3600000 + offsetDays * 86400000).toISOString().slice(0, 10)
+  const starDay = karachiDay(-1)
+  const [rules] = await pbEmpA.collection('org_settings').getFullList()
+  check('the late penalty is gone from the rules', !('late_penalty_pkr' in rules))
+  check('monthly leave limits start at 0 (no limit)', rules.monthly_full_leaves === 0 && rules.monthly_half_leaves === 0)
+  const payLines = await pbAdmin.collection('payroll_items').getFullList()
+  check('payroll lines have no late count any more', payLines.length > 0 && payLines.every((i) => !('late_count' in i)))
+
+  const starRules = await pbEmpA.collection('star_rules').getFullList()
+  check('everyone reads the star rules: 3 automatic ones, 0 stars until set', starRules.filter((r) => r.auto).length === 3 && starRules.every((r) => r.stars === 0))
+  const lateRule = starRules.find((r) => r.auto === 'late')
+  await denied('an employee cannot change star amounts', () => pbEmpA.collection('star_rules').update(lateRule.id, { stars: 5 }))
+  await denied('a manager cannot change star amounts', () => pbMgrA.collection('star_rules').update(lateRule.id, { stars: 5 }))
+  await allowed('an admin sets the stars for a rule break', () => pbAdmin.collection('star_rules').update(lateRule.id, { stars: 1 }))
+  await denied('an automatic rule cannot be deleted', () => pbAdmin.collection('star_rules').delete(lateRule.id))
+  await denied('an automatic rule cannot become a by-hand one', () => pbAdmin.collection('star_rules').update(lateRule.id, { auto: '' }))
+  await denied('a new rule cannot be automatic', () => pbAdmin.collection('star_rules').create({ name: 'Fake late', stars: 1, auto: 'late' }))
+  let phone = null
+  await allowed('an admin adds a rule given by hand', async () => {
+    phone = await pbAdmin.collection('star_rules').create({ name: 'Phone in meetings', stars: 2 })
+  })
+  const giveTo = (pb, extra) => pb.collection('star_records').create({ user: empA.id, rule: phone?.id, date: starDay, ...extra })
+  await denied('an employee cannot give stars', () => giveTo(pbEmpA, { user: empB.id }))
+  await denied('a manager cannot give stars', () => giveTo(pbMgrA))
+  let given = null
+  await allowed('an admin gives stars by hand', async () => {
+    given = await giveTo(pbAdmin, { note: 'Client call' })
+  })
+  check('the server stamps who gave them', given?.given_by === admin.id, JSON.stringify(given))
+  await denied('the same rule twice on one day is refused', () => giveTo(pbAdmin))
+  await denied('an automatic rule is not given by hand (only excused)', () => giveTo(pbAdmin, { rule: lateRule.id }))
+  await allowed('an admin excuses an automatic star for a day', () => giveTo(pbAdmin, { rule: lateRule.id, excused: true }))
+  await denied('stars for a day that hasn’t happened are refused', () => giveTo(pbAdmin, { date: karachiDay(2), note: 'future' }))
+  await denied('stars cannot be edited', () => pbAdmin.collection('star_records').update(given?.id ?? 'missing', { note: 'changed' }))
+  check('the person is told about stars given by hand (not about excuses)',
+    (await pbEmpA.collection('notifications').getFullList({ filter: 'type = "stars_given"' })).length === 1)
+  check('an employee sees only their own stars', (await pbEmpA.collection('star_records').getFullList()).length === 2)
+  check('a manager sees their team’s stars', (await pbMgrA.collection('star_records').getFullList()).length === 2)
+  check('someone in another team sees none of them', (await pbEmpB.collection('star_records').getFullList()).length === 0)
+  await denied('an employee cannot remove stars', () => pbEmpA.collection('star_records').delete(given?.id ?? 'missing'))
+  await allowed('an admin removes stars given by hand', () => pbAdmin.collection('star_records').delete(given?.id ?? 'missing'))
+  await allowed('deleting a by-hand rule is allowed', () => pbAdmin.collection('star_rules').delete(phone?.id ?? 'missing'))
+
+  // --- leave per month (Rules → Leaves per month; leave.pb.js) ------------------------
+  await denied('a manager cannot change the monthly leave limits', () =>
+    pbMgrA.collection('org_settings').update(rules.id, { monthly_full_leaves: 9 }))
+  const febRequest = await apply(pbEmpB, empB.id, { start_date: '2027-02-01', end_date: '2027-02-03' }).catch(() => null)
+  check('with no limit, 3 days in a month are fine', febRequest?.days === 3, JSON.stringify(febRequest))
+  await allowed('an admin sets the limits: 2 full days and 1 half day a month', () =>
+    pbAdmin.collection('org_settings').update(rules.id, { monthly_full_leaves: 2, monthly_half_leaves: 1 }))
+  await allowed('2 full days in December fit', () => apply(pbEmpB, empB.id, { start_date: '2026-12-07', end_date: '2026-12-08' }))
+  const third = await refusal(() => apply(pbEmpB, empB.id, { start_date: '2026-12-10', end_date: '2026-12-10' }))
+  check('a 3rd full day in December is refused', third === 'No full-day leave left in December (limit 2 a month).', third)
+  await allowed('a half day (short leave) has its own limit', () =>
+    apply(pbEmpB, empB.id, { start_date: '2026-12-11', end_date: '2026-12-11', half_day: true }))
+  await denied('a 2nd half day in December is refused', () =>
+    apply(pbEmpB, empB.id, { start_date: '2026-12-14', end_date: '2026-12-14', half_day: true }))
+  const across = await refusal(() => apply(pbEmpB, empB.id, { start_date: '2026-11-30', end_date: '2026-12-01' }))
+  check('a request into a full month is refused for that month', across.includes('in December'), across)
+  const lateApproval = await refusal(() => pbAdmin.collection('leave_requests').update(febRequest?.id ?? 'missing', { status: 'approved' }))
+  check('approving leave over the limit set since is refused', lateApproval.includes('left for them in February'), lateApproval)
+  await allowed('0 means no limit again', () => pbAdmin.collection('org_settings').update(rules.id, { monthly_full_leaves: 0, monthly_half_leaves: 0 }))
+  await allowed('…and the same approval then goes through', () =>
+    pbAdmin.collection('leave_requests').update(febRequest?.id ?? 'missing', { status: 'approved' }))
+
+  // --- old time: only superusers (imports, demo data) may store segments over 30 days old ---
+  const oldStart = Date.now() - 40 * 86400000
+  const oldSeg = (user) => ({ user, state: 'active', started_at: new Date(oldStart).toISOString(), ended_at: new Date(oldStart + 5 * 60000).toISOString() })
+  await denied('an employee cannot store a segment older than 30 days', () => pbEmpA.collection('activity_segments').create(oldSeg(empA.id)))
+  await allowed('a superuser can import a segment older than 30 days', () => root.collection('activity_segments').create(oldSeg(empA.id)))
+
   // --- the dashboard (superusers) only from the server PC (security.pb.js) ------------
   // Requests through Funnel carry X-Forwarded-For; local ones don't.
   const viaInternet = { 'X-Forwarded-For': '203.0.113.9', 'content-type': 'application/json' }

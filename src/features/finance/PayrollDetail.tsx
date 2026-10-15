@@ -160,7 +160,6 @@ export function PayrollDetail() {
                 <Th className="text-right">Absent</Th>
                 <Th className="text-right">Unpaid leave</Th>
                 <Th className="text-right">Half days</Th>
-                <Th className="text-right">Late</Th>
                 <Th className="text-right">Deductions</Th>
                 <Th className="text-right">Adjustment</Th>
                 <Th className="text-right">Net pay</Th>
@@ -191,7 +190,6 @@ export function PayrollDetail() {
                     <Td className="whitespace-nowrap text-right tabular-nums">{i.absent_days || '–'}</Td>
                     <Td className="whitespace-nowrap text-right tabular-nums">{i.unpaid_leave_days || '–'}</Td>
                     <Td className="whitespace-nowrap text-right tabular-nums">{i.half_days || '–'}</Td>
-                    <Td className="whitespace-nowrap text-right tabular-nums">{i.late_count || '–'}</Td>
                     <Td className="whitespace-nowrap text-right tabular-nums">{i.deductions ? formatPkr(-i.deductions) : '–'}</Td>
                     <Td className="whitespace-nowrap text-right tabular-nums" title={i.note || undefined}>
                       {formatAdjustment(i.adjustment_pkr)}
@@ -207,8 +205,8 @@ export function PayrollDetail() {
         )}
       </Card>
       <p className="text-xs text-slate-500">
-        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate + late × late
-        penalty. Click a line for its breakdown{draft ? ' and to set an adjustment' : ''}.
+        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate. Late days
+        cost nothing: they give stars instead. Click a line for its breakdown{draft ? ' and to set an adjustment' : ''}.
       </p>
 
       {open && <LineDialog line={open} month={r.month} editable={draft} onClose={() => setOpen(null)} />}
@@ -269,7 +267,7 @@ export function LineDialog({ line, month, editable, onClose }: { line: PayrollLi
         {line.absent_days > 0 && <Row label="Absent" detail={days(line.absent_days)} amount={formatPkr(-b.absent, 2)} />}
         {line.unpaid_leave_days > 0 && <Row label="Unpaid leave" detail={days(line.unpaid_leave_days)} amount={formatPkr(-b.unpaidLeave, 2)} />}
         {line.half_days > 0 && <Row label="Half days" detail={`${line.half_days} × ½ day`} amount={formatPkr(-b.halfDays, 2)} />}
-        {line.late_count > 0 && <Row label="Late" detail={`${line.late_count} × ${formatPkr(b.latePenalty)}`} amount={formatPkr(-b.late)} />}
+        {b.other > 0 && <Row label="Other" detail="under earlier pay rules" amount={formatPkr(-b.other)} />}
         <Row label="Deductions" amount={formatPkr(-line.deductions)} strong />
         {!editable && <Row label="Adjustment" detail={line.note} amount={formatAdjustment(line.adjustment_pkr)} />}
         {editable ? (

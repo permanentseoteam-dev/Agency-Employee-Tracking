@@ -19,7 +19,6 @@ export interface PayrollItem {
   absent_days: number
   unpaid_leave_days: number
   half_days: number
-  late_count: number
   deductions: number
   adjustment_pkr: number
   note: string
@@ -43,9 +42,8 @@ export interface Breakdown {
   absent: number
   unpaidLeave: number
   halfDays: number
-  late: number
-  /** Penalty per late day, recovered from the stored deductions. */
-  latePenalty: number
+  /** Deducted under earlier pay rules (a month counted before late days stopped costing pay); usually 0. */
+  other: number
 }
 
 /** Amounts behind a line's deductions (the per-day parts keep their decimals). */
@@ -54,8 +52,8 @@ export function breakdown(item: PayrollItem): Breakdown {
   const absent = item.absent_days * rate
   const unpaidLeave = item.unpaid_leave_days * rate
   const halfDays = 0.5 * item.half_days * rate
-  const late = Math.max(0, Math.round(item.deductions - absent - unpaidLeave - halfDays))
-  return { rate, absent, unpaidLeave, halfDays, late, latePenalty: item.late_count ? late / item.late_count : 0 }
+  const other = Math.max(0, Math.round(item.deductions - absent - unpaidLeave - halfDays))
+  return { rate, absent, unpaidLeave, halfDays, other }
 }
 
 /** Joined or left part-way through the month: there is no pro-rating, so the admin sets an adjustment. */
@@ -76,7 +74,7 @@ export function runTotals(items: PayrollItem[]): { base: number; deductions: num
 
 /** The run as a spreadsheet, one line per employee plus a total. Amounts are plain numbers. */
 export function payrollCsv(items: PayrollItem[], nameOf: (userId: string) => string): string {
-  const header = ['Employee', 'Monthly salary', 'Working days', 'Absent', 'Unpaid leave', 'Half days', 'Late', 'Deductions', 'Adjustment', 'Note', 'Net pay']
+  const header = ['Employee', 'Monthly salary', 'Working days', 'Absent', 'Unpaid leave', 'Half days', 'Deductions', 'Adjustment', 'Note', 'Net pay']
   const lines = items.map((i) => [
     nameOf(i.user),
     String(i.base),
@@ -84,13 +82,12 @@ export function payrollCsv(items: PayrollItem[], nameOf: (userId: string) => str
     String(i.absent_days),
     String(i.unpaid_leave_days),
     String(i.half_days),
-    String(i.late_count),
     String(i.deductions),
     String(i.adjustment_pkr),
     i.note,
     String(i.net)
   ])
   const t = runTotals(items)
-  lines.push(['Total', String(t.base), '', '', '', '', '', String(t.deductions), String(t.adjustments), '', String(t.net)])
+  lines.push(['Total', String(t.base), '', '', '', '', String(t.deductions), String(t.adjustments), '', String(t.net)])
   return toCsv([header, ...lines])
 }

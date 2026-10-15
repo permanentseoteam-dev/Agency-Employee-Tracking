@@ -39,50 +39,52 @@ describe('unpaid leave days', () => {
 
 describe('calculate: a hand calculation', () => {
   // Base 100,000 in October 2026 with one holiday: 21 working days → rate 4,761.904…
-  // Absent 2 + unpaid leave 1 + half day 1 × 0.5 = 3.5 days → 16,666.67; late 3 × 500 = 1,500.
-  // Deductions = round(18,166.67) = 18,167.
+  // Absent 2 + unpaid leave 1 + half day 1 × 0.5 = 3.5 days → 16,666.67 → deductions 16,667.
+  // Late days cost nothing (they give stars instead).
   const month = {
     base: 100000,
     workingDays: payroll.workingDays('2026-10', MON_FRI, HOLIDAYS),
     absentDays: 2,
     unpaidLeaveDays: 1,
-    halfDays: 1,
-    lateCount: 3,
-    latePenalty: 500
+    halfDays: 1
   }
 
   it('with no adjustment', () => {
     const r = payroll.calculate({ ...month, adjustment: 0 })
     expect(r.rate).toBeCloseTo(4761.9048, 4)
-    expect(r.deductions).toBe(18167)
-    expect(r.net).toBe(81833)
+    expect(r.deductions).toBe(16667)
+    expect(r.net).toBe(83333)
   })
 
   it('with a negative adjustment (left on the 18th)', () => {
-    expect(payroll.calculate({ ...month, adjustment: -20000 }).net).toBe(61833)
+    expect(payroll.calculate({ ...month, adjustment: -20000 }).net).toBe(63333)
   })
 
   it('with a positive adjustment (bonus)', () => {
-    expect(payroll.calculate({ ...month, adjustment: 5000 }).net).toBe(86833)
+    expect(payroll.calculate({ ...month, adjustment: 5000 }).net).toBe(88333)
   })
 
   it('a perfect month pays the full salary', () => {
-    expect(payroll.calculate({ base: 85000, workingDays: 22, absentDays: 0, unpaidLeaveDays: 0, halfDays: 0, lateCount: 0, latePenalty: 500, adjustment: 0 })).toEqual({
+    expect(payroll.calculate({ base: 85000, workingDays: 22, absentDays: 0, unpaidLeaveDays: 0, halfDays: 0, adjustment: 0 })).toEqual({
       rate: 85000 / 22,
       deductions: 0,
       net: 85000
     })
   })
 
-  it('a month with no working days deducts nothing for days', () => {
-    expect(payroll.calculate({ base: 50000, workingDays: 0, absentDays: 3, lateCount: 1, latePenalty: 500 }).deductions).toBe(500)
+  it('a month with no working days deducts nothing', () => {
+    expect(payroll.calculate({ base: 50000, workingDays: 0, absentDays: 3 }).deductions).toBe(0)
+  })
+
+  it('late days are not deducted', () => {
+    expect(payroll.calculate({ base: 50000, workingDays: 22, lateCount: 5, latePenalty: 500 }).deductions).toBe(0)
   })
 })
 
 describe('attendance counts', () => {
-  it('counts absent, half day and late; other statuses cost nothing', () => {
+  it('counts absent and half day; other statuses (late included) cost nothing', () => {
     const records = ['absent', 'absent', 'half_day', 'late', 'late', 'late', 'present', 'on_leave', 'holiday', 'weekend'].map((status) => ({ status }))
-    expect(payroll.attendanceCounts(records)).toEqual({ absent: 2, half: 1, late: 3 })
+    expect(payroll.attendanceCounts(records)).toEqual({ absent: 2, half: 1 })
   })
 })
 

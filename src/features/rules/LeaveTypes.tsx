@@ -7,11 +7,13 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { FormError } from '@/features/auth/AuthLayout'
-import { errorMessage } from '@/stores/session'
+import { errorMessage, useSession } from '@/stores/session'
 import { useDeleteLeaveType, useLeaveTypes, useSaveLeaveType, type LeaveType } from './api'
+import { ReadOnlyNote } from './RulesForm'
 
 export function LeaveTypes() {
   const types = useLeaveTypes()
+  const readOnly = useSession((s) => s.user?.role) !== 'admin'
   const remove = useDeleteLeaveType()
   const [editing, setEditing] = useState<LeaveType | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -28,11 +30,14 @@ export function LeaveTypes() {
 
   return (
     <div className="space-y-4">
+      {readOnly && <ReadOnlyNote />}
       <div className="flex items-center justify-between">
         <p className="text-sm text-slate-500">Quotas are per calendar year. Unpaid leave is deducted in payroll.</p>
-        <Button onClick={() => setEditing('new')}>
-          <Plus className="size-4" aria-hidden /> New leave type
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => setEditing('new')}>
+            <Plus className="size-4" aria-hidden /> New leave type
+          </Button>
+        )}
       </div>
       <FormError message={error} />
       <Card>
@@ -47,7 +52,7 @@ export function LeaveTypes() {
                 <Th>Leave type</Th>
                 <Th>Days per year</Th>
                 <Th>Pay</Th>
-                <Th className="w-40" />
+                {!readOnly && <Th className="w-40" />}
               </tr>
             </thead>
             <tbody>
@@ -56,14 +61,16 @@ export function LeaveTypes() {
                   <Td className="font-medium">{t.name}</Td>
                   <Td>{t.yearly_quota_days}</Td>
                   <Td>{t.paid ? <Badge tone="green">Paid</Badge> : <Badge tone="amber">Unpaid</Badge>}</Td>
-                  <Td className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
-                      Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => void onDelete(t)}>
-                      Delete
-                    </Button>
-                  </Td>
+                  {!readOnly && (
+                    <Td className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
+                        Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => void onDelete(t)}>
+                        Delete
+                      </Button>
+                    </Td>
+                  )}
                 </tr>
               ))}
             </tbody>

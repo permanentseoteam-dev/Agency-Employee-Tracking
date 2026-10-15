@@ -7,6 +7,7 @@ import { dateRange, daysText } from '@/lib/notifications'
 import { useSession } from '@/stores/session'
 import { useLeaveBalances, useLeaveLive, usePendingApprovals } from './api'
 import { DecideDialog, type Move } from './DecideDialog'
+import { byKind, LeaveKindFilter, type LeaveKind } from './LeaveKindFilter'
 
 /** Pending leave from the people I can decide for (my teams, or everyone for an admin). */
 export function Approvals() {
@@ -15,23 +16,32 @@ export function Approvals() {
   const balances = useLeaveBalances()
   useLeaveLive()
   const [deciding, setDeciding] = useState<{ request: LeaveRequest; status: Move } | null>(null)
-  const requests = pending.data ?? []
+  const [kind, setKind] = useState<LeaveKind>('all')
+  const all = pending.data ?? []
+  const requests = byKind(all, kind)
 
   const balanceFor = (r: LeaveRequest): LeaveBalance | undefined =>
     (balances.data ?? []).find((b) => b.user === r.user && b.leave_type === r.leave_type)
 
   return (
     <div className="space-y-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-        Waiting for a decision{requests.length ? ` (${requests.length})` : ''}
-      </h2>
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Waiting for a decision{all.length ? ` (${all.length})` : ''}
+        </h2>
+        {all.length > 0 && (
+          <div className="ml-auto">
+            <LeaveKindFilter value={kind} onChange={setKind} />
+          </div>
+        )}
+      </div>
       <Card>
         {pending.isLoading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
         ) : pending.isError ? (
           <p className="p-6 text-sm text-red-600">Could not load the requests.</p>
         ) : requests.length === 0 ? (
-          <p className="p-6 text-sm text-slate-500">Nothing waiting for you.</p>
+          <p className="p-6 text-sm text-slate-500">{all.length ? 'No requests of this kind.' : 'Nothing waiting for you.'}</p>
         ) : (
           <Table>
             <thead>

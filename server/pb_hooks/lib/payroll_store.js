@@ -96,8 +96,6 @@ function runPayroll(app, month) {
         absentDays: counts.absent,
         unpaidLeaveDays: unpaid,
         halfDays: counts.half,
-        lateCount: counts.late,
-        latePenalty: settings.late_penalty_pkr,
         adjustment: keep.adjustment
       })
       const item = new Record(collection)
@@ -108,7 +106,6 @@ function runPayroll(app, month) {
       item.set('absent_days', counts.absent)
       item.set('unpaid_leave_days', unpaid)
       item.set('half_days', counts.half)
-      item.set('late_count', counts.late)
       item.set('deductions', result.deductions)
       item.set('adjustment_pkr', Math.round(keep.adjustment))
       item.set('note', keep.note)

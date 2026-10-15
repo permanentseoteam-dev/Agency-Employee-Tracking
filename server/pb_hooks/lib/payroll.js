@@ -2,9 +2,10 @@
 // here, so Vitest can test the same file the hook require()s.
 //
 //   per-day rate = monthly salary ÷ working days in the month (weekends and holidays excluded)
-//   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate + late count × late penalty
+//   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate
 //   net          = monthly salary − deductions + adjustment
 // There is no automatic pro-rating: the admin sets an adjustment for mid-month joiners and leavers.
+// Late days cost nothing here: they give stars instead (star_rules), which never touch pay.
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const DAY_MS = 86400000
@@ -73,13 +74,12 @@ function unpaidLeaveDays(leaves, month, workDays, holidays) {
   return total
 }
 
-/** Absent, half-day and late counts from the month's attendance records. */
+/** Absent and half-day counts from the month's attendance records. */
 function attendanceCounts(records) {
-  const out = { absent: 0, half: 0, late: 0 }
+  const out = { absent: 0, half: 0 }
   for (const r of records || []) {
     if (r.status === 'absent') out.absent++
     else if (r.status === 'half_day') out.half++
-    else if (r.status === 'late') out.late++
   }
   return out
 }
@@ -90,7 +90,7 @@ function calculate(input) {
   const days = Number(input.workingDays) || 0
   const rate = days > 0 ? base / days : 0
   const deductedDays = (Number(input.absentDays) || 0) + (Number(input.unpaidLeaveDays) || 0) + 0.5 * (Number(input.halfDays) || 0)
-  const deductions = Math.round(deductedDays * rate + (Number(input.lateCount) || 0) * (Number(input.latePenalty) || 0))
+  const deductions = Math.round(deductedDays * rate)
   const adjustment = Math.round(Number(input.adjustment) || 0)
   return { rate: rate, deductions: deductions, net: base - deductions + adjustment }
 }

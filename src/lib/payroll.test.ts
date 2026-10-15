@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { breakdown, formatAdjustment, formatPkr, midMonth, payrollCsv, runTotals, type PayrollItem } from './payroll'
 
-// The hand calculation from server/pb_hooks/lib/payroll.test.mjs, as stored.
+// The hand calculation from server/pb_hooks/lib/payroll.test.mjs, as stored (late days cost nothing).
 const item: PayrollItem = {
   id: 'i1',
   run: 'r1',
@@ -11,11 +11,10 @@ const item: PayrollItem = {
   absent_days: 2,
   unpaid_leave_days: 1,
   half_days: 1,
-  late_count: 3,
-  deductions: 18167,
+  deductions: 16667,
   adjustment_pkr: -20000,
   note: 'Left on the 18th',
-  net: 61833
+  net: 63333
 }
 
 describe('formatting', () => {
@@ -39,8 +38,11 @@ describe('breakdown', () => {
     expect(b.absent).toBeCloseTo(9523.81, 2)
     expect(b.unpaidLeave).toBeCloseTo(4761.9, 2)
     expect(b.halfDays).toBeCloseTo(2380.95, 2)
-    expect(b.late).toBe(1500)
-    expect(b.latePenalty).toBe(500)
+    expect(b.other).toBe(0)
+  })
+
+  it('shows what earlier pay rules deducted on top (an old month with a late fine)', () => {
+    expect(breakdown({ ...item, deductions: 18167 }).other).toBe(1500)
   })
 })
 
@@ -57,14 +59,14 @@ describe('totals and CSV', () => {
   const other = { ...item, id: 'i2', user: 'u2', base: 50000, deductions: 0, adjustment_pkr: 5000, note: 'Bonus, Q3', net: 55000 }
 
   it('adds up the run', () => {
-    expect(runTotals([item, other])).toEqual({ base: 150000, deductions: 18167, adjustments: -15000, net: 116833 })
+    expect(runTotals([item, other])).toEqual({ base: 150000, deductions: 16667, adjustments: -15000, net: 118333 })
   })
 
   it('exports a line per employee and a total', () => {
     const lines = payrollCsv([item, other], (id) => (id === 'u1' ? 'Asma Khan' : 'Bilal')).replace('﻿', '').trim().split('\r\n')
-    expect(lines[0]).toBe('Employee,Monthly salary,Working days,Absent,Unpaid leave,Half days,Late,Deductions,Adjustment,Note,Net pay')
-    expect(lines[1]).toBe('Asma Khan,100000,21,2,1,1,3,18167,-20000,Left on the 18th,61833')
-    expect(lines[2]).toBe('Bilal,50000,21,2,1,1,3,0,5000,"Bonus, Q3",55000')
-    expect(lines[3]).toBe('Total,150000,,,,,,18167,-15000,,116833')
+    expect(lines[0]).toBe('Employee,Monthly salary,Working days,Absent,Unpaid leave,Half days,Deductions,Adjustment,Note,Net pay')
+    expect(lines[1]).toBe('Asma Khan,100000,21,2,1,1,16667,-20000,Left on the 18th,63333')
+    expect(lines[2]).toBe('Bilal,50000,21,2,1,1,0,5000,"Bonus, Q3",55000')
+    expect(lines[3]).toBe('Total,150000,,,,,16667,-15000,,118333')
   })
 })

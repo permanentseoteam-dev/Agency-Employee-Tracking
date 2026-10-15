@@ -105,6 +105,63 @@ function yearOf(dateKey) {
   return String(dateKey || '').slice(0, 4)
 }
 
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/**
+ * A request's leave per month for the monthly limits: { "YYYY-MM": { full, half } }, where
+ * full = its working days in that month and half = 1 for a half-day (short) leave.
+ * A request may run into the next month; each month counts its own days.
+ */
+function leaveByMonth(start, end, halfDay, workDays, holidays) {
+  const out = {}
+  if (halfDay) {
+    if (workingDays(start, start, workDays, holidays).length) out[start.slice(0, 7)] = { full: 0, half: 1 }
+    return out
+  }
+  for (const d of workingDays(start, end, workDays, holidays)) {
+    const month = d.slice(0, 7)
+    out[month] = out[month] || { full: 0, half: 0 }
+    out[month].full++
+  }
+  return out
+}
+
+/** The leave several requests ({ start_date, end_date, half_day }) add up to in one month. */
+function monthTotals(requests, month, workDays, holidays) {
+  const out = { full: 0, half: 0 }
+  for (const r of requests || []) {
+    const m = leaveByMonth(r.start_date, r.end_date, !!r.half_day, workDays, holidays)[month]
+    if (m) {
+      out.full += m.full
+      out.half += m.half
+    }
+  }
+  return out
+}
+
+/**
+ * Leave per month from Rules: limits { full, half }, 0 = no limit. taken: the person's
+ * other leave in the month; adding: this request's, both { full, half }.
+ * Returns null when it fits, or the reason it doesn't.
+ */
+function monthlyLimitProblem(limits, month, taken, adding) {
+  const name = MONTH_NAMES[Number(String(month).slice(5, 7)) - 1] || month
+  const check = (limit, used, add, kind, one, many) => {
+    const max = Number(limit) || 0
+    if (max <= 0 || !(add > 0) || used + add <= max) return null
+    const left = Math.max(0, max - used)
+    const rule = ' (limit ' + max + ' a month)'
+    if (left === 0) return 'No ' + kind + ' leave left in ' + name + rule + '.'
+    return 'Only ' + left + ' ' + (left === 1 ? one : many) + ' of leave left in ' + name + rule + '; this request needs ' + add + '.'
+  }
+  const t = taken || {}
+  const a = adding || {}
+  return (
+    check(limits && limits.full, Number(t.full) || 0, Number(a.full) || 0, 'full-day', 'full day', 'full days') ||
+    check(limits && limits.half, Number(t.half) || 0, Number(a.half) || 0, 'half-day (short)', 'half day', 'half days')
+  )
+}
+
 /**
  * Whether `actor` may move a request of `requester` from `before` to `after`.
  * actor and requester: { id, role }. Returns null when allowed, or the reason it isn't.
@@ -181,6 +238,9 @@ module.exports = {
   evaluateRequest,
   quotaProblem,
   yearOf,
+  leaveByMonth,
+  monthTotals,
+  monthlyLimitProblem,
   decisionProblem,
   lockedFieldProblem,
   isStaffDecision,

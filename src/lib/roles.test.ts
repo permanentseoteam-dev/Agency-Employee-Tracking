@@ -17,7 +17,7 @@ describe('roles', () => {
     const employee = navFor('employee').map((n) => n.path)
     const manager = navFor('manager').map((n) => n.path)
     const admin = navFor('admin').map((n) => n.path)
-    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/calendar', '/finance'])
+    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/calendar', '/rules', '/finance'])
     expect(manager).toContain('/live')
     expect(manager).toContain('/finance')
     expect(manager).not.toContain('/org')
@@ -37,7 +37,8 @@ describe('roles', () => {
     expect(canOpen('employee', '/my-leaves')).toBe(true)
     expect(canOpen('employee', '/profile')).toBe(true)
     expect(canOpen('manager', '/approvals')).toBe(true)
-    expect(canOpen('manager', '/rules')).toBe(false)
+    expect(canOpen('manager', '/rules')).toBe(true) // read-only for anyone but an admin
+    expect(canOpen('employee', '/rules/stars')).toBe(true)
     expect(canOpen('admin', '/org/teams')).toBe(true)
   })
 })

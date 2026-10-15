@@ -21,6 +21,9 @@ onRecordCreateRequest((e) => {
     } catch (_) {}
     if (exists) return e.next()
   }
+  // Superusers (imports, demo data, fixes on the server PC) are trusted, like leave.pb.js:
+  // their segments may be older than 30 days.
+  if (e.hasSuperuserAuth()) return e.next()
 
   const start = e.record.getString('started_at')
   const end = e.record.getString('ended_at')

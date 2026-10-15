@@ -11,6 +11,7 @@ import { dateRange, daysText } from '@/lib/notifications'
 import { errorMessage } from '@/stores/session'
 import { useCancelLeave, useLeaveLive, useMyLeaves } from './api'
 import { ApplyLeaveDialog } from './ApplyLeaveDialog'
+import { byKind, LeaveKindFilter, type LeaveKind } from './LeaveKindFilter'
 import { LeaveStatusBadge } from './LeaveStatusBadge'
 
 export function MyLeaves() {
@@ -24,7 +25,9 @@ export function MyLeaves() {
   useLeaveLive()
   const [applying, setApplying] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [kind, setKind] = useState<LeaveKind>('all')
   const requests = mine.data ?? []
+  const shown = byKind(requests, kind)
   const rows = balanceRows(types.data ?? [], requests, year)
 
   async function onCancel(r: LeaveRequest) {
@@ -66,6 +69,7 @@ export function MyLeaves() {
       </div>
 
       <FormError message={error} />
+      {requests.length > 0 && <LeaveKindFilter value={kind} onChange={setKind} />}
       <Card>
         {mine.isLoading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
@@ -73,6 +77,8 @@ export function MyLeaves() {
           <p className="p-6 text-sm text-red-600">Could not load your leave requests.</p>
         ) : requests.length === 0 ? (
           <p className="p-6 text-sm text-slate-500">No leave requests yet. Use Apply for leave to send one.</p>
+        ) : shown.length === 0 ? (
+          <p className="p-6 text-sm text-slate-500">No requests of this kind.</p>
         ) : (
           <Table>
             <thead>
@@ -86,7 +92,7 @@ export function MyLeaves() {
               </tr>
             </thead>
             <tbody>
-              {requests.map((r) => (
+              {shown.map((r) => (
                 <tr key={r.id} data-request={r.id} data-status={r.status}>
                   <Td>{r.expand?.leave_type?.name ?? '—'}</Td>
                   <Td className="tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>

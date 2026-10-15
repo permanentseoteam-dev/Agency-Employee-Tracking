@@ -71,7 +71,7 @@ onRecordUpdateRequest((e) => {
   for (const field of ['run', 'user']) {
     if (e.record.getString(field) !== before.getString(field)) throw new BadRequestError('Only the adjustment and note can be changed.')
   }
-  for (const field of ['base', 'working_days', 'absent_days', 'unpaid_leave_days', 'half_days', 'late_count', 'deductions']) {
+  for (const field of ['base', 'working_days', 'absent_days', 'unpaid_leave_days', 'half_days', 'deductions']) {
     if (e.record.getFloat(field) !== before.getFloat(field)) {
       throw new BadRequestError('Only the adjustment and note can be changed. Run payroll again to recount the month.')
     }
