@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
 import { Avatar } from '@/components/layout/Avatar'
-import { pb } from '@/lib/pb'
+import { AppError, must, supabase } from '@/lib/db'
 import { ROLE_LABEL } from '@/lib/roles'
 import { errorMessage, useSession } from '@/stores/session'
 
@@ -12,6 +12,7 @@ const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 export function MyProfile() {
   const user = useSession((s) => s.user)!
+  const reload = useSession((s) => s.reload)
   const [fullName, setFullName] = useState(user.full_name)
   const [phone, setPhone] = useState(user.phone)
   const [designation, setDesignation] = useState(user.designation)
@@ -27,15 +28,29 @@ export function MyProfile() {
 
   const team = useQuery({
     queryKey: ['teams', user.team],
-    queryFn: () => pb.collection('teams').getOne<{ name: string }>(user.team),
+    queryFn: async () => must(await supabase.from('teams').select('name').eq('id', user.team).single()) as { name: string },
     enabled: !!user.team
   })
 
-  async function save(data: Record<string, unknown> | FormData, done: string) {
+  /** Saves profile fields, or a new photo (a File: uploaded to my own folder first). */
+  async function save(data: Record<string, unknown> | File, done: string) {
     setStatus(null)
     setBusy(true)
     try {
-      await pb.collection('users').update(user.id, data) // also refreshes the signed-in record
+      let fields = data instanceof File ? null : data
+      if (data instanceof File) {
+        const name = `${Date.now()}.${(data.name.split('.').pop() || 'jpg').toLowerCase()}`
+        const up = await supabase.storage.from('avatars').upload(`${user.id}/${name}`, data, { contentType: data.type, upsert: true })
+        if (up.error) throw new AppError(400, up.error.message)
+        fields = { avatar: name }
+      }
+      if (fields && 'avatar' in fields && fields.avatar === null) fields = { avatar: '' }
+      const previous = user.avatar
+      must(await supabase.from('profiles').update(fields!).eq('id', user.id).select())
+      if (fields && 'avatar' in fields && previous && previous !== fields.avatar) {
+        await supabase.storage.from('avatars').remove([`${user.id}/${previous}`]) // the old photo
+      }
+      await reload() // the signed-in record shows the change
       setStatus({ ok: true, text: done })
     } catch (err) {
       setStatus({ ok: false, text: errorMessage(err) })
@@ -59,9 +74,7 @@ export function MyProfile() {
       setStatus({ ok: false, text: 'The photo must be 5 MB or smaller.' })
       return
     }
-    const form = new FormData()
-    form.append('avatar', file)
-    void save(form, 'Photo updated.')
+    void save(file, 'Photo updated.')
   }
 
   return (

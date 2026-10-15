@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Employee } from '@/features/org/api'
-import { pb } from '@/lib/pb'
+import { call, live, must, PROFILE_WITH_TEAM, supabase, toEmployee } from '@/lib/db'
 import type { TeamStatusResponse } from '@/lib/projects'
 
 export interface Client {
@@ -44,7 +44,13 @@ export const projectKeys = {
 export function useClients() {
   return useQuery({
     queryKey: projectKeys.clients,
-    queryFn: () => pb.collection('clients').getFullList<Client>({ sort: 'archived,name', expand: 'members,members.team' })
+    queryFn: async () => {
+      const clients = must(await supabase.from('clients').select('*').order('archived').order('name')) as Client[]
+      const ids = [...new Set(clients.flatMap((c) => c.members))]
+      const people = ids.length ? must(await supabase.from('profiles').select(PROFILE_WITH_TEAM).in('id', ids)).map((r) => toEmployee<Employee>(r)) : []
+      const byId = new Map(people.map((p) => [p.id, p]))
+      return clients.map((c) => ({ ...c, expand: { members: c.members.map((id) => byId.get(id)).filter((p): p is Employee => !!p) } }))
+    }
   })
 }
 
@@ -52,7 +58,7 @@ export function useClients() {
 export function useTeamStatus(client: string, date: string, today: boolean) {
   return useQuery({
     queryKey: projectKeys.status(client, date),
-    queryFn: () => pb.send<TeamStatusResponse>('/api/projects/status', { query: { client, date } }),
+    queryFn: () => call<TeamStatusResponse>('projects-status', { client, date }),
     refetchInterval: today ? 60_000 : false,
     enabled: !!client
   })
@@ -62,11 +68,16 @@ export function useTeamStatus(client: string, date: string, today: boolean) {
 export function useProjectEvents(client: string, start: Date, end: Date) {
   return useQuery({
     queryKey: projectKeys.events(client, start.toISOString(), end.toISOString()),
-    queryFn: () =>
-      pb.collection('project_events').getFullList<ProjectEvent>({
-        filter: pb.filter('client = {:client} && starts_at < {:end} && ends_at > {:start}', { client, start, end }),
-        sort: 'starts_at'
-      }),
+    queryFn: async () =>
+      (must(
+        await supabase
+          .from('project_events')
+          .select('*')
+          .eq('client', client)
+          .lt('starts_at', end.toISOString())
+          .gt('ends_at', start.toISOString())
+          .order('starts_at')
+      ) as ProjectEvent[]).map((e) => ({ ...e, created_by: e.created_by ?? '' })),
     enabled: !!client
   })
 }
@@ -74,7 +85,7 @@ export function useProjectEvents(client: string, start: Date, end: Date) {
 export function useTeamLeaves(client: string, from: string, to: string) {
   return useQuery({
     queryKey: projectKeys.leaves(client, from, to),
-    queryFn: () => pb.send<TeamLeave[]>('/api/projects/leaves', { query: { client, from, to } }),
+    queryFn: () => call<TeamLeave[]>('projects-leaves', { client, from, to }),
     enabled: !!client
   })
 }
@@ -83,24 +94,9 @@ export function useTeamLeaves(client: string, from: string, to: string) {
 export function useProjectsLive() {
   const qc = useQueryClient()
   useEffect(() => {
-    const stops: (() => Promise<void>)[] = []
-    let cancelled = false
     const refresh = () => void qc.invalidateQueries({ queryKey: projectKeys.all })
-    for (const name of ['clients', 'project_events']) {
-      pb.collection(name)
-        .subscribe('*', refresh)
-        .then((stop) => {
-          if (cancelled) void stop()
-          else stops.push(stop)
-        })
-        .catch(() => {
-          /* offline: the next refetch catches up */
-        })
-    }
-    return () => {
-      cancelled = true
-      for (const stop of stops) void stop()
-    }
+    const stops = ['clients', 'project_events'].map((table) => live(table, refresh))
+    return () => stops.forEach((stop) => stop())
   }, [qc])
 }
 
@@ -109,8 +105,10 @@ export type ClientInput = Pick<Client, 'name' | 'description' | 'archived'>
 export function useSaveClient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: ClientInput }) =>
-      id ? pb.collection('clients').update<Client>(id, data) : pb.collection('clients').create<Client>({ ...data, members: [] }),
+    mutationFn: async ({ id, data }: { id?: string; data: ClientInput }) =>
+      (id
+        ? must(await supabase.from('clients').update(data).eq('id', id).select().single())
+        : must(await supabase.from('clients').insert({ ...data, members: [] }).select().single())) as Client,
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.all })
   })
 }
@@ -118,7 +116,7 @@ export function useSaveClient() {
 export function useDeleteClient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('clients').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('clients').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.all })
   })
 }
@@ -127,8 +125,11 @@ export function useDeleteClient() {
 export function useChangeMembers() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, add, remove }: { id: string; add?: string[]; remove?: string }) =>
-      pb.collection('clients').update<Client>(id, add ? { 'members+': add } : { 'members-': remove }),
+    mutationFn: async ({ id, add, remove }: { id: string; add?: string[]; remove?: string }) => {
+      const current = must(await supabase.from('clients').select('members').eq('id', id).single()) as { members: string[] }
+      const members = add ? [...new Set([...current.members, ...add])] : current.members.filter((m) => m !== remove)
+      return must(await supabase.from('clients').update({ members }).eq('id', id).select().single()) as Client
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.all })
   })
 }
@@ -138,8 +139,10 @@ export type ProjectEventData = Pick<ProjectEvent, 'title' | 'description' | 'sta
 export function useSaveProjectEvent(client: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: ProjectEventData }) =>
-      id ? pb.collection('project_events').update<ProjectEvent>(id, data) : pb.collection('project_events').create<ProjectEvent>({ ...data, client }),
+    mutationFn: async ({ id, data }: { id?: string; data: ProjectEventData }) =>
+      (id
+        ? must(await supabase.from('project_events').update(data).eq('id', id).select().single())
+        : must(await supabase.from('project_events').insert({ ...data, client }).select().single())) as ProjectEvent,
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.all })
   })
 }
@@ -147,7 +150,7 @@ export function useSaveProjectEvent(client: string) {
 export function useDeleteProjectEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('project_events').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('project_events').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: projectKeys.all })
   })
 }

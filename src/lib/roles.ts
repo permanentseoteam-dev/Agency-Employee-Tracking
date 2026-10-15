@@ -1,6 +1,6 @@
 // The only place UI role logic lives (plan §4.8). Data access is enforced
 // separately by the PocketBase API rules; this file only shapes navigation.
-import type { Role } from './pb'
+import type { Role } from './db'
 
 export const ROLES: Role[] = ['admin', 'manager', 'employee']
 

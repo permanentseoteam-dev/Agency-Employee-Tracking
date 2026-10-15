@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { dayRangeUtc, toDateKey, DEFAULT_TZ } from '@/lib/dates'
-import { pb } from '@/lib/pb'
+import { call, live, must, PROFILE_WITH_TEAM, selectAll, supabase, toEmployee } from '@/lib/db'
 import type { PresenceRecord, ReportRow, SegmentRow } from '@/lib/tracking'
 import { useSession } from '@/stores/session'
 import { useOrgSettings } from '@/features/rules/api'
@@ -54,10 +54,14 @@ export function useMySegments(from: string) {
     enabled: !!user,
     refetchInterval: 60_000,
     queryFn: () =>
-      pb.collection('activity_segments').getFullList<SegmentRow>({
-        filter: pb.filter('user = {:u} && started_at >= {:start}', { u: user!.id, start: dayRangeUtc(from, tz).start }),
-        fields: 'state,started_at,ended_at'
-      })
+      selectAll<SegmentRow>(() =>
+        supabase
+          .from('activity_segments')
+          .select('state, started_at, ended_at')
+          .eq('user', user!.id)
+          .gte('started_at', new Date(dayRangeUtc(from, tz).start).toISOString())
+          .order('started_at')
+      )
   })
 }
 
@@ -73,35 +77,21 @@ export function usePeople() {
   const query = useQuery({
     queryKey: trackingKeys.people(userId),
     enabled: !!user,
-    queryFn: () =>
-      pb.collection('users').getFullList<Employee>({
-        filter:
-          user!.role === 'admin' ? 'active = true' : pb.filter('active = true && team.manager = {:me}', { me: user!.id }),
-        sort: 'full_name',
-        expand: 'team'
-      })
+    queryFn: async () => {
+      let q = supabase.from('profiles').select(PROFILE_WITH_TEAM).eq('active', true).order('full_name')
+      if (user!.role !== 'admin') {
+        const teams = must(await supabase.from('teams').select('id').eq('manager', user!.id)) as { id: string }[]
+        q = q.in('team', teams.map((t) => t.id))
+      }
+      return must(await q).map((r) => toEmployee<Employee>(r))
+    }
   })
 
   useEffect(() => {
     if (!userId) return
     const refresh = () => void qc.invalidateQueries({ queryKey: trackingKeys.people(userId) })
-    const unsubscribers: (() => Promise<void>)[] = []
-    let cancelled = false
-    for (const collection of ['users', 'teams']) {
-      pb.collection(collection)
-        .subscribe('*', refresh)
-        .then((fn) => {
-          if (cancelled) void fn()
-          else unsubscribers.push(fn)
-        })
-        .catch(() => {
-          /* offline: the refetch on reconnect catches up */
-        })
-    }
-    return () => {
-      cancelled = true
-      for (const fn of unsubscribers) void fn()
-    }
+    const stops = ['profiles', 'teams'].map((table) => live(table, refresh))
+    return () => stops.forEach((stop) => stop())
   }, [qc, userId])
 
   return query
@@ -113,11 +103,11 @@ export function useMyTeams() {
   return useQuery({
     queryKey: ['tracking', 'teams', user?.id ?? ''],
     enabled: !!user,
-    queryFn: () =>
-      pb.collection('teams').getFullList<Team>({
-        filter: user!.role === 'admin' ? '' : pb.filter('manager = {:me}', { me: user!.id }),
-        sort: 'name'
-      })
+    queryFn: async () => {
+      let q = supabase.from('teams').select('*').order('name')
+      if (user!.role !== 'admin') q = q.eq('manager', user!.id)
+      return (must(await q) as Team[]).map((t) => ({ ...t, manager: t.manager ?? '' }))
+    }
   })
 }
 
@@ -127,35 +117,23 @@ export function usePresence() {
   const query = useQuery({
     queryKey: trackingKeys.presence,
     queryFn: async () => {
-      const list = await pb.collection('presence').getFullList<PresenceRecord>()
+      const list = must(await supabase.from('presence').select('*')) as PresenceRecord[]
       return Object.fromEntries(list.map((p) => [p.user, p])) as Record<string, PresenceRecord>
     }
   })
 
-  useEffect(() => {
-    let unsubscribe: (() => Promise<void>) | undefined
-    let cancelled = false
-    pb.collection('presence')
-      .subscribe<PresenceRecord>('*', (e) => {
+  useEffect(
+    () =>
+      live('presence', (e) => {
         qc.setQueryData<Record<string, PresenceRecord>>(trackingKeys.presence, (prev) => {
           const next = { ...(prev ?? {}) }
-          if (e.action === 'delete') delete next[e.record.user]
-          else next[e.record.user] = e.record
+          if (e.eventType === 'DELETE') delete next[e.old.user as string]
+          else next[e.new.user as string] = e.new as unknown as PresenceRecord
           return next
         })
-      })
-      .then((fn) => {
-        if (cancelled) void fn()
-        else unsubscribe = fn
-      })
-      .catch(() => {
-        /* offline: the refetch on reconnect catches up */
-      })
-    return () => {
-      cancelled = true
-      void unsubscribe?.()
-    }
-  }, [qc])
+      }),
+    [qc]
+  )
 
   return query
 }
@@ -179,11 +157,7 @@ export function useReport(params: ReportParams) {
   return useQuery({
     queryKey: trackingKeys.report(params),
     placeholderData: keepPreviousData,
-    queryFn: () =>
-      pb.send<ReportResponse>('/api/reports/activity', {
-        method: 'GET',
-        query: Object.fromEntries(Object.entries(params).filter(([, v]) => v !== ''))
-      })
+    queryFn: () => call<ReportResponse>('reports-activity', Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '')))
   })
 }
 

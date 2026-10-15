@@ -3,7 +3,7 @@
 // show problems before sending, and the Approvals queue can offer only valid moves.
 import { addDays, isoWeekday } from './dates'
 import { isDateKey } from './holidays'
-import type { Role } from './pb'
+import type { Role } from './db'
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled'
 

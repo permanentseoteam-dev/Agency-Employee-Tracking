@@ -136,7 +136,21 @@ export function live(table: string, onChange: (change: { eventType: string; new:
 
 /** A profile row with its team embedded, as screens use it: Employee-like ({ expand: { team } }). */
 export const PROFILE_WITH_TEAM = '*, team_row:teams!profiles_team_fkey(*), email_row:profile_emails(email)'
-export function toEmployee<T = UserRecord>(row: Record<string, unknown>): T & { expand?: { team?: Record<string, unknown> } } {
+export function toEmployee<T = UserRecord>(row: Record<string, unknown>): T {
   const { team_row, email_row, ...rest } = row as Record<string, unknown> & { team_row?: Record<string, unknown> | null; email_row?: { email?: string } | null }
-  return { ...toUser(rest, email_row?.email ?? undefined), expand: team_row ? { team: team_row } : {} } as never
+  return { ...toUser(rest, email_row?.email ?? undefined), expand: team_row ? { team: team_row } : {} } as T
+}
+
+/**
+ * Every row of a query, page by page: Supabase returns at most 1,000 rows per request, and a
+ * month of 5-minute segments (or a month of attendance for a team) is more than that.
+ * `build` must give the same ordered query each time.
+ */
+export async function selectAll<T>(build: () => { range(from: number, to: number): PromiseLike<{ data: unknown; error: PostgrestError | null; status?: number }> }, pageSize = 1000): Promise<T[]> {
+  const out: T[] = []
+  for (let from = 0; ; from += pageSize) {
+    const rows = must(await build().range(from, from + pageSize - 1)) as T[]
+    out.push(...rows)
+    if (rows.length < pageSize) return out
+  }
 }
