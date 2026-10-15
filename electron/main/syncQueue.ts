@@ -1,6 +1,6 @@
 // Offline-safe delivery of activity segments (plan §4.1). Every closed segment
 // is stored on disk first and then created in PocketBase with a client-made id,
-// so a retry can never create a second copy.
+// so a retry can never create a second copy (Supabase answers a repeat with 409).
 import { randomInt } from 'node:crypto'
 
 export interface QueuedSegment {
@@ -25,7 +25,7 @@ export interface QueueDeps {
   storage: QueueStorage
   /** The signed-in user and a create call, or null while signed out. */
   client(): { userId: string; create(item: Omit<QueuedSegment, 'attempts' | 'next_at'>): Promise<unknown> } | null
-  /** Called on an unexplained 400 (PocketBase answers a create with an expired token that way). True = still signed in. */
+  /** Called on an unexplained 400/403 (a permission rule refuses a dead session that way). True = still signed in. */
   verifySession(): Promise<boolean>
   /** Called once when the server says the session is no longer valid. */
   onAuthLost(): void
@@ -38,24 +38,26 @@ const BASE_DELAY_MS = 5_000
 const MAX_DELAY_MS = 5 * 60_000
 const MAX_AGE_MS = 30 * 24 * 60 * 60_000
 
-/** A PocketBase-style record id: 15 characters of [a-z0-9]. */
+/** A record id like the server's own: 15 characters of [a-z0-9]. */
 export function newId(): string {
   let id = ''
   for (let i = 0; i < 15; i++) id += ALPHABET[randomInt(ALPHABET.length)]
   return id
 }
 
-/** What to do with a segment after a failed create. */
+/**
+ * What to do with a segment after a failed create (a Supabase error: status, Postgres code, hint).
+ * - the id is taken (23505 / 409): an earlier attempt got through
+ * - the guard trigger refused it (hint segment_rejected): drop it
+ * - 401: the session is dead; 400 / 403 (a permission rule refused it): check the session first
+ */
 export function classify(err: unknown): Outcome {
-  const e = err as { status?: number; response?: { data?: Record<string, unknown> } }
+  const e = err as { status?: number; code?: string; hint?: string }
   const status = e?.status ?? 0
-  const data = e?.response?.data ?? {}
-  if (status === 400) {
-    if ('id' in data) return 'synced' // the id is taken: an earlier attempt got through
-    if ('segment' in data) return 'rejected' // segments.pb.js said no
-    return 'check'
-  }
-  if (status === 401 || status === 403) return 'auth'
+  if (e?.code === '23505' || status === 409) return 'synced'
+  if (e?.hint === 'segment_rejected') return 'rejected'
+  if (status === 401) return 'auth'
+  if (status === 400 || status === 403) return 'check'
   return 'retry' // offline (0), server errors, rate limits
 }
 

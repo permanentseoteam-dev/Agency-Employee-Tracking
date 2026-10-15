@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { backoffMs, classify, newId, SyncQueue, type QueuedSegment, type QueueDeps } from './syncQueue'
 
-const err = (status: number, data: Record<string, unknown> = {}) =>
-  Object.assign(new Error('Failed to create record.'), { status, response: { data } })
+const err = (status: number, extra: { code?: string; hint?: string } = {}) =>
+  Object.assign(new Error('Failed to create record.'), { status, ...extra })
 
 const NOW = Date.parse('2026-10-14T05:00:00.000Z')
 const seg = (minute: number) => ({
@@ -43,11 +43,11 @@ describe('newId', () => {
 
 describe('classify', () => {
   it.each([
-    [err(400, { id: { code: 'validation_not_unique' } }), 'synced'],
-    [err(400, { segment: {} }), 'rejected'],
+    [err(409, { code: '23505' }), 'synced'],
+    [err(400, { code: 'P0001', hint: 'segment_rejected' }), 'rejected'],
     [err(400), 'check'],
+    [err(403, { code: '42501' }), 'check'],
     [err(401), 'auth'],
-    [err(403), 'auth'],
     [err(0), 'retry'],
     [err(502), 'retry'],
     [err(429), 'retry'],
@@ -96,7 +96,7 @@ describe('SyncQueue', () => {
 
   it('counts a duplicate id as already synced', async () => {
     const t = setup(async () => {
-      throw err(400, { id: { code: 'validation_not_unique' } })
+      throw err(409, { code: '23505' })
     })
     t.q.add(seg(0))
     await t.q.flush()
@@ -106,7 +106,7 @@ describe('SyncQueue', () => {
   it('drops a segment the server rejects and carries on', async () => {
     const warn = vi.fn()
     const create = vi.fn(async (item: unknown) => {
-      if ((item as QueuedSegment).started_at === seg(0).started_at) throw err(400, { segment: {} })
+      if ((item as QueuedSegment).started_at === seg(0).started_at) throw err(400, { hint: 'segment_rejected' })
     })
     const t = setup(create, { log: { info: () => {}, warn } })
     t.q.add(seg(0))
@@ -119,7 +119,7 @@ describe('SyncQueue', () => {
   it('keeps segments and pauses when the session has expired', async () => {
     let valid = false
     const t = setup(async () => {
-      if (!valid) throw err(400) // PocketBase's answer to a create with a dead token
+      if (!valid) throw err(403, { code: '42501' }) // a permission rule refusing a dead session
     }, { verifySession: async () => valid })
     t.q.add(seg(0))
     await t.q.flush()

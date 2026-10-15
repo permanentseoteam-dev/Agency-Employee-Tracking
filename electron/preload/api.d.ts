@@ -45,12 +45,8 @@ export interface TrackerStatus {
 
 /** What the sign-in screen needs to know before it lets anyone sign in or register. */
 export interface NetworkStatus {
-  /** The server answered /api/health. */
+  /** The server (Supabase) answered its health check. */
   server: boolean
-  /** This PC's Tailscale: not installed, service off, installed but not signed in, or connected. */
-  tailscale: 'missing' | 'stopped' | 'signed_out' | 'running'
-  /** Connected to the network that has the server (it lists the server's machine). */
-  onAgencyNetwork: boolean
 }
 
 export interface TrackerApi {

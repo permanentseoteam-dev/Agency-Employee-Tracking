@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { pb } from '@/lib/pb'
+import { must, supabase } from '@/lib/db'
 import { errorMessage, useSession } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
@@ -21,6 +21,7 @@ const NOT_TRACKED = [
 export function TrackingNotice() {
   const user = useSession((s) => s.user)!
   const logout = useSession((s) => s.logout)
+  const reload = useSession((s) => s.reload)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -28,7 +29,8 @@ export function TrackingNotice() {
     setError(null)
     setBusy(true)
     try {
-      await pb.collection('users').update(user.id, { tracking_consent_at: new Date().toISOString() })
+      must(await supabase.from('profiles').update({ tracking_consent_at: new Date().toISOString() }).eq('id', user.id).select())
+      await reload()
     } catch (err) {
       setError(errorMessage(err))
     } finally {

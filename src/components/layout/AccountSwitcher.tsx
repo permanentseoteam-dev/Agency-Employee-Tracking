@@ -2,21 +2,21 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeftRight, Undo2 } from 'lucide-react'
-import PocketBase from 'pocketbase'
+import { createClient } from '@supabase/supabase-js'
 import { Avatar } from '@/components/layout/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
 import { Input } from '@/components/ui/Input'
 import { FormError } from '@/features/auth/AuthLayout'
-import { pb, type UserRecord } from '@/lib/pb'
-import { loadHome, saveHome, switchTargets, viewingAs } from '@/lib/roleSwitch'
+import { call, must, supabase, toUser, type UserRecord } from '@/lib/db'
+import { loadHome, refreshHome, saveHome, switchTargets, viewingAs, type SessionTokens } from '@/lib/roleSwitch'
 import { landingFor, roleOf, ROLE_LABEL } from '@/lib/roles'
-import { errorMessage, useSession } from '@/stores/session'
+import { currentTokens, errorMessage, useSession } from '@/stores/session'
 
 /**
  * The signed-in role. An admin can switch role: view the app as any active person, with
- * no password (POST /api/org/switch-to, admins only), and come back with "Back to me".
+ * no password (the org function's switch-to, admins only), and come back with "Back to me".
  * Time tracked on this PC keeps counting for the admin. Others only see their role.
  */
 export function AccountSwitcher() {
@@ -29,28 +29,30 @@ export function AccountSwitcher() {
   const home = loadHome()
   const asSomeoneElse = viewingAs(home, user.id)
 
-  /** Makes a token the app's session and goes to that role's landing page. */
-  async function apply(token: string, record: UserRecord) {
+  /** Makes a session the app's session and goes to that role's landing page. */
+  async function apply(tokens: SessionTokens, record: UserRecord) {
     // Close the old account's realtime connection; the remounted shell reconnects as the new one.
-    await pb.realtime.unsubscribe()
+    await supabase.removeAllChannels()
     queryClient.clear()
-    pb.authStore.save(token, record as never)
+    const { error: e } = await supabase.auth.setSession(tokens)
+    if (e) throw e
     setOpen(false)
     navigate(landingFor(roleOf(record.role)))
   }
 
   async function switchTo(person: UserRecord) {
     setError(null)
-    const me = loadHome() ?? { token: pb.authStore.token, record: user }
     try {
-      if (person.id === me.record.id) return await apply(me.token, me.record)
+      const home = loadHome()
+      // The admin's own session: the saved one (renewed now) when viewing as someone else.
+      const tokens = home ? await refreshHome() : currentTokens()
+      if (!tokens) throw new Error('Sign in again to switch.')
+      const me = { session: tokens, record: home?.record ?? user }
+      if (person.id === me.record.id) return await apply(me.session, me.record)
       // Asked with the admin's own token, whoever is on screen right now.
-      const client = new PocketBase(pb.baseURL)
-      client.autoCancellation(false)
-      client.authStore.save(me.token, me.record as never)
-      const res = await client.send<{ token: string; record: UserRecord }>('/api/org/switch-to', { method: 'POST', body: { userId: person.id } })
+      const res = await call<{ session: SessionTokens; record: Record<string, unknown> }>('org', { action: 'switch-to', userId: person.id }, me.session.access_token)
       saveHome(me)
-      await apply(res.token, res.record)
+      await apply(res.session, toUser(res.record))
     } catch (err) {
       setError(errorMessage(err, 'Could not switch.'))
     }
@@ -100,14 +102,21 @@ function SwitchRoleDialog({
   // Listed with the admin's own sign-in: the person on screen may see fewer people.
   const people = useQuery({
     queryKey: ['switch-role', 'people'],
-    queryFn: () => {
+    queryFn: async () => {
       const home = loadHome()
-      const client = home ? new PocketBase(pb.baseURL) : pb
-      if (home) {
-        client.autoCancellation(false)
-        client.authStore.save(home.token, home.record as never)
-      }
-      return client.collection('users').getFullList<UserRecord>({ filter: 'active = true', sort: 'full_name' })
+      const tokens = home ? await refreshHome() : null
+      const client = tokens
+        ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false, storageKey: 'pseo.switch' },
+            global: { headers: { Authorization: `Bearer ${tokens.access_token}` } }
+          })
+        : supabase
+      const [people, emails] = await Promise.all([
+        client.from('profiles').select('*').eq('active', true).order('full_name'),
+        client.from('profile_emails').select('id, email')
+      ])
+      const emailOf = new Map(must(emails).map((r) => [r.id, r.email]))
+      return must(people).map((p) => toUser(p, emailOf.get(p.id) ?? ''))
     }
   })
   const list = useMemo(() => {

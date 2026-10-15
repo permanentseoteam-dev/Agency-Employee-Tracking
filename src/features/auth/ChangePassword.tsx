@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
-import { pb } from '@/lib/pb'
+import { AppError, must, supabase } from '@/lib/db'
 import { errorMessage, useSession } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
@@ -11,6 +11,7 @@ const MIN_LENGTH = 8
 export function ChangePassword() {
   const user = useSession((s) => s.user)!
   const logout = useSession((s) => s.logout)
+  const reload = useSession((s) => s.reload)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
@@ -33,14 +34,13 @@ export function ChangePassword() {
     setBusy(true)
     try {
       const email = user.email ?? ''
-      await pb.collection('users').update(user.id, {
-        oldPassword: current,
-        password: next,
-        passwordConfirm: confirm,
-        must_change_password: false
-      })
-      // Changing the password signs out every session, including this one.
-      await pb.collection('users').authWithPassword(email, next)
+      // Check the temporary password first (the server doesn't ask for it on a change).
+      const check = await supabase.auth.signInWithPassword({ email, password: current })
+      if (check.error) throw new AppError(check.error.status ? 400 : 0, 'The temporary password is not correct.')
+      const changed = await supabase.auth.updateUser({ password: next })
+      if (changed.error) throw new AppError(changed.error.status ? 400 : 0, changed.error.message)
+      must(await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id).select())
+      await reload()
     } catch (err) {
       setError(errorMessage(err, 'Could not change the password. Check the temporary password and try again.'))
     } finally {
