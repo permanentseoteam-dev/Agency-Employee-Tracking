@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { addDays, formatDate } from '@/lib/dates'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, formatSignedDuration } from '@/lib/format'
 import { monthWeeks, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
 import { cn } from '@/lib/cn'
 import { todayKey, useMySegments, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
@@ -61,6 +61,11 @@ export function MyStats() {
   const live: LiveStatus = status?.state === 'active' ? 'active' : status?.state === 'idle' ? 'idle' : 'offline'
   const note = status && !status.signedIn ? 'Signed out – your time is saved and syncs after you sign in.' : status ? REASON[status.reason] : ''
 
+  const todayActive = byDay[today]?.active_s ?? 0
+  const todayIdle = byDay[today]?.idle_s ?? 0
+  // Net = active − idle, in the whole minutes shown above, so it always matches the two figures.
+  const todayNet = (Math.floor(todayActive / 60) - Math.floor(todayIdle / 60)) * 60
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <Card>
@@ -68,10 +73,11 @@ export function MyStats() {
           <CardTitle>Today</CardTitle>
           <StatusBadge status={live} />
         </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-6 sm:grid-cols-3">
-          <Stat label="Active" value={formatDuration(byDay[today]?.active_s ?? 0)} className="text-emerald-700 dark:text-emerald-400" />
-          <Stat label="Idle" value={formatDuration(byDay[today]?.idle_s ?? 0)} className="text-amber-700 dark:text-amber-400" />
-          <div className="col-span-2 self-end text-sm text-slate-500 sm:col-span-1">
+        <CardContent className="grid grid-cols-3 gap-6">
+          <Stat label="Active" value={formatDuration(todayActive)} className="text-emerald-700 dark:text-emerald-400" />
+          <Stat label="Idle" value={formatDuration(todayIdle)} className="text-amber-700 dark:text-amber-400" />
+          <Stat label="Net" value={formatSignedDuration(todayNet)} className={todayNet < 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-900 dark:text-slate-100'} />
+          <div className="col-span-3 text-sm text-slate-500 empty:hidden">
             {note}
             {status && status.pending > 0 && (
               <span className="block">

@@ -6,3 +6,9 @@ export function formatDuration(totalSeconds: number): string {
   const minutes = totalMinutes % 60
   return `${hours}h ${minutes}m`
 }
+
+/** Like formatDuration, with a leading "−" when negative, e.g. -780 → "−0h 13m". */
+export function formatSignedDuration(totalSeconds: number): string {
+  const s = Number.isFinite(totalSeconds) ? totalSeconds : 0
+  return (s <= -60 ? '−' : '') + formatDuration(Math.abs(s))
+}
