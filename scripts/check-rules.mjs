@@ -688,6 +688,24 @@ try {
   await denied('an employee cannot store a segment older than 30 days', () => pbEmpA.collection('activity_segments').create(oldSeg(empA.id)))
   await allowed('a superuser can import a segment older than 30 days', () => root.collection('activity_segments').create(oldSeg(empA.id)))
 
+  // --- Switch role: admins view the app as anyone, no password (switch.pb.js) ------------
+  const switchTo = (pb, userId) => pb.send('/api/org/switch-to', { method: 'POST', body: { userId } })
+  let asEmp = null
+  await allowed('an admin switches to an employee without a password', async () => {
+    asEmp = await switchTo(pbAdmin, empA.id)
+  })
+  const viewer = new PocketBase(URL)
+  viewer.autoCancellation(false)
+  viewer.authStore.save(asEmp?.token ?? '', asEmp?.record ?? null)
+  check('the token is that employee’s: they see only their own salary', asEmp?.record?.id === empA.id &&
+    (await viewer.collection('salaries').getFullList().catch(() => [])).every((s) => s.user === empA.id))
+  await denied('an employee cannot switch to anyone', () => switchTo(pbEmpA, admin.id))
+  await denied('a manager cannot switch to anyone', () => switchTo(pbMgrA, empA.id))
+  await denied('the switched-to employee cannot switch on to the admin', () => switchTo(viewer, admin.id))
+  const offAccount = await root.collection('users').getFirstListItem('email = "gone@test.local"')
+  await denied('a switched-off account cannot be switched to', () => switchTo(pbAdmin, offAccount.id))
+  await denied('nobody signed out can switch', () => switchTo(new PocketBase(URL), empA.id))
+
   // --- the dashboard (superusers) only from the server PC (security.pb.js) ------------
   // Requests through Funnel carry X-Forwarded-For; local ones don't.
   const viaInternet = { 'X-Forwarded-For': '203.0.113.9', 'content-type': 'application/json' }

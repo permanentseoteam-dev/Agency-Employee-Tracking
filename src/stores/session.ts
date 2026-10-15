@@ -1,9 +1,9 @@
 import { create } from 'zustand'
 import PocketBase from 'pocketbase'
 import { pb, type UserRecord } from '@/lib/pb'
-import { forget, loadAccounts, markNeedsPassword, remember, updateAccount } from '@/lib/rememberedAccounts'
+import { clearHome, loadHome, saveHome, viewingAs } from '@/lib/roleSwitch'
 
-/** How often the other remembered accounts' tokens are renewed, so they don't expire unused. */
+/** How often the admin's own saved sign-in is renewed while viewing as someone else. */
 const KEEP_ALIVE_MS = 6 * 60 * 60_000
 let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 
@@ -22,47 +22,45 @@ function currentUser(): UserRecord | null {
   return pb.authStore.isValid ? (pb.authStore.record as unknown as UserRecord) : null
 }
 
-// Tell the main process who is signed in, so the tracker writes as that user.
+// Tell the main process who is signed in, so the tracker writes as that user. While an
+// admin views the app as someone else (Switch role), the tracker keeps recording the admin.
 function shareWithMain(): void {
   const user = currentUser()
+  const home = loadHome()
+  const me = viewingAs(home, user?.id) ? { token: home!.token, record: home!.record } : user ? { token: pb.authStore.token, record: user } : null
   window.tracker?.setSession(
-    user ? { token: pb.authStore.token, userId: user.id, role: user.role, consented: !!user.tracking_consent_at } : null
+    me ? { token: me.token, userId: me.record.id, role: me.record.role, consented: !!me.record.tracking_consent_at } : null
   )
 }
 
-/**
- * Renews the saved tokens of the remembered accounts that aren't signed in, each on its
- * own client. One the server refuses is marked "needs password"; offline changes nothing.
- */
-async function keepRememberedAlive(): Promise<void> {
-  const currentId = pb.authStore.record?.id
-  for (const a of loadAccounts()) {
-    if (a.id === currentId || a.needsPassword || !a.token) continue
-    const client = new PocketBase(pb.baseURL)
-    client.autoCancellation(false)
-    client.authStore.save(a.token, a.record as never)
-    try {
-      await client.collection('users').authRefresh()
-      updateAccount(client.authStore.record as unknown as UserRecord, client.authStore.token)
-    } catch (err) {
-      const status = (err as { status?: number }).status
-      if (status && status >= 400 && status < 500) markNeedsPassword(a.id)
-    }
+/** Renews the admin's own saved sign-in while viewing as someone else; drops it once the server refuses it. */
+async function keepHomeAlive(): Promise<void> {
+  const home = loadHome()
+  if (!viewingAs(home, pb.authStore.record?.id)) return
+  const client = new PocketBase(pb.baseURL)
+  client.autoCancellation(false)
+  client.authStore.save(home!.token, home!.record as never)
+  try {
+    await client.collection('users').authRefresh()
+    saveHome({ token: client.authStore.token, record: client.authStore.record as unknown as UserRecord })
+    shareWithMain()
+  } catch (err) {
+    const status = (err as { status?: number }).status
+    if (status && status >= 400 && status < 500) clearHome()
   }
 }
 
 export const useSession = create<SessionState>((set) => {
   pb.authStore.onChange(() => {
-    // Every sign-in, switch and token refresh keeps this PC's list of accounts current.
     const user = currentUser()
-    if (user) remember(user, pb.authStore.token)
+    // Back on the admin's own account (or signed out): nothing is being viewed as anyone else.
+    if (!user || loadHome()?.record.id === user.id) clearHome()
     set({ user })
     shareWithMain()
   })
   // The tracker found the token dead (expired, password reset, deactivated): show Login.
   // Its segments stay queued and sync after the next sign-in.
   window.tracker?.onSessionExpired(() => {
-    if (pb.authStore.record) markNeedsPassword(pb.authStore.record.id)
     if (pb.authStore.token) pb.authStore.clear()
   })
 
@@ -84,8 +82,7 @@ export const useSession = create<SessionState>((set) => {
     },
 
     logout() {
-      // Signing out of an account also drops its saved token from Switch account.
-      if (pb.authStore.record) forget(pb.authStore.record.id)
+      clearHome()
       pb.authStore.clear()
       window.location.hash = '#/'
     },
@@ -101,17 +98,14 @@ export const useSession = create<SessionState>((set) => {
         } catch (err) {
           // Expired, revoked or deactivated: start from the login screen. Offline keeps the saved session.
           const status = (err as { status?: number }).status
-          if (status && status >= 400 && status < 500) {
-            if (pb.authStore.record) markNeedsPassword(pb.authStore.record.id)
-            pb.authStore.clear()
-          }
+          if (status && status >= 400 && status < 500) pb.authStore.clear()
         }
       }
       shareWithMain()
       set({ user: currentUser(), ready: true })
       if (!keepAliveTimer) {
-        void keepRememberedAlive()
-        keepAliveTimer = setInterval(() => void keepRememberedAlive(), KEEP_ALIVE_MS)
+        void keepHomeAlive()
+        keepAliveTimer = setInterval(() => void keepHomeAlive(), KEEP_ALIVE_MS)
       }
     }
   }

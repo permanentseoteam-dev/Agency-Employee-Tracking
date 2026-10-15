@@ -1,211 +1,163 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeftRight } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeftRight, Undo2 } from 'lucide-react'
 import PocketBase from 'pocketbase'
 import { Avatar } from '@/components/layout/Avatar'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Dialog } from '@/components/ui/Dialog'
-import { Field, Input } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
 import { FormError } from '@/features/auth/AuthLayout'
 import { pb, type UserRecord } from '@/lib/pb'
-import { forget, loadAccounts, markNeedsPassword, othersIn, type RememberedAccount } from '@/lib/rememberedAccounts'
+import { loadHome, saveHome, switchTargets, viewingAs } from '@/lib/roleSwitch'
 import { landingFor, roleOf, ROLE_LABEL } from '@/lib/roles'
-import { useSession } from '@/stores/session'
+import { errorMessage, useSession } from '@/stores/session'
 
 /**
- * Shows the signed-in account's role and switches to another account. A role always
- * belongs to a real account: one that has signed in on this PC before switches in one
- * click (its saved token); any other account needs its email and password once.
+ * The signed-in role. An admin can switch role: view the app as any active person, with
+ * no password (POST /api/org/switch-to, admins only), and come back with "Back to me".
+ * Time tracked on this PC keeps counting for the admin. Others only see their role.
  */
 export function AccountSwitcher() {
   const user = useSession((s) => s.user)!
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const role = roleOf(user.role)
+  const home = loadHome()
+  const asSomeoneElse = viewingAs(home, user.id)
 
+  /** Makes a token the app's session and goes to that role's landing page. */
+  async function apply(token: string, record: UserRecord) {
+    // Close the old account's realtime connection; the remounted shell reconnects as the new one.
+    await pb.realtime.unsubscribe()
+    queryClient.clear()
+    pb.authStore.save(token, record as never)
+    setOpen(false)
+    navigate(landingFor(roleOf(record.role)))
+  }
+
+  async function switchTo(person: UserRecord) {
+    setError(null)
+    const me = loadHome() ?? { token: pb.authStore.token, record: user }
+    try {
+      if (person.id === me.record.id) return await apply(me.token, me.record)
+      // Asked with the admin's own token, whoever is on screen right now.
+      const client = new PocketBase(pb.baseURL)
+      client.autoCancellation(false)
+      client.authStore.save(me.token, me.record as never)
+      const res = await client.send<{ token: string; record: UserRecord }>('/api/org/switch-to', { method: 'POST', body: { userId: person.id } })
+      saveHome(me)
+      await apply(res.token, res.record)
+    } catch (err) {
+      setError(errorMessage(err, 'Could not switch.'))
+    }
+  }
+
+  const canSwitch = role === 'admin' || asSomeoneElse
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className="text-slate-500 dark:text-slate-400" data-role={role}>
-        {ROLE_LABEL[role]}
-      </span>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
-        <ArrowLeftRight className="size-4" aria-hidden /> Switch account
-      </Button>
-      {open && <SwitchAccountDialog currentId={user.id} currentEmail={user.email ?? ''} onClose={() => setOpen(false)} />}
+      {asSomeoneElse ? (
+        <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-role={role} data-viewing-as={user.email}>
+          Viewing as {user.full_name || user.email} · {ROLE_LABEL[role]}
+        </span>
+      ) : (
+        <span className="text-slate-500 dark:text-slate-400" data-role={role}>
+          {ROLE_LABEL[role]}
+        </span>
+      )}
+      {asSomeoneElse && (
+        <Button type="button" variant="secondary" size="sm" onClick={() => void switchTo(home!.record)}>
+          <Undo2 className="size-4" aria-hidden /> Back to me
+        </Button>
+      )}
+      {canSwitch && (
+        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+          <ArrowLeftRight className="size-4" aria-hidden /> Switch role
+        </Button>
+      )}
+      {error && !open && <span className="text-xs text-red-600">{error}</span>}
+      {open && <SwitchRoleDialog currentId={user.id} error={error} onPick={switchTo} onClose={() => setOpen(false)} />}
     </div>
   )
 }
 
-function SwitchAccountDialog({ currentId, currentEmail, onClose }: { currentId: string; currentEmail: string; onClose: () => void }) {
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [accounts, setAccounts] = useState(() => othersIn(loadAccounts(), currentId))
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  /** The account being switched to, 'form' for the password form, or null. */
+function SwitchRoleDialog({
+  currentId,
+  error,
+  onPick,
+  onClose
+}: {
+  currentId: string
+  error: string | null
+  onPick: (person: UserRecord) => Promise<void>
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const passwordRef = useRef<HTMLInputElement>(null)
-  const refresh = () => setAccounts(othersIn(loadAccounts(), currentId))
-
-  /** Makes the checked client's account the app's session. */
-  async function apply(client: PocketBase) {
-    const record = client.authStore.record as unknown as UserRecord
-    // Close the old account's realtime connection; the remounted shell reconnects as the new one.
-    await pb.realtime.unsubscribe()
-    queryClient.clear()
-    pb.authStore.save(client.authStore.token, client.authStore.record)
-    onClose()
-    navigate(landingFor(roleOf(record.role)))
-  }
-
-  function askPassword(account: RememberedAccount, message: string) {
-    setEmail(account.email)
-    setPassword('')
-    setError(null)
-    setNotice(message)
-    passwordRef.current?.focus()
-  }
-
-  async function switchTo(account: RememberedAccount) {
-    setError(null)
-    setNotice(null)
-    if (account.needsPassword || !account.token) {
-      askPassword(account, `Enter the password for ${account.email} to switch to it again.`)
-      return
-    }
-    setBusy(account.id)
-    try {
-      // The saved token is checked (and renewed) on a separate client first.
-      const probe = new PocketBase(pb.baseURL)
-      probe.autoCancellation(false)
-      probe.authStore.save(account.token, account.record as never)
-      await probe.collection('users').authRefresh()
-      await apply(probe)
-    } catch (err) {
-      if ((err as { status?: number }).status === 0) {
-        setError('Cannot reach the server. Check your connection and try again.')
-      } else {
-        markNeedsPassword(account.id)
-        refresh()
-        askPassword(account, `${account.email} needs its password again (it was signed out, changed or switched off).`)
+  // Listed with the admin's own sign-in: the person on screen may see fewer people.
+  const people = useQuery({
+    queryKey: ['switch-role', 'people'],
+    queryFn: () => {
+      const home = loadHome()
+      const client = home ? new PocketBase(pb.baseURL) : pb
+      if (home) {
+        client.autoCancellation(false)
+        client.authStore.save(home.token, home.record as never)
       }
-    } finally {
-      setBusy(null)
+      return client.collection('users').getFullList<UserRecord>({ filter: 'active = true', sort: 'full_name' })
     }
-  }
-
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setNotice(null)
-    if (currentEmail && email.trim().toLowerCase() === currentEmail.toLowerCase()) {
-      setError('You are already signed in as this account.')
-      return
-    }
-    setBusy('form')
-    try {
-      // Checked on a separate client, so a wrong password never touches the current session.
-      const probe = new PocketBase(pb.baseURL)
-      probe.autoCancellation(false)
-      await probe.collection('users').authWithPassword(email.trim(), password)
-      await apply(probe)
-    } catch (err) {
-      const status = (err as { status?: number }).status
-      setError(
-        status === 0
-          ? 'Cannot reach the server. Check your connection and try again.'
-          : 'Email or password is incorrect, or that account is inactive.'
-      )
-    } finally {
-      setBusy(null)
-    }
-  }
+  })
+  const list = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return switchTargets(people.data ?? []).filter((p) => !q || `${p.full_name} ${p.email ?? ''}`.toLowerCase().includes(q))
+  }, [people.data, search])
 
   return (
-    <Dialog open onClose={onClose} title="Switch account">
-      <div className="space-y-4">
-        <p className="text-sm text-slate-600 dark:text-slate-400">Time tracked on this PC will be recorded for that account.</p>
-        {accounts.length > 0 && (
-          <ul
-            className="divide-y divide-slate-200 rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800"
-            aria-label="Accounts on this PC"
-          >
-            {accounts.map((a) => (
-              <li key={a.id} className="flex items-center gap-3 px-3 py-2" data-remembered={a.email}>
-                <button
-                  type="button"
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left hover:opacity-80 disabled:opacity-50"
-                  onClick={() => void switchTo(a)}
-                  disabled={busy !== null}
-                >
-                  <Avatar user={a.record} size={32} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {a.full_name || a.email}
-                      {busy === a.id && <span className="font-normal text-slate-500"> · switching…</span>}
-                    </span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {a.email}
-                      {a.needsPassword && ' · needs password'}
-                    </span>
+    <Dialog open onClose={onClose} title="Switch role" className="max-w-lg">
+      <div className="space-y-3">
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          See the app exactly as this person does. No password needed. Time tracked on this PC still counts for you.
+        </p>
+        <Input aria-label="Search people" placeholder="Search by name or email" value={search} autoFocus onChange={(e) => setSearch(e.target.value)} />
+        <FormError message={error} />
+        <ul className="max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+          {people.isLoading && <li className="px-3 py-2 text-sm text-slate-500">Loading…</li>}
+          {people.isError && <li className="px-3 py-2 text-sm text-red-600">{errorMessage(people.error, 'Could not load people.')}</li>}
+          {list.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                data-switch-to={p.email}
+                disabled={busy !== null || p.id === currentId}
+                onClick={async () => {
+                  setBusy(p.id)
+                  await onPick(p)
+                  setBusy(null)
+                }}
+                className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50 disabled:opacity-50 dark:hover:bg-slate-800/50"
+              >
+                <Avatar user={p} size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {p.full_name || p.email}
+                    {p.id === currentId && <span className="font-normal text-slate-500"> · on screen now</span>}
+                    {busy === p.id && <span className="font-normal text-slate-500"> · switching…</span>}
                   </span>
-                  <Badge className="ml-auto shrink-0">{ROLE_LABEL[roleOf(a.role)]}</Badge>
-                </button>
-                <button
-                  type="button"
-                  className="shrink-0 text-xs text-slate-500 hover:text-red-600"
-                  aria-label={`Forget ${a.email}`}
-                  onClick={() => {
-                    forget(a.id)
-                    refresh()
-                  }}
-                >
-                  Forget
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            {accounts.length > 0 ? 'Or sign in to another account' : 'Sign in with the email and password of the account to switch to.'}
-          </p>
-          {notice && <p className="text-sm text-amber-700 dark:text-amber-400">{notice}</p>}
-          <Field label="Email" htmlFor="switch_email">
-            <Input
-              id="switch_email"
-              type="email"
-              autoComplete="off"
-              autoFocus={accounts.length === 0}
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-          <Field label="Password" htmlFor="switch_password">
-            <Input
-              ref={passwordRef}
-              id="switch_password"
-              type="password"
-              autoComplete="off"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </Field>
-          <FormError message={error} />
-          <div className="flex gap-2">
-            <Button type="submit" loading={busy === 'form'} disabled={!email || !password || (busy !== null && busy !== 'form')}>
-              Switch
-            </Button>
-            <Button type="button" variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-          </div>
-        </form>
+                  <span className="block truncate text-xs text-slate-500">{p.email}</span>
+                </span>
+                <Badge tone={p.role === 'admin' ? 'red' : p.role === 'manager' ? 'blue' : 'neutral'}>{ROLE_LABEL[roleOf(p.role)]}</Badge>
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="flex justify-end">
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Close
+          </Button>
+        </div>
       </div>
     </Dialog>
   )

@@ -41,14 +41,17 @@ import { MyStats } from '@/features/tracking/MyStats'
 import { Reports } from '@/features/tracking/Reports'
 import { Settings } from '@/features/profile/Settings'
 import { NAV } from '@/lib/roles'
+import { loadHome, viewingAs } from '@/lib/roleSwitch'
 import { useSession } from '@/stores/session'
 
 /** Sign-in steps in order: sign in (or create an account) → forced password change → tracking notice → app. */
 function Gate() {
   const user = useSession((s) => s.user)
   if (!user) return <SignedOut />
-  if (user.must_change_password) return <ChangePassword />
-  if (!user.tracking_consent_at) return <TrackingNotice />
+  // An admin viewing as someone else (Switch role) never changes their password or consents for them.
+  const asSomeoneElse = viewingAs(loadHome(), user.id)
+  if (user.must_change_password && !asSomeoneElse) return <ChangePassword />
+  if (!user.tracking_consent_at && !asSomeoneElse) return <TrackingNotice />
   // Keyed by account: a switch remounts the shell, so every live subscription restarts as the new user.
   return <AppShell key={user.id} />
 }
