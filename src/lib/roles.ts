@@ -31,6 +31,8 @@ export interface NavItem {
   label: string
   icon: NavIcon
   minRole: Role
+  /** Roles that don't get this item even though they rank high enough. */
+  hiddenFor?: Role[]
   /** Module that builds the screen, shown on placeholders until then. */
   module: string
 }
@@ -49,7 +51,8 @@ export const NAV: NavItem[] = [
   { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', module: 'M3' },
   // Everyone reads the rules (work hours, leave, stars); only an admin changes them.
   { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'employee', module: 'M4' },
-  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', module: 'M11' }
+  // Managers don't see Finance for now (2026-10-15); employees see their own pay, admins everything.
+  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', hiddenFor: ['manager'], module: 'M11' }
 ]
 
 /** Pages every signed-in user can open, whatever role is selected. */
@@ -69,7 +72,7 @@ export function roleOf(storedRole: Role | undefined): Role {
 }
 
 export function navFor(role: Role): NavItem[] {
-  return NAV.filter((item) => hasRole(role, item.minRole))
+  return NAV.filter((item) => hasRole(role, item.minRole) && !item.hiddenFor?.includes(role))
 }
 
 export function landingFor(role: Role): string {

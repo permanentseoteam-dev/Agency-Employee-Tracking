@@ -9,7 +9,7 @@ Sign in as Bilal (manager of Alpha). Sana manages Bravo; use her to check team b
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
 | M-01 | Sign in | Sign in as bilal@test.local | Lands on the Live Board; the top bar shows "Manager" | ★ |  |
-| M-02 | Manager menu | Look at the sidebar | My Stats, My Attendance, My Leaves, Calendar, Live Board, Approvals, Attendance, Reports, Finance; no Organization or Rules |  |  |
+| M-02 | Manager menu | Look at the sidebar | My Stats, My Attendance, My Leaves, Calendar, Project, Live Board, Approvals, Attendance, Reports, Rules; no Organization or Finance (hidden for managers for now) |  |  |
 | M-03 | Own tracking and leave | Run E-20 to E-22, E-40 and E-50 to E-63 once as Bilal | Same results as for an employee |  |  |
 | M-04 | Quit from the tray | Right-click the tray icon → Quit | Quit is there; the app closes cleanly (no error) | ★ | – |
 | M-05 | Quit from the profile menu | Profile menu → Quit PSEO Tracker | The app closes cleanly |  |  |
@@ -71,8 +71,8 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| M-50 | Admin pages blocked | (automated) Open the Organization or Rules address; then the Finance Payroll or Salaries address | Organization and Rules: sent back to the Live Board. Payroll and Salaries: sent to My pay | ★ |  |
-| M-51 | Only own pay | Finance; (server check) read salaries or payroll | My pay shows Bilal's own salary and finalized months; nothing from his team |  | ✓ |
+| M-50 | Admin pages blocked | (automated) Open the Organization address, then any Finance address (Payroll, Salaries, My pay) | Sent back to the Live Board | ★ |  |
+| M-51 | No Finance tab | Look at the sidebar; (server check) read salaries or payroll | No Finance item; the server still returns only Bilal's own salary and finalized lines, nothing from his team |  | ✓ |
 | M-52 | No rule or calendar changes | (server check) Change rules, leave types, holidays, events or teams | Refused |  | ✓ |
 | M-53 | No staff admin | (server check) Add an employee, reset a password, deactivate someone | Refused |  | ✓ |
 | M-54 | Can't change own role or team | (server check) | Refused |  | ✓ |
