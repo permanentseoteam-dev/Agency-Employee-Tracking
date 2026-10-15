@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
+import postgres from 'postgres'
 
 const env = Object.fromEntries(
   readFileSync(resolve(import.meta.dirname, '..', '.env.supabase'), 'utf8')
@@ -362,6 +363,42 @@ try {
   await root.from('leave_requests').delete().eq('leave_type', unpaid.id)
   await root.from('leave_types').delete().eq('id', unpaid.id)
 
+  // --- functions, step 3c: payroll run and the finalized lock ----------------------------------
+  const thisMonth = new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 7)
+  const runPay = (client, m = thisMonth) => fn(client, 'payroll-run', { month: m })
+  await denied('employee cannot run payroll', () => runPay(sbEmpA))
+  await denied('manager cannot run payroll', () => runPay(sbMgrA))
+  await denied('payroll cannot be run for a future month', () => runPay(sbAdmin, '2099-01'))
+  const pay = await runPay(sbAdmin)
+  check('admin runs payroll', !pay.error, pay.error?.message)
+  created.runs.push(pay.data?.run)
+  const lines = await must(sbAdmin.from('payroll_items').select('*').eq('run', pay.data?.run ?? 'x').in('user', five))
+  check('one line per employee with a salary (not someone who left before the month)', lines.length === 5, `got ${lines.length}`)
+  check('an employee sees no draft payroll (run or line)',
+    (await must(sbEmpA.from('payroll_items').select('id').eq('run', pay.data?.run ?? 'x'))).length === 0 && (await must(sbEmpA.from('payroll_runs').select('id').eq('id', pay.data?.run ?? 'x'))).length === 0)
+  const lineA = lines.find((l) => l.user === empA.id)
+  await denied('an employee cannot edit their own payroll line', () => sbEmpA.from('payroll_items').update({ adjustment_pkr: 99999 }).eq('id', lineA.id).select())
+  await allowed('admin sets an adjustment and note on a draft line', () => sbAdmin.from('payroll_items').update({ adjustment_pkr: -5000, note: 'Advance' }).eq('id', lineA.id).select())
+  const adjusted = (await must(sbAdmin.from('payroll_items').select('*').eq('id', lineA.id)))[0]
+  check('net follows the adjustment', Number(adjusted.net) === Number(adjusted.base) - Number(adjusted.deductions) - 5000, JSON.stringify(adjusted))
+  await denied('the counted figures cannot be edited', () => sbAdmin.from('payroll_items').update({ deductions: 0 }).eq('id', lineA.id).select())
+  await runPay(sbAdmin)
+  const recounted = (await must(sbAdmin.from('payroll_items').select('*').eq('run', pay.data?.run ?? 'x').eq('user', empA.id)))[0]
+  check('recounting a draft keeps adjustments and notes', Number(recounted?.adjustment_pkr) === -5000 && recounted?.note === 'Advance')
+  await allowed('admin finalizes the run', () => sbAdmin.from('payroll_runs').update({ status: 'finalized' }).eq('id', pay.data?.run ?? 'x').select())
+  const empLines = await must(sbEmpA.from('payroll_items').select('user, run, payroll_runs(status)').eq('run', pay.data?.run ?? 'x'))
+  check('once finalized, the employee sees only their own line and its month',
+    empLines.length === 1 && empLines[0].user === empA.id && empLines[0].payroll_runs?.status === 'finalized', JSON.stringify(empLines))
+  const mgrLines = await must(sbMgrA.from('payroll_items').select('user').eq('run', pay.data?.run ?? 'x'))
+  check('the manager sees only their own line, not their team’s', mgrLines.length === 1 && mgrLines[0].user === mgrA.id, `got ${mgrLines.length}`)
+  await denied('a finalized run cannot be reopened', () => sbAdmin.from('payroll_runs').update({ status: 'draft' }).eq('id', pay.data?.run ?? 'x').select())
+  await denied('a finalized run cannot be deleted', () => sbAdmin.from('payroll_runs').delete().eq('id', pay.data?.run ?? 'x').select())
+  await denied('a finalized line cannot be edited', () => sbAdmin.from('payroll_items').update({ adjustment_pkr: 0 }).eq('id', recounted.id).select())
+  await denied('a finalized line cannot be deleted', () => sbAdmin.from('payroll_items').delete().eq('id', recounted.id).select())
+  await denied('lines cannot be added to a finalized run', () => sbAdmin.from('payroll_items').insert({ run: pay.data?.run, user: mgrB.id, base: 1 }).select())
+  await denied('a finalized month cannot be recounted', () => runPay(sbAdmin))
+  await denied('not even the service role can edit a finalized line', () => root.from('payroll_items').update({ adjustment_pkr: 1 }).eq('id', recounted.id).select())
+
   // --- old time: only trusted writers (imports, demo data) may store segments over 30 days old ---
   const oldStart = Date.now() - 40 * 86400000
   const oldSeg = (user, n) => ({ id: `${segId.slice(0, 13)}o${n}`, user, state: 'active', started_at: new Date(oldStart).toISOString(), ended_at: new Date(oldStart + 5 * 60000).toISOString() })
@@ -376,7 +413,16 @@ try {
   console.error('ERROR', e?.message ?? e)
 } finally {
   // Clean up: deleting the accounts removes their profiles, salaries, segments, leave, etc.
-  for (const id of created.runs) await root.from('payroll_runs').delete().eq('id', id)
+  // Finalized test runs are locked even for the service role: delete them with the guards off.
+  const ref = new globalThis.URL(URL).hostname.split('.')[0]
+  const db = postgres({ host: env.STAGING_DB_HOST, port: 5432, database: 'postgres', username: `postgres.${ref}`, password: env.STAGING_DB_PASSWORD, ssl: 'require', prepare: false })
+  for (const id of created.runs.filter(Boolean)) {
+    await db.begin(async (tx) => {
+      await tx`set local app.bypass_guards = 'on'`
+      await tx`delete from payroll_runs where id = ${id}`
+    })
+  }
+  await db.end()
   for (const id of created.clients) await root.from('clients').delete().eq('id', id)
   for (const id of created.events.filter(Boolean)) await root.from('events').delete().eq('id', id)
   for (const id of created.holidays) await root.from('holidays').delete().eq('id', id)
