@@ -21,6 +21,7 @@
     "test:all": "npm run typecheck && npm test && npm run check:rules && npm run test:e2e",
     "icon": "electron scripts/make-icon.mjs",
     "dist": "node scripts/check-release-env.mjs && electron-vite build --mode production --outDir out-release && electron-builder --win --publish never",
+    "office-setup": "node scripts/office-setup/build.mjs",
     "release": "node scripts/check-release-env.mjs && electron-vite build --mode production --outDir out-release && electron-builder --win --publish always"
   },
   "dependencies": {

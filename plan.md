@@ -408,6 +408,11 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
+- **Office setup file** (2026-10-15): a PC that only got the app installer couldn't reach the server, because it wasn't on the agency's Tailscale. `npm run office-setup` (`scripts/office-setup/build.mjs` + `office-setup.nsi`, built with electron-builder's cached makensis) makes the private `dist\office\PSEO-Tracker-Office-Setup-<version>.exe`.
+  - It packs `setup-staff-pc.ps1`, the Tailscale MSI, the app installer and the key from `.env.office` (git-ignored). It is never uploaded.
+  - At run time it extracts to `$PLUGINSDIR`, which is deleted on exit, so the key doesn't stay on the PC.
+  - `setup-staff-pc.ps1` now switches a PC signed in to another Tailscale account to the agency network (`up --reset --force-reauth --authkey`), keeps the window open on errors, and has `-CheckOnly` (`/check` on the exe).
+  - Tested with a dummy key: `/check` exits 0, no temp folder or key left behind, nothing installed.
 - **Create an account** (2026-10-15): the sign-in page has "Create an account". At the user's choice it works right away, for any email.
   - `POST /api/register` (`register.pb.js`, guests): `validateRegister` in `lib/org.js` takes only name, email, password and phone. The server always makes an active `employee` with no team, `joined_on` today and salary 0 (not set), with no forced password change, and notifies the active admins (`employee_registered`, bell → Organization → Employees)
   - migration `1791990000_register_rate_limit.js`: PocketBase rate limiting on, with only `POST /api/register` limited to 5 a minute per guest address

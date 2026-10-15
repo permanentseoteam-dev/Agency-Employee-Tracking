@@ -74,7 +74,9 @@ Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale
    - **Expiration:** 90 days
    - **Tags:** `tag:staff`
 
-   Click **Generate** and copy the key, which starts with `tskey-auth-`. It is shown only once, so keep it somewhere private. Devices joined with it are tagged, so they never need signing in again.
+   Click **Generate** and copy the key, which starts with `tskey-auth-`. It is shown only once. Paste it into `F:\agency-tracker\.env.office` as one line, `TS_AUTHKEY=tskey-auth-…`. Git ignores that file. Then build the office setup file (Part C). Devices joined with the key are tagged, so they never need signing in again.
+
+   The key expires after 90 days. Then make a new one, replace it in `.env.office`, and build the office setup file again. PCs already set up keep working.
 4. **Optional check from your phone:** install the Tailscale app, sign in with the agency account, and open `http://agency-server:8090/api/health` in the phone's browser. It should say `API is healthy`. That proves other devices can reach the server.
 
 ---
@@ -83,19 +85,26 @@ Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale
 
 **Before you start:** either add the employee in the app (**Organization → Add employee**) and note their email and temporary password, or let them create their own account in step 3.
 
-1. Copy the folder `F:\agency-tracker\dist\staff-pc-setup` to the PC (USB stick or Google Drive). It holds the installer, the Tailscale installer, `Set up this PC.cmd` and a short `README.txt`.
-2. On the PC, signed in to Windows **as the employee**, double-click **Set up this PC.cmd**. Click **Yes** when Windows asks, and paste the auth key from Part B when asked. The script ([setup-staff-pc.ps1](../scripts/staff-pc/setup-staff-pc.ps1)):
-   - installs Tailscale and joins the agency network
+**The office setup file** is one file that does everything: `F:\agency-tracker\dist\office\PSEO-Tracker-Office-Setup-<version>.exe`.
+- Build it with `npm run office-setup`. It packs the newest `dist\PSEO-Tracker-Setup-<version>.exe`, the Tailscale installer and the key from `.env.office` ([build.mjs](../scripts/office-setup/build.mjs)).
+- **It contains the network key: keep it private.** Pass it on only by USB stick or a private Drive folder, never by email to outsiders, and never upload it to GitHub.
+- To check it on any PC without installing anything, run it with `/check`.
+
+1. Copy the office setup file to the PC.
+2. On the PC, signed in to Windows **as the employee**, run it and click **Yes** when Windows asks. A window shows the progress ([setup-staff-pc.ps1](../scripts/staff-pc/setup-staff-pc.ps1)):
+   - installs Tailscale and joins the agency network. A PC whose Tailscale is signed in to another account is switched to the agency network.
    - checks that `agency-server` answers
    - installs PSEO Tracker for that Windows user and opens it
+
+   On success the window closes itself; on an error it stays open and shows what went wrong.
+
+**Fallback without the office file:** copy the folder `dist\staff-pc-setup` and double-click **Set up this PC.cmd**. It asks for the key when there is no `tailscale-key.txt` in the folder. Installing only `PSEO-Tracker-Setup-<version>.exe` (for example from GitHub) does **not** connect the PC: sign-in then says "Cannot reach the server".
 3. The employee signs in and chooses a new password, or clicks **Create an account** on the sign-in page and fills in their name, email and a password. Then they accept the tracking notice.
 4. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
 
 **People who create their own account** are employees straight away, with no team and no salary, and they are tracked from the start. You get a bell notification, "New employee registered". Open them under **Organization → Employees** and set their team, role, designation and salary. An account you don't recognise can be deactivated there. Only devices on the agency's Tailscale can reach the sign-in page's server, and it accepts at most 5 new accounts a minute from one PC.
 
 From then on the app starts by itself (hidden in the tray) at every Windows sign-in and records active and idle time during shift hours. Employees can't turn that off. Laptops work anywhere with internet. Without a connection they keep recording and send the time later.
-
-**Tip:** to skip pasting the key, put it in `tailscale-key.txt` inside the folder before copying it, and delete that file afterwards.
 
 **When someone leaves:** deactivate them in the app (**Organization**), and remove their PC under **Machines** in the Tailscale admin console.
 
