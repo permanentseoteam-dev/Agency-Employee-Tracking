@@ -84,6 +84,16 @@ Sign in as Ayesha (admin). Admins can do everything; these tests cover what only
 | A-68 | Counted figures are locked | (server check) Edit deductions or base on a line | Refused; only adjustment and note can change on a draft |  | ✓ |
 | A-69 | Others see only their own pay | (server check) A manager or employee reads or changes salaries or payroll | Only their own salary and their own lines in finalized months; no drafts; changes refused |  | ✓ |
 
+## 5b. Project (clients)
+
+| ID | Check | How | Expected | ★ | Auto |
+| --- | --- | --- | --- | --- | --- |
+| A-70 | New client | Project → New client "Test Co" with a short description | It opens on its Team tab and appears as a tab with 0 people | ★ |  |
+| A-71 | Add and remove people | Add people → pick Asma and Danish; then × on Danish | Both appear with today's status and month totals; Danish disappears again; people from any team can be added |  | ✓ |
+| A-72 | Team status by day | Open Acme Dental; step back a few days with ◀ | Today: Present or Late once someone starts, "Not in yet" before; past days show the counted status (Asma On leave on her Sick day); the chips count and filter | ★ |  |
+| A-73 | Archive and delete | Edit → Archived; then Delete a test client | Archived: still a tab for admins (marked), gone for its people; Delete removes it and its calendar |  | ✓ |
+| A-74 | Every project calendar | Open a client you aren't on → Calendar; add, edit and delete an event | All allowed for the admin |  | ✓ |
+
 ## 6. System and the installed app
 
 These use your real setup or a test PC, not the test company. Do them before a release.

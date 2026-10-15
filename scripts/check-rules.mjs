@@ -706,6 +706,57 @@ try {
   })
   check('employees can still sign in from the internet', userViaInternet.status === 200, `status ${userViaInternet.status}`)
   check('superusers still work on the server PC', (await root.collection('users').getList(1, 1)).totalItems > 0)
+
+  // --- projects: clients, their calendars and team status (projects.pb.js) ------------
+  const acme = await pbAdmin.collection('clients').create({ name: 'Acme', description: 'Retainer', members: [empA.id, mgrA.id] })
+  const north = await root.collection('clients').create({ name: 'North', members: [empB.id] })
+  const empClients = await pbEmpA.collection('clients').getFullList()
+  check('a member sees only their own clients', empClients.length === 1 && empClients[0].id === acme.id, `got ${empClients.length}`)
+  check('someone on no client sees none', (await pbMgrB.collection('clients').getFullList()).length === 0)
+  check('the admin sees every client', (await pbAdmin.collection('clients').getFullList()).length === 2)
+  await denied('an employee cannot create a client', () => pbEmpA.collection('clients').create({ name: 'Mine' }))
+  await denied('a manager cannot add people to a client', () => pbMgrA.collection('clients').update(acme.id, { 'members+': mgrB.id }))
+  await denied('a member cannot rename their client', () => pbEmpA.collection('clients').update(acme.id, { name: 'Renamed' }))
+  await denied('client names are unique', () => pbAdmin.collection('clients').create({ name: 'acme' }))
+
+  const novAt = (h) => new Date(Date.UTC(2026, 10, 3, h)).toISOString()
+  let meeting = null
+  await allowed('an employee on the client adds a meeting to its calendar', async () => {
+    meeting = await pbEmpA.collection('project_events').create({ client: acme.id, title: 'Kickoff', starts_at: novAt(5), ends_at: novAt(6), created_by: admin.id })
+  })
+  check('the server records who added it', meeting?.created_by === empA.id, JSON.stringify(meeting))
+  await allowed('a manager on the client changes it', () => pbMgrA.collection('project_events').update(meeting?.id ?? 'missing', { title: 'Kickoff call' }))
+  await denied('an event cannot end before it starts', () => pbEmpA.collection('project_events').update(meeting?.id ?? 'missing', { ends_at: novAt(4) }))
+  await denied('an event cannot move to another client', () => pbAdmin.collection('project_events').update(meeting?.id ?? 'missing', { client: north.id }))
+  await denied('someone not on the client cannot add to its calendar', () =>
+    pbEmpB.collection('project_events').create({ client: acme.id, title: 'Sneaky', starts_at: novAt(7), ends_at: novAt(8) }))
+  check('someone not on the client cannot see its calendar', (await pbEmpB.collection('project_events').getFullList()).length === 0)
+  await denied('someone not on the client cannot delete its events', () => pbEmpB.collection('project_events').delete(meeting?.id ?? 'missing'))
+
+  const projectStatus = (pb, client, date) => pb.send('/api/projects/status', { query: date ? { client, date } : { client } })
+  let team = null
+  await allowed('a member reads their client’s team status', async () => {
+    team = await projectStatus(pbEmpA, acme.id)
+  })
+  check('one row per person on the client', team?.members?.length === 2 && team.members.every((m) => [empA.id, mgrA.id].includes(m.user)), JSON.stringify(team))
+  check('status only: no hours or times', !!team?.members?.every((m) => Object.keys(m).sort().join() === 'month,status,user' && Object.keys(m.month).length === 5))
+  await denied('someone not on the client cannot read its status', () => projectStatus(pbEmpB, acme.id))
+  await denied('no status for a day that hasn’t come yet', () => projectStatus(pbEmpA, acme.id, '2099-01-01'))
+  await allowed('the admin reads any client’s status', () => projectStatus(pbAdmin, north.id, '2026-10-01'))
+  const teamLeave = (pb, client) => pb.send('/api/projects/leaves', { query: { client, from: '2026-10-01', to: '2026-10-31' } })
+  let leaveRows = null
+  await allowed('a member reads their client’s approved leave', async () => {
+    leaveRows = await teamLeave(pbEmpA, acme.id)
+  })
+  check('only the client’s people, no leave type or reason', Array.isArray(leaveRows) && leaveRows.every((r) => [empA.id, mgrA.id].includes(r.user) && !('reason' in r) && !('leave_type' in r)))
+  await denied('someone not on the client cannot read its leave', () => teamLeave(pbEmpB, acme.id))
+
+  await allowed('the admin archives a client', () => pbAdmin.collection('clients').update(acme.id, { archived: true }))
+  check('an archived client disappears for its people', (await pbEmpA.collection('clients').getFullList()).length === 0)
+  check('and so does its calendar', (await pbEmpA.collection('project_events').getFullList()).length === 0)
+  await denied('and its status', () => projectStatus(pbEmpA, acme.id))
+  await allowed('the admin deletes a client', () => pbAdmin.collection('clients').delete(acme.id))
+  check('its calendar goes with it', (await root.collection('project_events').getFullList({ filter: `client = "${acme.id}"` })).length === 0)
 } catch (e) {
   failed++
   console.error('ERROR', e?.status ?? '', e?.message ?? e, e?.response ? JSON.stringify(e.response) : '')

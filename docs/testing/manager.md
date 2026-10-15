@@ -64,6 +64,8 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 | M-41 | No calendar editing | Look for add or edit on Month and Holidays | None for a manager |  | ✓ |
 | M-42 | Bell on a new request | Asma applies for leave | Bilal's bell goes up by one: "Asma Khan asked for leave"; clicking it opens Approvals | ★ | ✓ |
 | M-43 | Other teams don't ring | Danish (Bravo) applies | Bilal's bell does not change |  | ✓ |
+| M-44 | Project: own clients only | Project as Bilal | Only Acme Dental; the team's status and month totals; no New client, Edit, Add people or × | ★ | ✓ |
+| M-45 | Project calendar | Acme Dental → Calendar → add "Test call" tomorrow 10:00; edit it; delete it | All allowed; the day view says "Added by Bilal Manager"; Asma sees it too |  | ✓ |
 
 ## 6. Limits
 

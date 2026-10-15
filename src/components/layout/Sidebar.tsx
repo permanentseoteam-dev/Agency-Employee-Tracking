@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Briefcase,
   Building2,
   CalendarCheck,
   CalendarDays,
@@ -23,6 +24,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   attendance: CalendarCheck,
   leave: Plane,
   calendar: CalendarDays,
+  project: Briefcase,
   live: Radio,
   approvals: ClipboardCheck,
   grid: LayoutGrid,

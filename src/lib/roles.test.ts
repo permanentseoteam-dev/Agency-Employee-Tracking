@@ -17,7 +17,7 @@ describe('roles', () => {
     const employee = navFor('employee').map((n) => n.path)
     const manager = navFor('manager').map((n) => n.path)
     const admin = navFor('admin').map((n) => n.path)
-    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/calendar', '/rules', '/finance'])
+    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/calendar', '/projects', '/rules', '/finance'])
     expect(manager).toContain('/live')
     expect(manager).toContain('/finance')
     expect(manager).not.toContain('/org')

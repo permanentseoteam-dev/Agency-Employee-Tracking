@@ -32,6 +32,10 @@ import { RulesForm } from '@/features/rules/RulesForm'
 import { RulesLayout } from '@/features/rules/RulesLayout'
 import { StarRules } from '@/features/rules/StarRules'
 import { MyProfile } from '@/features/profile/MyProfile'
+import { ClientCalendar } from '@/features/projects/ClientCalendar'
+import { ClientPage } from '@/features/projects/ClientPage'
+import { ClientTeam } from '@/features/projects/ClientTeam'
+import { ProjectsLayout } from '@/features/projects/ProjectsLayout'
 import { LiveBoard } from '@/features/tracking/LiveBoard'
 import { MyStats } from '@/features/tracking/MyStats'
 import { Reports } from '@/features/tracking/Reports'
@@ -71,7 +75,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance', '/my-leaves', '/approvals'])
+const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance', '/my-leaves', '/approvals', '/projects'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -114,6 +118,21 @@ const router = createHashRouter([
           { index: true, element: <Navigate to="/calendar/month" replace /> },
           { path: 'month', element: <MonthCalendar /> },
           { path: 'holidays', element: <HolidayManager /> }
+        ]
+      },
+      {
+        path: 'projects',
+        element: <ProjectsLayout />,
+        children: [
+          {
+            path: ':id',
+            element: <ClientPage />,
+            children: [
+              { index: true, element: <Navigate to="team" replace /> },
+              { path: 'team', element: <ClientTeam /> },
+              { path: 'calendar', element: <ClientCalendar /> }
+            ]
+          }
         ]
       },
       {

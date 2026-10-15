@@ -4,9 +4,42 @@
 //   something under Finance. The figures go through the real formula
 //   (server/pb_hooks/lib/payroll.js), so the breakdown dialog adds up.
 // This month stays free for running payroll by hand (admin plan A-61).
+// - three clients for the Project tab, with people on more than one, and a few meetings
+//   on their calendars this week, each added by someone on that client
 import { createRequire } from 'node:module'
 
 const payroll = createRequire(import.meta.url)('../../server/pb_hooks/lib/payroll.js')
+
+const OFFSET_MIN = 300 // Asia/Karachi, no DST
+const addDays = (key, n) => new Date(Date.parse(key + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)
+/** The n-th working day (Mon–Fri) after a day. */
+const workdayAfter = (key, n) => {
+  let d = key
+  while (n > 0) {
+    d = addDays(d, 1)
+    const wd = new Date(d + 'T00:00:00Z').getUTCDay()
+    if (wd !== 0 && wd !== 6) n--
+  }
+  return d
+}
+/** A Karachi wall-clock time on a day, as an ISO instant. */
+const at = (key, hhmm) => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return new Date(Date.parse(key + 'T00:00:00Z') + (h * 60 + m - OFFSET_MIN) * 60000).toISOString()
+}
+
+const CLIENTS = [
+  { name: 'Acme Dental', description: 'Local SEO retainer', people: ['asma', 'chand', 'danish', 'bilal'] },
+  { name: 'Northwind Realty', description: 'Content and link building', people: ['erum', 'sana', 'chand'] },
+  { name: 'Bluefin Media', description: 'Technical SEO audit', people: ['admin', 'asma'] }
+]
+// [client, who adds it, title, working days from today, start, end] ('' times = all day)
+const MEETINGS = [
+  ['Acme Dental', 'bilal', 'Weekly SEO check-in', 1, '11:00', '11:30'],
+  ['Acme Dental', 'asma', 'Monthly report call', 3, '15:00', '16:00'],
+  ['Northwind Realty', 'sana', 'Content plan review', 2, '12:00', '13:00'],
+  ['Bluefin Media', 'admin', 'Site audit due', 4, '', '']
+]
 
 const shiftMonth = (month, n) => {
   const d = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + n, 1))
@@ -69,4 +102,19 @@ export async function seedExtras(api, info, { log = () => {} } = {}) {
     await api.update('payroll_runs', run.id, { status: 'finalized' })
     log(`payroll ${month}: ${lines.length} people, finalized`)
   }
+
+  // Project tab: clients and their calendars. Meetings are added with that person's own
+  // sign-in, as on a real PC, so the calendar shows who added each one.
+  const idOf = new Map(users.map((u) => [u.email.split('@')[0], u.id]))
+  const clientId = {}
+  for (const c of CLIENTS) {
+    clientId[c.name] = (await api.create('clients', { name: c.name, description: c.description, members: c.people.map((k) => idOf.get(k)) })).id
+  }
+  for (const [client, who, title, days, start, end] of MEETINGS) {
+    const day = workdayAfter(info.today, days)
+    const times = start ? { starts_at: at(day, start), ends_at: at(day, end) } : { starts_at: at(day, '00:00'), ends_at: at(addDays(day, 1), '00:00') }
+    const token = await api.tokenOf(`${who}@test.local`)
+    await api.create('project_events', { client: clientId[client], title, description: '', ...times }, token)
+  }
+  log(`projects: ${CLIENTS.length} clients, ${MEETINGS.length} meetings`)
 }

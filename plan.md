@@ -21,6 +21,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 | Rules | Shift timing, working weekdays, grace period, day thresholds, idle threshold, leave types and quotas, late penalty | Per-team or per-employee shifts, policy documents |
 | Finance | Monthly payroll: fixed salary − deductions | Payslip PDFs, expenses, company revenue |
 | Working Calendar | Public/company holidays, approved-leave overlay, events and meetings | Google/Outlook sync |
+| Project | Clients, the people on each with their status for a day (live today) and month totals, and a calendar per client that everyone on it edits | Tasks, time per client, client logins |
 | Organization | Teams (one manager each), employees, adding employees with a temporary password | Departments, multiple managers per team, email invites |
 | Profile & Roles | Profile icon menu (My Profile, Settings, Logout) and role-switch dropdown. Salary, payroll and tracked time are locked down by role on the server | Full per-screen role permissions (defined later) |
 | Notifications | In-app bell for leave requests and decisions | Email, desktop toasts |
@@ -165,6 +166,12 @@ These settings live in a single `org_settings` record:
   - events and meetings (company-wide or for one team)
 - Holidays feed into attendance and payroll.
 
+### 4.6b Project (clients)
+- The admin creates clients and picks their people from any team; one person can be on several clients. Archiving hides a client from its people.
+- **Team tab:** each person's status for a day. Past days show the counted attendance. Today is live: Present or Late once they start, "Not in yet" until the shift ends (then Absent), and Half day only once the shift is over. Next to it, this month's totals (P, L, ½, A, LV).
+- **Calendar tab:** a calendar per client with its meetings and deadlines, company holidays, and its people's approved leave (no leave type). Everyone on the client, whatever their role, can add, change and delete its events.
+- Teammates' status and leave come from `GET /api/projects/status` and `GET /api/projects/leaves` (`projects.pb.js`), for members and admins only, as statuses without hours, because attendance and leave records stay own-or-staff.
+
 ### 4.7 Organization
 - **Teams:** each team has one manager and many employees. Each employee belongs to exactly one team.
 - **Employees:** a list and a detail page with profile, team, designation, salary, attendance and leave summary.
@@ -235,6 +242,8 @@ Shorthand used in the table:
 | `leave_balances` (view) | own \|\| staff | — | — | — |
 | `notifications` | own | locked (hook) | own, `read_at` only (migration `1791960000`) | own |
 | `teams`, `org_settings`, `leave_types`, `holidays`, `events` | auth | admin | admin | admin |
+| `clients` (migration `1792031000`) | admin, or someone in `members` of a client that isn't archived | admin | admin | admin |
+| `project_events` | admin, or a member of the event's client (not archived) | same | same, and the client can't change | same |
 
 The custom routes `/api/org/invite`, `/api/org/reset-password`, `/api/payroll/run` and finalize, and `/api/attendance/recompute` reject any caller whose `e.auth.get("role")` isn't `admin`. Server hooks write as the app itself, so locked rules don't block them. A rule left **empty/locked** means superusers only, so every rule that should be open must be set.
 

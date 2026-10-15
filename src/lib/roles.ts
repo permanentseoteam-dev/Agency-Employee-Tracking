@@ -17,6 +17,7 @@ export type NavIcon =
   | 'attendance'
   | 'leave'
   | 'calendar'
+  | 'project'
   | 'live'
   | 'approvals'
   | 'reports'
@@ -39,6 +40,8 @@ export const NAV: NavItem[] = [
   { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', module: 'M7' },
   { path: '/my-leaves', label: 'My Leaves', icon: 'leave', minRole: 'employee', module: 'M8' },
   { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', module: 'M10' },
+  // Everyone sees the clients they're on; only an admin sets up clients and their people.
+  { path: '/projects', label: 'Project', icon: 'project', minRole: 'employee', module: 'Projects' },
   { path: '/live', label: 'Live Board', icon: 'live', minRole: 'manager', module: 'M6' },
   { path: '/approvals', label: 'Approvals', icon: 'approvals', minRole: 'manager', module: 'M8' },
   { path: '/attendance', label: 'Attendance', icon: 'grid', minRole: 'manager', module: 'M7' },

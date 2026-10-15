@@ -100,6 +100,9 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-80 | Logs folder | Settings → Open logs folder | Explorer opens the folder with main.log |  | – |
 | E-81 | Others' notifications are private | (server check) Read or change someone else's notification | Refused |  | ✓ |
 | E-82 | My pay | Open Finance as Asma | Lands on My pay: salary PKR 90,000 and the three months before this one, each with its net pay; clicking a month shows its breakdown; no Run payroll, Salaries or edit buttons | ★ |  |
+| E-84 | Project: my clients | Project as Asma | Tabs Acme Dental and Bluefin Media only; teammates' status and month totals, no hours; no admin buttons | ★ | ✓ |
+| E-85 | Project calendar | Acme Dental → Calendar → Add event | Saved and shown as "Added by Asma Khan"; others on Acme Dental can change it; the team's approved leave shows as "On leave", without the leave type |  | ✓ |
+| E-86 | Other clients are private | (server check) Read Northwind Realty's status, leave or calendar as Asma | Refused or empty |  | ✓ |
 | E-83 | Only your own pay | Open the `#/finance/payroll` or `#/finance/salaries` address; (server check) read salaries or payroll | Sent back to My pay; only your own salary and your own lines in finalized months come back; nothing can be changed |  | ✓ |
 
 ## 6. Limits, resilience and display
