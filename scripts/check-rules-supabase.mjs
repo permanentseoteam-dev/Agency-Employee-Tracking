@@ -399,6 +399,138 @@ try {
   await denied('a finalized month cannot be recounted', () => runPay(sbAdmin))
   await denied('not even the service role can edit a finalized line', () => root.from('payroll_items').update({ adjustment_pkr: 1 }).eq('id', recounted.id).select())
 
+  // --- functions, step 3d: accounts, sign-ups, stars, switch role --------------------------------
+  const orgFn = (client, action, extra) => fn(client, 'org', { action, ...extra })
+  const salaryOf = async (client) => (await client.from('salaries').select('user')).data ?? []
+  const hire = { email: `newhire.${RUN}@test.local`, full_name: 'New Hire', password: 'Temp-pass-1', team: teamA.id, role: 'employee', monthly_salary_pkr: 50000 }
+  await denied('employee cannot add employees', () => orgFn(sbEmpA, 'invite', hire))
+  await denied('manager cannot add employees', () => orgFn(sbMgrA, 'invite', hire))
+  const invited = await orgFn(sbAdmin, 'invite', hire)
+  check('admin adds an employee', !invited.error && !!invited.data?.id, invited.error?.message)
+  if (invited.data?.id) created.users.push(invited.data.id)
+  await denied('duplicate email is rejected', () => orgFn(sbAdmin, 'invite', hire))
+  await denied('short temporary password is rejected', () => orgFn(sbAdmin, 'invite', { ...hire, email: `short.${RUN}@test.local`, password: 'abc' }))
+  check('invite also creates the salary record', (await must(sbAdmin.from('salaries').select('monthly_salary_pkr').eq('user', invited.data?.id ?? 'x')))[0]?.monthly_salary_pkr === 50000)
+  const noPay = await orgFn(sbAdmin, 'invite', { ...hire, email: `nopay.${RUN}@test.local`, monthly_salary_pkr: undefined })
+  check('an employee can be added before their salary is known', !noPay.error, noPay.error?.message)
+  if (noPay.data?.id) created.users.push(noPay.data.id)
+  check('their salary is stored as 0 (not set)', (await must(sbAdmin.from('salaries').select('monthly_salary_pkr').eq('user', noPay.data?.id ?? 'x')))[0]?.monthly_salary_pkr === 0)
+  const hireUser = { id: invited.data?.id, email: hire.email }
+  const signIn = async (email, password) => {
+    const c = createClient(URL, env.STAGING_ANON_KEY, opts)
+    const { error } = await c.auth.signInWithPassword({ email, password })
+    return { client: error ? null : c, error }
+  }
+  const h1 = await signIn(hire.email, hire.password)
+  check('new hire signs in with the temporary password', !!h1.client, h1.error?.message)
+  const hireProfile = h1.client ? (await must(h1.client.from('profiles').select('*').eq('id', hireUser.id)))[0] : null
+  check('new hire must change the password', hireProfile?.must_change_password === true)
+  check('new hire is in team A', hireProfile?.team === teamA.id)
+
+  await denied('employee cannot reset passwords', () => orgFn(sbEmpA, 'reset-password', { userId: hireUser.id, password: 'Temp-pass-2' }))
+  await allowed('admin resets a password', () => orgFn(sbAdmin, 'reset-password', { userId: hireUser.id, password: 'Temp-pass-2' }))
+  check('reset signs out the old session', h1.client ? (await salaryOf(h1.client)).length === 0 : false)
+  check('new temporary password works', !!(await signIn(hire.email, 'Temp-pass-2')).client)
+
+  await denied('manager cannot deactivate people', () => orgFn(sbMgrA, 'set-active', { userId: hireUser.id, active: false }))
+  await denied('admin cannot deactivate themselves', () => orgFn(sbAdmin, 'set-active', { userId: admin.id, active: false }))
+  const h2 = await signIn(hire.email, 'Temp-pass-2')
+  await allowed('admin deactivates an employee', () => orgFn(sbAdmin, 'set-active', { userId: hireUser.id, active: false, left_on: '2026-10-31' }))
+  check('deactivation signs them out immediately', h2.client ? (await salaryOf(h2.client)).length === 0 : false)
+  check('deactivated employee cannot log in', !(await signIn(hire.email, 'Temp-pass-2')).client)
+  check('leaving date is recorded', (await must(sbAdmin.from('profiles').select('left_on').eq('id', hireUser.id)))[0]?.left_on === '2026-10-31')
+  await allowed('admin reactivates the employee', () => orgFn(sbAdmin, 'set-active', { userId: hireUser.id, active: true }))
+  check('reactivated employee can log in', !!(await signIn(hire.email, 'Temp-pass-2')).client)
+
+  // "Create an account": open to guests
+  const guest = createClient(URL, env.STAGING_ANON_KEY, opts)
+  const reg = (extra) => fn(guest, 'register', extra)
+  const signup = { email: `Signup.${RUN}@Test.Local`, full_name: 'Sign Up', password: 'Own-pass-123', phone: '0300 1234567', role: 'admin', team: teamA.id, active: true }
+  const r1 = await reg(signup)
+  check('a guest registers', !r1.error && !!r1.data?.id, r1.error?.message)
+  if (r1.data?.id) created.users.push(r1.data.id)
+  const sp = (await must(root.from('profiles').select('*').eq('id', r1.data?.id ?? 'x')))[0]
+  check('a sign-up waits for approval: switched off, employee, no team, whatever the request said', sp && !sp.active && sp.pending_approval && sp.role === 'employee' && !sp.team, JSON.stringify(sp))
+  const se = (await must(root.from('profile_emails').select('email').eq('id', r1.data?.id ?? 'x')))[0]
+  check('sign-up: email lowercased, phone kept, no forced password change', se?.email === signup.email.toLowerCase() && sp?.phone === '0300 1234567' && sp?.must_change_password === false)
+  check('sign-up creates the salary record as 0 (not set)', (await must(root.from('salaries').select('monthly_salary_pkr').eq('user', r1.data?.id ?? 'x')))[0]?.monthly_salary_pkr === 0)
+  await denied('registering an existing email is refused', () => reg(signup))
+  await denied('registering with a short password is refused', () => reg({ ...signup, email: `s2.${RUN}@test.local`, password: 'abc' }))
+  await denied('registering without a name is refused', () => reg({ ...signup, email: `s3.${RUN}@test.local`, full_name: '' }))
+  const r2 = await reg({ ...signup, email: `second.${RUN}@test.local` })
+  check('a second person registers', !r2.error, r2.error?.message)
+  if (r2.data?.id) created.users.push(r2.data.id)
+  const r6 = await reg({ ...signup, email: `sixth.${RUN}@test.local` })
+  check('a 6th sign-up within a minute is refused (rate limit)', !!r6.error && r6.error.context?.status === 429, r6.error?.message ?? 'allowed')
+  if (r6.data?.id) created.users.push(r6.data.id)
+  check('a sign-up waiting for approval cannot sign in', !(await signIn(signup.email.toLowerCase(), signup.password)).client)
+  check('every active admin is told a sign-up is waiting', (await must(sbAdmin.from('notifications').select('type, payload'))).some((n) => n.type === 'signup_pending' && n.payload.user === r1.data?.id))
+  await denied('an employee cannot approve sign-ups', () => orgFn(sbEmpA, 'approve', { userId: r1.data?.id }))
+  await denied('a manager cannot approve sign-ups', () => orgFn(sbMgrA, 'approve', { userId: r1.data?.id }))
+  await denied('"Reactivate" cannot switch on a waiting sign-up', () => orgFn(sbAdmin, 'set-active', { userId: r1.data?.id, active: true }))
+  await allowed('an admin approves a sign-up', () => orgFn(sbAdmin, 'approve', { userId: r1.data?.id }))
+  const ap = (await must(root.from('profiles').select('*').eq('id', r1.data?.id ?? 'x')))[0]
+  check('approved: active, no longer waiting, joined today', ap?.active && !ap?.pending_approval && ap?.joined_on === new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10), JSON.stringify(ap))
+  const approvedIn = await signIn(signup.email.toLowerCase(), signup.password)
+  check('an approved person signs in', !!approvedIn.client, approvedIn.error?.message)
+  if (approvedIn.client) {
+    await denied('they cannot make themselves admin', () => approvedIn.client.from('profiles').update({ role: 'admin' }).eq('id', r1.data.id).select())
+    await denied('they cannot mark themselves as waiting again', () => approvedIn.client.from('profiles').update({ pending_approval: true }).eq('id', r1.data.id).select())
+  }
+  await denied('approving twice is refused', () => orgFn(sbAdmin, 'approve', { userId: r1.data?.id }))
+  await denied('an approved account cannot be "rejected"', () => orgFn(sbAdmin, 'reject', { userId: r1.data?.id }))
+  await denied('an employee cannot reject sign-ups', () => orgFn(sbEmpA, 'reject', { userId: r2.data?.id }))
+  await allowed('an admin rejects a sign-up', () => orgFn(sbAdmin, 'reject', { userId: r2.data?.id }))
+  check('a rejected sign-up is deleted, with its salary record',
+    (await must(root.from('profiles').select('id').eq('id', r2.data?.id ?? 'x'))).length === 0 && (await must(root.from('salaries').select('id').eq('user', r2.data?.id ?? 'x'))).length === 0)
+
+  // stars
+  check('the late penalty is gone from the rules', !('late_penalty_pkr' in settings[0]))
+  check('monthly leave limits start at 0 (no limit)', settings[0].monthly_full_leaves === 0 && settings[0].monthly_half_leaves === 0)
+  check('payroll lines have no late count any more', !('late_count' in (lines[0] ?? {})))
+  await denied('an employee cannot change star amounts', () => sbEmpA.from('star_rules').update({ stars: 5 }).eq('id', late.id).select())
+  await denied('a manager cannot change star amounts', () => sbMgrA.from('star_rules').update({ stars: 5 }).eq('id', late.id).select())
+  await allowed('an admin sets the stars for a rule break', () => sbAdmin.from('star_rules').update({ stars: 2 }).eq('id', late.id).select())
+  const byHand = (await must(sbAdmin.from('star_rules').insert({ name: `Phone in meetings ${RUN}`, stars: 3 }).select()))[0]
+  const give = (client, extra) => fn(client, 'star-record', { user: empA.id, rule: byHand.id, date: day, ...extra })
+  await denied('an employee cannot give stars', () => give(sbEmpA))
+  await denied('a manager cannot give stars', () => give(sbMgrA))
+  const given = await give(sbAdmin, { note: 'Client call' })
+  check('an admin gives stars by hand', !given.error, given.error?.message)
+  check('the server stamps who gave them', given.data?.given_by === admin.id)
+  await denied('the same rule twice on one day is refused', () => give(sbAdmin))
+  await denied('an automatic rule is not given by hand (only excused)', () => give(sbAdmin, { rule: late.id }))
+  await allowed('an admin excuses an automatic star for a day', () => give(sbAdmin, { rule: late.id, excused: true }))
+  await denied('stars for a day that hasn’t happened are refused', () => give(sbAdmin, { date: '2099-01-01' }))
+  await denied('stars cannot be edited', () => sbAdmin.from('star_records').update({ note: 'x' }).eq('id', given.data?.id ?? 'x').select())
+  const empNotes = await must(sbEmpA.from('notifications').select('type, payload'))
+  check('the person is told about stars given by hand (not about excuses)', empNotes.filter((n) => n.type === 'stars_given').length === 1)
+  await must(root.from('star_records').insert({ user: empB.id, rule: byHand.id, date: day, given_by: admin.id }))
+  check('an employee sees only their own stars', (await must(sbEmpA.from('star_records').select('user'))).every((r) => r.user === empA.id))
+  check('a manager sees their team’s stars', (await must(sbMgrA.from('star_records').select('user'))).some((r) => r.user === empA.id))
+  check('someone in another team sees none of them', (await must(sbEmpB.from('star_records').select('user'))).every((r) => r.user === empB.id))
+  await denied('an employee cannot remove stars', () => sbEmpA.from('star_records').delete().eq('id', given.data?.id ?? 'x').select())
+  await allowed('an admin removes stars given by hand', () => sbAdmin.from('star_records').delete().eq('id', given.data?.id ?? 'x').select())
+  await root.from('star_records').delete().eq('rule', byHand.id)
+  await allowed('deleting a by-hand rule is allowed', () => sbAdmin.from('star_rules').delete().eq('id', byHand.id).select())
+  await root.from('star_records').delete().eq('rule', late.id).eq('user', empA.id)
+  await root.from('star_rules').update({ stars: 0 }).eq('id', late.id)
+
+  // Switch role
+  const sw = await orgFn(sbAdmin, 'switch-to', { userId: empA.id })
+  check('an admin switches to an employee without a password', !sw.error && !!sw.data?.session?.access_token, sw.error?.message)
+  if (sw.data?.session) {
+    const asEmp = createClient(URL, env.STAGING_ANON_KEY, opts)
+    await asEmp.auth.setSession(sw.data.session)
+    const mine = await salaryOf(asEmp)
+    check('the token is that employee’s: they see only their own salary', mine.length === 1 && mine[0].user === empA.id, JSON.stringify(mine))
+    await denied('the switched-to employee cannot switch on to the admin', () => orgFn(asEmp, 'switch-to', { userId: admin.id }))
+  }
+  await denied('an employee cannot switch to anyone', () => orgFn(sbEmpA, 'switch-to', { userId: empB.id }))
+  await denied('a manager cannot switch to anyone', () => orgFn(sbMgrA, 'switch-to', { userId: empA.id }))
+  await denied('a switched-off account cannot be switched to', () => orgFn(sbAdmin, 'switch-to', { userId: gone.id }))
+  await denied('nobody signed out can switch', () => orgFn(guest, 'switch-to', { userId: empA.id }))
+
   // --- old time: only trusted writers (imports, demo data) may store segments over 30 days old ---
   const oldStart = Date.now() - 40 * 86400000
   const oldSeg = (user, n) => ({ id: `${segId.slice(0, 13)}o${n}`, user, state: 'active', started_at: new Date(oldStart).toISOString(), ended_at: new Date(oldStart + 5 * 60000).toISOString() })
