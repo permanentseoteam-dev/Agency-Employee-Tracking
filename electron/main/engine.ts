@@ -93,6 +93,26 @@ async function loadTodayFromServer(userId: string): Promise<void> {
   }
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * After the switch from PocketBase, time this PC recorded before the person signed in again
+ * still carries their old PocketBase id. It moves to them only if their profile holds that old
+ * id (profiles.legacy_id, set by the migration), so on a shared PC nobody gets someone else's time.
+ */
+async function adoptTimeFromBeforeTheSwitch(userId: string): Promise<void> {
+  const t = persisted().get('today')
+  const old = new Set(queue.pending().map((i) => i.user).filter((u) => !UUID.test(u)))
+  if (t && !UUID.test(t.userId)) old.add(t.userId)
+  if (!old.size) return
+  const { data, error } = await db.from('profiles').select('legacy_id').eq('id', userId).maybeSingle()
+  if (error || !data?.legacy_id || !old.has(data.legacy_id)) return
+  const moved = queue.reassign(data.legacy_id, userId)
+  if (t && t.userId === data.legacy_id) persisted().set('today', { ...t, userId })
+  log.info(`moved ${moved} segment(s) recorded before the switch to Supabase to this account`)
+  pushStatus()
+}
+
 export function today(): { date: string; active_s: number; idle_s: number } {
   const id = identity()
   const date = toDateKey(Date.now(), settings().timezone)
@@ -261,7 +281,9 @@ export function startEngine(): void {
     const id = identity()
     const user = isSignedIn() ? (id?.userId ?? null) : null
     if (user && user !== lastSignedInUser) {
-      void loadTodayFromServer(user)
+      void adoptTimeFromBeforeTheSwitch(user)
+        .catch((err) => log.warn('could not check for time from before the switch:', (err as Error).message))
+        .finally(() => loadTodayFromServer(user))
       void queue.flush()
       lastBeat = null
     }

@@ -1,6 +1,7 @@
 // Copies a PocketBase database into a Supabase project (plan step 5; the switch-over is step 6).
 //   node scripts/migrate-to-supabase.mjs --from <pb_data\data.db> --to staging [--reset]
 //   node scripts/migrate-to-supabase.mjs --from <pb_data\data.db> --to live
+//   node scripts/migrate-to-supabase.mjs --from <pb_data\data.db> --to live --delta
 // - PocketBase is only read: data.db (with its -wal/-shm) is copied to a temp folder and the
 //   copy is opened; profile pictures are read from <pb_data>\storage.
 // - Accounts are made in Supabase Auth with their PocketBase bcrypt hashes, so everyone keeps
@@ -11,6 +12,10 @@
 //   transaction rolls back and the accounts made by this run are deleted again.
 // - Afterwards it compares both sides: row counts, tracked seconds per person per day,
 //   attendance and payroll totals, password hashes and pictures. It prints no names or emails.
+// --delta (switch-over step 6.7, after the main copy): PCs that hadn't updated yet still send
+//   tracked time to PocketBase. Accounts are matched by email (new ones are made); new segments
+//   are added unless that person already has time recorded then; it can run again safely.
+//   Anything else new in PocketBase is only listed, to be looked at by hand.
 // Reads <TARGET>_URL, _SERVICE_ROLE_KEY, _DB_HOST, _DB_PASSWORD from .env.supabase.
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -26,11 +31,13 @@ const arg = (name) => {
 const from = arg('--from')
 const target = (arg('--to') ?? '').toUpperCase()
 const reset = process.argv.includes('--reset')
+const delta = process.argv.includes('--delta')
 if (!from || !['STAGING', 'LIVE'].includes(target)) {
-  console.error('Usage: node scripts/migrate-to-supabase.mjs --from <pb_data\\data.db> --to staging|live [--reset]')
+  console.error('Usage: node scripts/migrate-to-supabase.mjs --from <pb_data\\data.db> --to staging|live [--reset | --delta]')
   process.exit(1)
 }
 if (reset && target !== 'STAGING') throw new Error('--reset is for staging only')
+if (reset && delta) throw new Error('--reset and --delta don’t go together')
 if (!existsSync(from)) throw new Error(`${from} not found`)
 
 const env = Object.fromEntries(
@@ -68,6 +75,67 @@ const PROFILE_FIELDS = ['full_name', 'avatar', 'designation', 'phone', 'team', '
 const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' }
 
 const log = (m) => console.log(m)
+/** --delta: what PocketBase got after the main copy (see the top of this file). */
+async function deltaCopy({ collections, rowsOf, users }) {
+  const known = new Map((await sql`select lower(email) email, id::text from profile_emails`).map((r) => [r.email, r.id]))
+  if (!known.size) throw new Error('the target has no accounts: run the main copy first (without --delta)')
+  const teams = new Set((await sql`select id from teams`).map((r) => r.id))
+  const uuidOf = new Map()
+  let made = 0
+  for (const u of users) {
+    const id = known.get(String(u.email).toLowerCase())
+    if (id) {
+      uuidOf.set(u.id, id)
+      continue
+    }
+    const { data, error } = await auth.auth.admin.createUser({
+      email: u.email,
+      password_hash: u.password,
+      email_confirm: true,
+      user_metadata: { full_name: u.full_name ?? '' },
+      ...(!u.active || u.pending_approval ? { ban_duration: '876000h' } : {})
+    })
+    if (error) throw new Error(`new account: ${error.message}`)
+    committed = true // accounts made here stay: segments below may point at them
+    uuidOf.set(u.id, data.user.id)
+    await sql`update profiles set full_name = ${u.full_name ?? ''}, phone = ${u.phone ?? ''}, designation = ${u.designation ?? ''},
+      role = ${u.role || 'employee'}, team = ${teams.has(u.team) ? u.team : null}, joined_on = ${u.joined_on ?? ''}, left_on = ${u.left_on ?? ''},
+      active = ${!!u.active}, pending_approval = ${!!u.pending_approval}, must_change_password = ${!!u.must_change_password},
+      tracking_consent_at = ${u.tracking_consent_at || null}, legacy_id = ${u.id} where id = ${data.user.id}`
+    made++
+  }
+  log(`  accounts: ${uuidOf.size - made} matched by email, ${made} new`)
+
+  const segments = rowsOf('activity_segments').filter((r) => uuidOf.has(r.user))
+  const result = await sql.begin(async (tx) => {
+    await tx`create temp table incoming (id text, "user" uuid, state text, started_at timestamptz, ended_at timestamptz) on commit drop`
+    const rows = segments.map((r) => ({ id: r.id, user: uuidOf.get(r.user), state: r.state, started_at: r.started_at, ended_at: r.ended_at }))
+    for (let i = 0; i < rows.length; i += 1000) await tx`insert into incoming ${tx(rows.slice(i, i + 1000), 'id', 'user', 'state', 'started_at', 'ended_at')}`
+    const [{ there }] = await tx`select count(*)::int there from incoming i where exists (select 1 from activity_segments s where s.id = i.id)`
+    const [{ added }] = await tx`with ins as (
+        insert into activity_segments (id, "user", state, started_at, ended_at)
+        select i.id, i."user", i.state, i.started_at, i.ended_at from incoming i
+        where not exists (select 1 from activity_segments s where s.id = i.id)
+          and not exists (select 1 from activity_segments s where s."user" = i."user" and s.started_at < i.ended_at and s.ended_at > i.started_at)
+        returning 1)
+      select count(*)::int added from ins`
+    return { there, added }
+  })
+  const skipped = segments.length - result.there - result.added
+  log(`  tracked time: ${result.added} new segments added, ${result.there} already there${skipped ? `, ${skipped} skipped (that person already has time recorded then)` : ''}`)
+  if (result.added) log('  attendance: the hourly job recounts the last 7 days; for older days use Attendance → Recompute')
+
+  const newer = []
+  for (const t of TABLES.filter((t) => t !== 'activity_segments' && t !== 'presence' && collections.has(t))) {
+    const ids = rowsOf(t).map((r) => r.id)
+    if (!ids.length) continue
+    const there = new Set((await sql.unsafe(`select id from public.${t}`)).map((r) => r.id))
+    const missing = ids.filter((id) => !there.has(id)).length
+    if (missing) newer.push(`${t} ${missing}`)
+  }
+  log(newer.length ? `  new in PocketBase, not copied (look at these by hand): ${newer.join(', ')}` : '  nothing else is new in PocketBase')
+}
+
 const tmp = mkdtempSync(join(tmpdir(), 'pseo-migrate-'))
 const created = [] // Auth accounts made by this run, deleted again if the tables weren't copied
 let committed = false
@@ -88,191 +156,198 @@ try {
 
   // ---- the Supabase side must be empty ---------------------------------------------------------
   log(`Target: ${target.toLowerCase()} (${ref})`)
-  if (reset) {
+  if (delta) await deltaCopy({ collections, rowsOf, users })
+  else {
+    if (reset) {
+      await sql.begin(async (tx) => {
+        await tx`set local app.bypass_guards = 'on'`
+        for (const t of [...TABLES].reverse()) if (!DEFAULT_ROWS.includes(t)) await tx.unsafe(`delete from public.${t}`)
+        await tx`delete from public.profiles`
+      })
+      for (let page = 1; ; page++) {
+        const { data, error } = await auth.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        if (error) throw new Error(`list accounts: ${error.message}`)
+        for (const u of data.users) {
+          const { data: files } = await auth.storage.from('avatars').list(u.id)
+          if (files?.length) await auth.storage.from('avatars').remove(files.map((f) => `${u.id}/${f.name}`))
+          await auth.auth.admin.deleteUser(u.id)
+        }
+        if (data.users.length < 1000 || page > 50) break
+      }
+      log('  --reset: staging wiped')
+    }
+    const [{ accounts }] = await sql`select count(*)::int accounts from auth.users`
+    const busy = []
+    for (const t of TABLES.filter((t) => !DEFAULT_ROWS.includes(t))) {
+      const [{ n }] = await sql.unsafe(`select count(*)::int n from public.${t}`)
+      if (n) busy.push(`${t} ${n}`)
+    }
+    if (accounts || busy.length) throw new Error(`the target is not empty (${accounts} accounts${busy.length ? ', ' + busy.join(', ') : ''})${target === 'STAGING' ? '; add --reset to wipe staging first' : ''}`)
+
+    // ---- accounts --------------------------------------------------------------------------------
+    const uuidOf = new Map()
+    for (const u of users) {
+      const { data, error } = await auth.auth.admin.createUser({
+        email: u.email,
+        password_hash: u.password,
+        email_confirm: true,
+        user_metadata: { full_name: u.full_name ?? '' },
+        // Switched off or waiting for approval: can't sign in (the org functions lift this).
+        ...(!u.active || u.pending_approval ? { ban_duration: '876000h' } : {})
+      })
+      if (error) throw new Error(`account ${created.length + 1} of ${users.length}: ${error.message}`)
+      created.push(data.user.id)
+      uuidOf.set(u.id, data.user.id)
+    }
+    log(`  accounts: ${created.length} made in Auth with their password hashes`)
+
+    // ---- values -------------------------------------------------------------------------------
+    const userRelation = (col, field) => {
+      const f = collections.get(col)?.fields.find((x) => x.name === field)
+      return f?.type === 'relation' && f.collectionId === usersCol.id
+    }
+    const mapUser = (id) => (id ? (uuidOf.get(id) ?? null) : null)
+    /** Ids inside a notification payload that point at accounts. */
+    const mapPayload = (p) => {
+      if (!p || typeof p !== 'object') return p
+      const out = { ...p }
+      for (const k of ['user', 'requester', 'given_by', 'approver']) if (typeof out[k] === 'string' && uuidOf.has(out[k])) out[k] = uuidOf.get(out[k])
+      return out
+    }
+    const columnsOf = async (table) =>
+      sql`select column_name, data_type, udt_name, is_nullable = 'YES' as nullable from information_schema.columns
+          where table_schema = 'public' and table_name = ${table} order by ordinal_position`
+    /** One PocketBase value as the Postgres column wants it. */
+    function convert(col, table, value, c) {
+      if (userRelation(table, c.column_name)) {
+        if (c.data_type === 'ARRAY') return `{${JSON.parse(value || '[]').map(mapUser).filter(Boolean).join(',')}}`
+        return mapUser(value)
+      }
+      if (value === null || value === undefined) return null
+      switch (c.data_type) {
+        case 'boolean':
+          return !!value
+        case 'timestamp with time zone':
+          return value === '' ? null : value
+        case 'jsonb': {
+          if (value === '') return null
+          const parsed = typeof value === 'string' ? JSON.parse(value) : value
+          return sql.json(table === 'notifications' && col === 'payload' ? mapPayload(parsed) : parsed)
+        }
+        case 'integer':
+          return Math.round(Number(value) || 0)
+        case 'numeric':
+          return Number(value) || 0
+        case 'ARRAY':
+          return `{${JSON.parse(value || '[]').join(',')}}`
+        default:
+          return value === '' && c.nullable ? null : String(value)
+      }
+    }
+
+    // ---- tables, in one transaction ----------------------------------------------------------------
+    const counts = {}
     await sql.begin(async (tx) => {
       await tx`set local app.bypass_guards = 'on'`
-      for (const t of [...TABLES].reverse()) if (!DEFAULT_ROWS.includes(t)) await tx.unsafe(`delete from public.${t}`)
-      await tx`delete from public.profiles`
+      const profileCols = (await columnsOf('profiles')).filter((c) => PROFILE_FIELDS.includes(c.column_name))
+      const teamOf = []
+      for (const u of users) {
+        const row = {}
+        for (const c of profileCols) {
+          if (c.column_name === 'team') teamOf.push([uuidOf.get(u.id), u.team || null])
+          else row[c.column_name] = convert(c.column_name, 'users', u[c.column_name], c)
+        }
+        row.legacy_id = u.id // lets a PC's queued time from before the switch find its owner
+        await tx`update public.profiles set ${tx(row)} where id = ${uuidOf.get(u.id)}`
+      }
+      counts.users = users.length
+
+      for (const t of TABLES) {
+        if (!collections.has(t)) continue
+        const source = rowsOf(t)
+        const cols = (await columnsOf(t)).filter((c) => source.length === 0 || c.column_name in source[0])
+        const missing = collections.get(t).fields.map((f) => f.name).filter((n) => !cols.some((c) => c.column_name === n))
+        if (missing.length && source.length) log(`  note: ${t} has PocketBase fields with no Supabase column, not copied: ${missing.join(', ')}`)
+        if (DEFAULT_ROWS.includes(t)) await tx.unsafe(`delete from public.${t}`)
+        const rows = source.map((r) => Object.fromEntries(cols.map((c) => [c.column_name, convert(c.column_name, t, r[c.column_name], c)])))
+        const names = cols.map((c) => c.column_name)
+        for (let i = 0; i < rows.length; i += 500) await tx`insert into ${tx(`public.${t}`)} ${tx(rows.slice(i, i + 500), names)}`
+        counts[t] = rows.length
+        if (t === 'teams') for (const [id, team] of teamOf) if (team) await tx`update public.profiles set team = ${team} where id = ${id}`
+      }
     })
-    for (let page = 1; ; page++) {
-      const { data, error } = await auth.auth.admin.listUsers({ page: 1, perPage: 1000 })
-      if (error) throw new Error(`list accounts: ${error.message}`)
-      for (const u of data.users) {
-        const { data: files } = await auth.storage.from('avatars').list(u.id)
-        if (files?.length) await auth.storage.from('avatars').remove(files.map((f) => `${u.id}/${f.name}`))
-        await auth.auth.admin.deleteUser(u.id)
+    committed = true
+    log(`  tables: ${Object.entries(counts).map(([t, n]) => `${t} ${n}`).join(', ')}`)
+
+    // ---- profile pictures --------------------------------------------------------------------------
+    const storage = join(dirname(from), 'storage', usersCol.id)
+    let pictures = 0
+    const lostPictures = []
+    for (const u of users.filter((x) => x.avatar)) {
+      const file = join(storage, u.id, u.avatar)
+      if (!existsSync(file)) {
+        lostPictures.push(u.id)
+        continue
       }
-      if (data.users.length < 1000 || page > 50) break
+      const { error } = await auth.storage
+        .from('avatars')
+        .upload(`${uuidOf.get(u.id)}/${u.avatar}`, readFileSync(file), { contentType: MIME[extname(u.avatar).toLowerCase()] ?? 'application/octet-stream', upsert: true })
+      if (error) throw new Error(`picture upload: ${error.message}`)
+      pictures++
     }
-    log('  --reset: staging wiped')
-  }
-  const [{ accounts }] = await sql`select count(*)::int accounts from auth.users`
-  const busy = []
-  for (const t of TABLES.filter((t) => !DEFAULT_ROWS.includes(t))) {
-    const [{ n }] = await sql.unsafe(`select count(*)::int n from public.${t}`)
-    if (n) busy.push(`${t} ${n}`)
-  }
-  if (accounts || busy.length) throw new Error(`the target is not empty (${accounts} accounts${busy.length ? ', ' + busy.join(', ') : ''})${target === 'STAGING' ? '; add --reset to wipe staging first' : ''}`)
+    log(`  pictures: ${pictures} copied${lostPictures.length ? `, ${lostPictures.length} missing in PocketBase storage (left as is)` : ''}`)
 
-  // ---- accounts --------------------------------------------------------------------------------
-  const uuidOf = new Map()
-  for (const u of users) {
-    const { data, error } = await auth.auth.admin.createUser({
-      email: u.email,
-      password_hash: u.password,
-      email_confirm: true,
-      user_metadata: { full_name: u.full_name ?? '' },
-      // Switched off or waiting for approval: can't sign in (the org functions lift this).
-      ...(!u.active || u.pending_approval ? { ban_duration: '876000h' } : {})
-    })
-    if (error) throw new Error(`account ${created.length + 1} of ${users.length}: ${error.message}`)
-    created.push(data.user.id)
-    uuidOf.set(u.id, data.user.id)
-  }
-  log(`  accounts: ${created.length} made in Auth with their password hashes`)
-
-  // ---- values -------------------------------------------------------------------------------
-  const userRelation = (col, field) => {
-    const f = collections.get(col)?.fields.find((x) => x.name === field)
-    return f?.type === 'relation' && f.collectionId === usersCol.id
-  }
-  const mapUser = (id) => (id ? (uuidOf.get(id) ?? null) : null)
-  /** Ids inside a notification payload that point at accounts. */
-  const mapPayload = (p) => {
-    if (!p || typeof p !== 'object') return p
-    const out = { ...p }
-    for (const k of ['user', 'requester', 'given_by', 'approver']) if (typeof out[k] === 'string' && uuidOf.has(out[k])) out[k] = uuidOf.get(out[k])
-    return out
-  }
-  const columnsOf = async (table) =>
-    sql`select column_name, data_type, udt_name, is_nullable = 'YES' as nullable from information_schema.columns
-        where table_schema = 'public' and table_name = ${table} order by ordinal_position`
-  /** One PocketBase value as the Postgres column wants it. */
-  function convert(col, table, value, c) {
-    if (userRelation(table, c.column_name)) {
-      if (c.data_type === 'ARRAY') return `{${JSON.parse(value || '[]').map(mapUser).filter(Boolean).join(',')}}`
-      return mapUser(value)
+    // ---- checks --------------------------------------------------------------------------------------
+    log('Checks')
+    const check = (name, good, detail = '') => {
+      if (!good) ok = false
+      log(`  ${good ? 'OK  ' : 'FAIL'} ${name}${detail ? `  (${detail})` : ''}`)
     }
-    if (value === null || value === undefined) return null
-    switch (c.data_type) {
-      case 'boolean':
-        return !!value
-      case 'timestamp with time zone':
-        return value === '' ? null : value
-      case 'jsonb': {
-        if (value === '') return null
-        const parsed = typeof value === 'string' ? JSON.parse(value) : value
-        return sql.json(table === 'notifications' && col === 'payload' ? mapPayload(parsed) : parsed)
-      }
-      case 'integer':
-        return Math.round(Number(value) || 0)
-      case 'numeric':
-        return Number(value) || 0
-      case 'ARRAY':
-        return `{${JSON.parse(value || '[]').join(',')}}`
-      default:
-        return value === '' && c.nullable ? null : String(value)
+    for (const t of ['profiles', ...TABLES]) {
+      const want = t === 'profiles' ? users.length : rowsOf(t).length
+      const [{ n }] = await sql.unsafe(`select count(*)::int n from public.${t}`)
+      check(`${t}: ${n} rows`, n === want, n === want ? '' : `PocketBase has ${want}`)
     }
+    const hashes = new Map((await sql`select id::text, encrypted_password from auth.users`).map((r) => [r.id, r.encrypted_password]))
+    const sameHash = users.filter((u) => hashes.get(uuidOf.get(u.id)) === u.password).length
+    check(`password hashes: ${sameHash} of ${users.length} identical`, sameHash === users.length)
+    const banned = (await sql`select count(*)::int n from auth.users where banned_until > now()`)[0].n
+    const wantBanned = users.filter((u) => !u.active || u.pending_approval).length
+    check(`switched-off and waiting accounts can't sign in: ${banned}`, banned === wantBanned, banned === wantBanned ? '' : `expected ${wantBanned}`)
+
+    // Tracked seconds per person per UTC day, both sides.
+    const pbSeconds = new Map(
+      pb.prepare(`select user, substr(started_at, 1, 10) day, state, round(sum((julianday(ended_at) - julianday(started_at)) * 86400)) s
+                  from activity_segments group by 1, 2, 3`).all().map((r) => [`${uuidOf.get(r.user)}|${r.day}|${r.state}`, Number(r.s)])
+    )
+    const sbSeconds = new Map(
+      (await sql`select "user"::text u, to_char(started_at at time zone 'UTC', 'YYYY-MM-DD') d, state, round(sum(extract(epoch from ended_at - started_at)))::int s
+                 from activity_segments group by 1, 2, 3`).map((r) => [`${r.u}|${r.d}|${r.state}`, r.s])
+    )
+    const dayDiff = [...new Set([...pbSeconds.keys(), ...sbSeconds.keys()])].filter((k) => Math.abs((pbSeconds.get(k) ?? 0) - (sbSeconds.get(k) ?? 0)) > 1)
+    check(`tracked time: ${pbSeconds.size} person-days match to the second`, dayDiff.length === 0, dayDiff.length ? `${dayDiff.length} differ` : '')
+
+    const pbAtt = pb.prepare(`select coalesce(sum(active_s), 0) a, coalesce(sum(idle_s), 0) i, count(*) n from attendance`).get()
+    const [sbAtt] = await sql`select coalesce(sum(active_s), 0)::bigint a, coalesce(sum(idle_s), 0)::bigint i from attendance`
+    check(`attendance totals: ${Number(sbAtt.a)} s active, ${Number(sbAtt.i)} s idle`, Number(sbAtt.a) === Number(pbAtt.a) && Number(sbAtt.i) === Number(pbAtt.i))
+    const pbNet = rowsOf('payroll_items').reduce((s, r) => s + Number(r.net), 0)
+    const [sbNet] = await sql`select coalesce(sum(net), 0)::numeric n from payroll_items`
+    check(`payroll net total: PKR ${Number(sbNet.n)}`, Number(sbNet.n) === pbNet)
+    const pbLeave = rowsOf('leave_requests').reduce((s, r) => s + Number(r.days), 0)
+    const [sbLeave] = await sql`select coalesce(sum(days), 0)::numeric n from leave_requests`
+    check(`leave days total: ${Number(sbLeave.n)}`, Number(sbLeave.n) === pbLeave)
+    const orphans = (await sql`select count(*)::int n from profiles p left join teams t on t.id = p.team where p.team is not null and t.id is null`)[0].n
+    check('every team on a profile exists', orphans === 0)
+    const legacy = new Map((await sql`select id::text, legacy_id from profiles`).map((r) => [r.id, r.legacy_id]))
+    const withOldId = users.filter((u) => legacy.get(uuidOf.get(u.id)) === u.id).length
+    check(`old PocketBase ids kept on ${withOldId} of ${users.length} profiles`, withOldId === users.length)
+    const [days] = await sql`select count(*)::int n from org_settings where jsonb_typeof(work_days) <> 'array'`
+    check('working days are a list', days.n === 0)
+    const [notes] = await sql`select count(*)::int n from notifications n
+      where jsonb_typeof(n.payload) <> 'object'
+         or (n.payload ? 'requester' and not exists (select 1 from profiles p where p.id::text = n.payload->>'requester'))`
+    check('notifications point at accounts that exist', notes.n === 0, notes.n ? `${notes.n} don't` : '')
   }
-
-  // ---- tables, in one transaction ----------------------------------------------------------------
-  const counts = {}
-  await sql.begin(async (tx) => {
-    await tx`set local app.bypass_guards = 'on'`
-    const profileCols = (await columnsOf('profiles')).filter((c) => PROFILE_FIELDS.includes(c.column_name))
-    const teamOf = []
-    for (const u of users) {
-      const row = {}
-      for (const c of profileCols) {
-        if (c.column_name === 'team') teamOf.push([uuidOf.get(u.id), u.team || null])
-        else row[c.column_name] = convert(c.column_name, 'users', u[c.column_name], c)
-      }
-      await tx`update public.profiles set ${tx(row)} where id = ${uuidOf.get(u.id)}`
-    }
-    counts.users = users.length
-
-    for (const t of TABLES) {
-      if (!collections.has(t)) continue
-      const source = rowsOf(t)
-      const cols = (await columnsOf(t)).filter((c) => source.length === 0 || c.column_name in source[0])
-      const missing = collections.get(t).fields.map((f) => f.name).filter((n) => !cols.some((c) => c.column_name === n))
-      if (missing.length && source.length) log(`  note: ${t} has PocketBase fields with no Supabase column, not copied: ${missing.join(', ')}`)
-      if (DEFAULT_ROWS.includes(t)) await tx.unsafe(`delete from public.${t}`)
-      const rows = source.map((r) => Object.fromEntries(cols.map((c) => [c.column_name, convert(c.column_name, t, r[c.column_name], c)])))
-      const names = cols.map((c) => c.column_name)
-      for (let i = 0; i < rows.length; i += 500) await tx`insert into ${tx(`public.${t}`)} ${tx(rows.slice(i, i + 500), names)}`
-      counts[t] = rows.length
-      if (t === 'teams') for (const [id, team] of teamOf) if (team) await tx`update public.profiles set team = ${team} where id = ${id}`
-    }
-  })
-  committed = true
-  log(`  tables: ${Object.entries(counts).map(([t, n]) => `${t} ${n}`).join(', ')}`)
-
-  // ---- profile pictures --------------------------------------------------------------------------
-  const storage = join(dirname(from), 'storage', usersCol.id)
-  let pictures = 0
-  const lostPictures = []
-  for (const u of users.filter((x) => x.avatar)) {
-    const file = join(storage, u.id, u.avatar)
-    if (!existsSync(file)) {
-      lostPictures.push(u.id)
-      continue
-    }
-    const { error } = await auth.storage
-      .from('avatars')
-      .upload(`${uuidOf.get(u.id)}/${u.avatar}`, readFileSync(file), { contentType: MIME[extname(u.avatar).toLowerCase()] ?? 'application/octet-stream', upsert: true })
-    if (error) throw new Error(`picture upload: ${error.message}`)
-    pictures++
-  }
-  log(`  pictures: ${pictures} copied${lostPictures.length ? `, ${lostPictures.length} missing in PocketBase storage (left as is)` : ''}`)
-
-  // ---- checks --------------------------------------------------------------------------------------
-  log('Checks')
-  const check = (name, good, detail = '') => {
-    if (!good) ok = false
-    log(`  ${good ? 'OK  ' : 'FAIL'} ${name}${detail ? `  (${detail})` : ''}`)
-  }
-  for (const t of ['profiles', ...TABLES]) {
-    const want = t === 'profiles' ? users.length : rowsOf(t).length
-    const [{ n }] = await sql.unsafe(`select count(*)::int n from public.${t}`)
-    check(`${t}: ${n} rows`, n === want, n === want ? '' : `PocketBase has ${want}`)
-  }
-  const hashes = new Map((await sql`select id::text, encrypted_password from auth.users`).map((r) => [r.id, r.encrypted_password]))
-  const sameHash = users.filter((u) => hashes.get(uuidOf.get(u.id)) === u.password).length
-  check(`password hashes: ${sameHash} of ${users.length} identical`, sameHash === users.length)
-  const banned = (await sql`select count(*)::int n from auth.users where banned_until > now()`)[0].n
-  const wantBanned = users.filter((u) => !u.active || u.pending_approval).length
-  check(`switched-off and waiting accounts can't sign in: ${banned}`, banned === wantBanned, banned === wantBanned ? '' : `expected ${wantBanned}`)
-
-  // Tracked seconds per person per UTC day, both sides.
-  const pbSeconds = new Map(
-    pb.prepare(`select user, substr(started_at, 1, 10) day, state, round(sum((julianday(ended_at) - julianday(started_at)) * 86400)) s
-                from activity_segments group by 1, 2, 3`).all().map((r) => [`${uuidOf.get(r.user)}|${r.day}|${r.state}`, Number(r.s)])
-  )
-  const sbSeconds = new Map(
-    (await sql`select "user"::text u, to_char(started_at at time zone 'UTC', 'YYYY-MM-DD') d, state, round(sum(extract(epoch from ended_at - started_at)))::int s
-               from activity_segments group by 1, 2, 3`).map((r) => [`${r.u}|${r.d}|${r.state}`, r.s])
-  )
-  const dayDiff = [...new Set([...pbSeconds.keys(), ...sbSeconds.keys()])].filter((k) => Math.abs((pbSeconds.get(k) ?? 0) - (sbSeconds.get(k) ?? 0)) > 1)
-  check(`tracked time: ${pbSeconds.size} person-days match to the second`, dayDiff.length === 0, dayDiff.length ? `${dayDiff.length} differ` : '')
-
-  const pbAtt = pb.prepare(`select coalesce(sum(active_s), 0) a, coalesce(sum(idle_s), 0) i, count(*) n from attendance`).get()
-  const [sbAtt] = await sql`select coalesce(sum(active_s), 0)::bigint a, coalesce(sum(idle_s), 0)::bigint i from attendance`
-  check(`attendance totals: ${Number(sbAtt.a)} s active, ${Number(sbAtt.i)} s idle`, Number(sbAtt.a) === Number(pbAtt.a) && Number(sbAtt.i) === Number(pbAtt.i))
-  const pbNet = rowsOf('payroll_items').reduce((s, r) => s + Number(r.net), 0)
-  const [sbNet] = await sql`select coalesce(sum(net), 0)::numeric n from payroll_items`
-  check(`payroll net total: PKR ${Number(sbNet.n)}`, Number(sbNet.n) === pbNet)
-  const pbLeave = rowsOf('leave_requests').reduce((s, r) => s + Number(r.days), 0)
-  const [sbLeave] = await sql`select coalesce(sum(days), 0)::numeric n from leave_requests`
-  check(`leave days total: ${Number(sbLeave.n)}`, Number(sbLeave.n) === pbLeave)
-  const orphans = (await sql`select count(*)::int n from profiles p left join teams t on t.id = p.team where p.team is not null and t.id is null`)[0].n
-  check('every team on a profile exists', orphans === 0)
-  const [days] = await sql`select count(*)::int n from org_settings where jsonb_typeof(work_days) <> 'array'`
-  check('working days are a list', days.n === 0)
-  const [notes] = await sql`select count(*)::int n from notifications n
-    where jsonb_typeof(n.payload) <> 'object'
-       or (n.payload ? 'requester' and not exists (select 1 from profiles p where p.id::text = n.payload->>'requester'))`
-  check('notifications point at accounts that exist', notes.n === 0, notes.n ? `${notes.n} don't` : '')
 } catch (err) {
   ok = false
   console.error(`\nMigration failed: ${err.message}`)

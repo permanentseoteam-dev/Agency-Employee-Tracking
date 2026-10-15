@@ -94,6 +94,21 @@ describe('SyncQueue', () => {
     expect(sent).toEqual([seg(0).started_at, seg(5).started_at])
   })
 
+  it('hands segments recorded under an old account id to the new one and sends them', async () => {
+    const sent: QueuedSegment[] = []
+    const t = setup(async (item) => void sent.push(item as QueuedSegment))
+    t.q.add({ ...seg(0), user: 'oldpocketbaseid' })
+    t.q.add({ ...seg(5), user: 'someoneelse0000' })
+    await t.q.flush()
+    expect(sent).toEqual([]) // nothing belongs to u1 yet
+
+    expect(t.q.reassign('oldpocketbaseid', 'u1')).toBe(1)
+    await t.q.flush()
+    expect(sent.map((s) => [s.user, s.started_at])).toEqual([['u1', seg(0).started_at]])
+    expect(t.q.pending().map((i) => i.user)).toEqual(['someoneelse0000']) // another person's time stays theirs
+    expect(t.saved().map((i) => i.user)).toEqual(['someoneelse0000'])
+  })
+
   it('counts a duplicate id as already synced', async () => {
     const t = setup(async () => {
       throw err(409, { code: '23505' })

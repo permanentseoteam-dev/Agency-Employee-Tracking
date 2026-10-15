@@ -149,6 +149,22 @@ export class SyncQueue {
     }
   }
 
+  /** Hands the queued segments of one account id to another (the PocketBase → Supabase switch). */
+  reassign(from: string, to: string): number {
+    let moved = 0
+    for (const item of this.items) {
+      if (item.user !== from) continue
+      item.user = to
+      item.next_at = 0
+      moved++
+    }
+    if (moved) {
+      this.persist()
+      void this.flush()
+    }
+    return moved
+  }
+
   /** The server rejects anything older than 30 days, so don't keep it. */
   private prune(): void {
     const cutoff = this.now() - MAX_AGE_MS
