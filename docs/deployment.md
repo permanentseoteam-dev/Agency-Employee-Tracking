@@ -5,7 +5,7 @@ This is how PSEO Tracker runs for the whole agency (roadmap M12), and the steps 
 - **Server:** an office PC runs the database (PocketBase) as the Windows service "PocketBase" from `D:\PSEOTracker`. On Tailscale it is called **agency-server**.
 - **Network:** staff PCs and laptops reach it over **Tailscale**, a free private network, under the agency's Tailscale account. The app connects to `http://agency-server:8090`. Nothing is opened to the internet: the firewall lets only Tailscale addresses reach port 8090.
 - **Backups:** PocketBase makes a backup zip every day at 13:00 (Pakistan time). A scheduled task copies it to `E:\PSEOTrackerBackups` at 13:30, or as soon as the PC is on again.
-- **Updates:** installers go to a public, releases-only GitHub repo, `permanentseoteam-dev/pseo-tracker-releases`, and installed apps update themselves from there (Part D).
+- **Updates:** installers are published as GitHub Releases of this repo, `permanentseoteam-dev/Agency-Employee-Tracking`, and installed apps update themselves from there (Part D).
 
 **Status on 2026-10-14:**
 - [x] Part A: the server is set up on the office PC, with the first admin login.
@@ -103,23 +103,18 @@ From then on the app starts by itself (hidden in the tray) at every Windows sign
 
 ## Part D: updates
 
-**One-time setup:**
-1. On GitHub, create an **empty public** repo, `permanentseoteam-dev/pseo-tracker-releases`. It holds only installers; the source code stays private.
-2. Create a GitHub token (**Settings → Developer settings → Personal access tokens**) with `repo` access to it.
+Releases go to the **Releases** page of this repo, `permanentseoteam-dev/Agency-Employee-Tracking`. It's public, so apps download updates without a token. Publishing needs GitHub access with `repo` rights: the git login this PC pushes with, or a token in `GH_TOKEN`.
+
+**Versions before 0.1.3** were built to look for updates in a repo that was never created (`pseo-tracker-releases`). Each PC that has one of them needs **one manual install of 0.1.3 or later** from `dist\staff-pc-setup`. After that it updates itself.
 
 **Each update:**
-1. Raise `"version"` in `package.json`, e.g. `0.1.0` → `0.2.0`, and commit.
-2. In PowerShell in `F:\agency-tracker`:
-   ```powershell
-   $env:GH_TOKEN = 'ghp_…'
-   npm run release
-   ```
-   This builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes a GitHub release. If GitHub shows it as a draft, publish it.
+1. Raise `"version"` in `package.json`, e.g. `0.1.3` → `0.1.4`, and commit.
+2. In PowerShell in `F:\agency-tracker`, with `GH_TOKEN` set, run `npm run release`. It builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes the GitHub release `v<version>` with the installer, its `.blockmap` and `latest.yml` (the file the apps check). If GitHub shows it as a draft, publish it.
 3. Copy the new installer into `dist\staff-pc-setup` (delete the old one), so new PCs get the latest version.
 
 Installed apps check at start-up and every 6 hours, download quietly, and install the update when nobody is being tracked on that PC (outside shift hours, or with the screen locked) or when the app quits.
 
-Until the releases repo exists, the check fails quietly in the app log (`updater: 404`) and nothing else happens. Apps installed today will update themselves once a newer release is published.
+If there is no release to find, the check fails quietly in the app log (`updater: 404`) and nothing else happens.
 
 `npm run dist` builds the same installer without publishing. Release builds go to `out-release\`, never `out\`, so building one doesn't disturb a running development copy. The server address comes from `.env.production` (`VITE_PB_URL=http://agency-server:8090`); the build refuses `localhost` or a raw IP.
 

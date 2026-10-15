@@ -28,9 +28,9 @@ nsis:
   shortcutName: PSEO Tracker
   runAfterFinish: true
   deleteAppDataOnUninstall: false
-# Installers only, in a public repo, so the app can update without a token.
+# GitHub Releases of the (public) source repo, so the app can update without a token.
 publish:
   provider: github
   owner: permanentseoteam-dev
-  repo: pseo-tracker-releases
+  repo: Agency-Employee-Tracking
   releaseType: release
