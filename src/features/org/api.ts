@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb, type Role, type UserRecord } from '@/lib/pb'
+import { call, live, must, PROFILE_WITH_TEAM, supabase, toEmployee, toUser, type Role, type UserRecord } from '@/lib/db'
 
 export interface Team {
   id: string
@@ -39,53 +39,41 @@ export const orgKeys = {
 export function useTeams() {
   return useQuery({
     queryKey: orgKeys.teams,
-    queryFn: () => pb.collection('teams').getFullList<Team>({ sort: 'name', expand: 'manager' })
+    queryFn: async () => {
+      const rows = must(await supabase.from('teams').select('*, manager_row:profiles!teams_manager_fkey(*)').order('name'))
+      return rows.map(({ manager_row, ...t }) => ({
+        ...(t as Team),
+        manager: t.manager ?? '',
+        expand: manager_row ? { manager: toUser(manager_row) } : {}
+      })) as Team[]
+    }
   })
 }
 
 export function useEmployees() {
   return useQuery({
     queryKey: orgKeys.employees,
-    queryFn: () => pb.collection('users').getFullList<Employee>({ sort: 'full_name', expand: 'team' })
+    queryFn: async () => must(await supabase.from('profiles').select(PROFILE_WITH_TEAM).order('full_name')).map((r) => toEmployee<Employee>(r))
   })
 }
 
 /** Keeps Organization's lists live: a sign-up or any change to an account refetches them. */
 export function useOrgLive() {
   const qc = useQueryClient()
-  useEffect(() => {
-    let unsubscribe: (() => Promise<void>) | undefined
-    let cancelled = false
-    pb.collection('users')
-      .subscribe('*', () => void qc.invalidateQueries({ queryKey: ['org'] }))
-      .then((fn) => {
-        if (cancelled) void fn()
-        else unsubscribe = fn
-      })
-      .catch(() => {
-        /* offline: the next refetch catches up */
-      })
-    return () => {
-      cancelled = true
-      void unsubscribe?.()
-    }
-  }, [qc])
+  useEffect(() => live('profiles', () => void qc.invalidateQueries({ queryKey: ['org'] })), [qc])
 }
 
 export function useEmployee(id: string) {
   return useQuery({
     queryKey: orgKeys.employee(id),
-    queryFn: () => pb.collection('users').getOne<Employee>(id, { expand: 'team' })
+    queryFn: async () => toEmployee<Employee>(must(await supabase.from('profiles').select(PROFILE_WITH_TEAM).eq('id', id).single()))
   })
 }
 
 export function useSalary(userId: string) {
   return useQuery({
     queryKey: orgKeys.salary(userId),
-    queryFn: async () => {
-      const list = await pb.collection('salaries').getList<Salary>(1, 1, { filter: pb.filter('user = {:u}', { u: userId }) })
-      return list.items[0] ?? null
-    }
+    queryFn: async () => (must(await supabase.from('salaries').select('*').eq('user', userId).maybeSingle()) as Salary | null) ?? null
   })
 }
 
@@ -98,7 +86,7 @@ function useOrgInvalidate() {
 export function useInvite() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: (input: InviteInput) => pb.send<{ id: string }>('/api/org/invite', { method: 'POST', body: input }),
+    mutationFn: (input: InviteInput) => call<{ id: string }>('org', { action: 'invite', ...input }),
     onSuccess: invalidate
   })
 }
@@ -106,7 +94,11 @@ export function useInvite() {
 export function useUpdateEmployee() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<UserRecord> }) => pb.collection('users').update(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: Partial<UserRecord> }) => {
+      const { email: _email, expand: _expand, ...fields } = data as Partial<UserRecord> & { expand?: unknown }
+      const row = { ...fields, ...('team' in fields ? { team: fields.team || null } : {}) }
+      return must(await supabase.from('profiles').update(row).eq('id', id).select().single())
+    },
     onSuccess: invalidate
   })
 }
@@ -114,26 +106,24 @@ export function useUpdateEmployee() {
 export function useSaveSalary() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: ({ userId, salary, amount }: { userId: string; salary: Salary | null; amount: number }) =>
+    mutationFn: async ({ userId, salary, amount }: { userId: string; salary: Salary | null; amount: number }) =>
       salary
-        ? pb.collection('salaries').update(salary.id, { monthly_salary_pkr: amount })
-        : pb.collection('salaries').create({ user: userId, monthly_salary_pkr: amount }),
+        ? must(await supabase.from('salaries').update({ monthly_salary_pkr: amount }).eq('id', salary.id).select().single())
+        : must(await supabase.from('salaries').insert({ user: userId, monthly_salary_pkr: amount }).select().single()),
     onSuccess: invalidate
   })
 }
 
 export function useResetPassword() {
   return useMutation({
-    mutationFn: ({ userId, password }: { userId: string; password: string }) =>
-      pb.send('/api/org/reset-password', { method: 'POST', body: { userId, password } })
+    mutationFn: ({ userId, password }: { userId: string; password: string }) => call('org', { action: 'reset-password', userId, password })
   })
 }
 
 export function useSetActive() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: (body: { userId: string; active: boolean; left_on?: string }) =>
-      pb.send('/api/org/set-active', { method: 'POST', body }),
+    mutationFn: (body: { userId: string; active: boolean; left_on?: string }) => call('org', { action: 'set-active', ...body }),
     onSuccess: invalidate
   })
 }
@@ -142,7 +132,7 @@ export function useSetActive() {
 export function useApproveSignup() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: (userId: string) => pb.send('/api/org/approve', { method: 'POST', body: { userId } }),
+    mutationFn: (userId: string) => call('org', { action: 'approve', userId }),
     onSuccess: invalidate
   })
 }
@@ -151,7 +141,7 @@ export function useApproveSignup() {
 export function useRejectSignup() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: (userId: string) => pb.send('/api/org/reject', { method: 'POST', body: { userId } }),
+    mutationFn: (userId: string) => call('org', { action: 'reject', userId }),
     onSuccess: invalidate
   })
 }
@@ -159,8 +149,12 @@ export function useRejectSignup() {
 export function useSaveTeam() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: ({ id, name, manager }: { id?: string; name: string; manager: string }) =>
-      id ? pb.collection('teams').update(id, { name, manager }) : pb.collection('teams').create({ name, manager }),
+    mutationFn: async ({ id, name, manager }: { id?: string; name: string; manager: string }) => {
+      const row = { name, manager: manager || null }
+      return id
+        ? must(await supabase.from('teams').update(row).eq('id', id).select().single())
+        : must(await supabase.from('teams').insert(row).select().single())
+    },
     onSuccess: invalidate
   })
 }
@@ -168,7 +162,7 @@ export function useSaveTeam() {
 export function useDeleteTeam() {
   const invalidate = useOrgInvalidate()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('teams').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('teams').delete().eq('id', id).select()),
     onSuccess: invalidate
   })
 }

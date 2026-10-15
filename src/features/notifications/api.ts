@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { live, must, supabase } from '@/lib/db'
 import type { NotificationRecord } from '@/lib/notifications'
 import { useSession } from '@/stores/session'
 
@@ -12,7 +12,7 @@ export const notificationKeys = {
   list: (userId: string) => ['notifications', userId] as const
 }
 
-/** My latest notifications and the unread count, kept live by a realtime subscription. */
+/** My latest notifications and the unread count, kept live by Realtime (the rules send only my own). */
 export function useNotifications() {
   const userId = useSession((s) => s.user?.id ?? '')
   const qc = useQueryClient()
@@ -21,35 +21,20 @@ export function useNotifications() {
     queryKey: notificationKeys.list(userId),
     enabled: !!userId,
     queryFn: async () => {
-      const mine = pb.filter('user = {:u}', { u: userId })
       const [latest, unread] = await Promise.all([
-        pb.collection('notifications').getList<NotificationRecord>(1, LIST_SIZE, { filter: mine, sort: '-created' }),
-        pb.collection('notifications').getList(1, 1, { filter: `${mine} && read_at = ""`, fields: 'id' })
+        supabase.from('notifications').select('*').eq('user', userId).order('created', { ascending: false }).limit(LIST_SIZE),
+        supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user', userId).is('read_at', null)
       ])
-      return { items: latest.items, unread: unread.totalItems }
+      const items = (must(latest) as NotificationRecord[]).map((n) => ({ ...n, read_at: n.read_at ?? '' }))
+      must(unread)
+      return { items, unread: unread.count ?? 0 }
     }
   })
 
-  useEffect(() => {
-    if (!userId) return
-    let unsubscribe: (() => Promise<void>) | undefined
-    let cancelled = false
-    pb.collection('notifications')
-      .subscribe('*', () => void qc.invalidateQueries({ queryKey: notificationKeys.list(userId) }), {
-        filter: pb.filter('user = {:u}', { u: userId })
-      })
-      .then((fn) => {
-        if (cancelled) void fn()
-        else unsubscribe = fn
-      })
-      .catch(() => {
-        /* offline: the refetch on reconnect catches up */
-      })
-    return () => {
-      cancelled = true
-      void unsubscribe?.()
-    }
-  }, [qc, userId])
+  useEffect(
+    () => (userId ? live('notifications', () => void qc.invalidateQueries({ queryKey: notificationKeys.list(userId) })) : undefined),
+    [qc, userId]
+  )
 
   return query
 }
@@ -57,7 +42,7 @@ export function useNotifications() {
 export function useMarkRead() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('notifications').update(id, { read_at: new Date().toISOString() }),
+    mutationFn: async (id: string) => must(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', id).select()),
     onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all })
   })
 }
@@ -66,14 +51,8 @@ export function useMarkAllRead() {
   const userId = useSession((s) => s.user?.id ?? '')
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async () => {
-      const unread = await pb.collection('notifications').getFullList({
-        filter: pb.filter('user = {:u} && read_at = ""', { u: userId }),
-        fields: 'id'
-      })
-      const now = new Date().toISOString()
-      for (const n of unread) await pb.collection('notifications').update(n.id, { read_at: now })
-    },
+    mutationFn: async () =>
+      must(await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('user', userId).is('read_at', null).select('id')),
     onSettled: () => qc.invalidateQueries({ queryKey: notificationKeys.all })
   })
 }

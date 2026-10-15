@@ -121,3 +121,22 @@ export function toUser(row: Record<string, unknown>, email?: string): UserRecord
     ...(email !== undefined ? { email } : {})
   }
 }
+
+/**
+ * Follows live changes to a table (Supabase Realtime; the row-level security decides which rows
+ * this person hears about) and calls `onChange` for each. Returns a function that stops it.
+ */
+export function live(table: string, onChange: (change: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => void): () => void {
+  const channel = supabase
+    .channel(`live:${table}:${Math.random().toString(36).slice(2)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table }, (p) => onChange(p as never))
+    .subscribe()
+  return () => void supabase.removeChannel(channel)
+}
+
+/** A profile row with its team embedded, as screens use it: Employee-like ({ expand: { team } }). */
+export const PROFILE_WITH_TEAM = '*, team_row:teams!profiles_team_fkey(*), email_row:profile_emails(email)'
+export function toEmployee<T = UserRecord>(row: Record<string, unknown>): T & { expand?: { team?: Record<string, unknown> } } {
+  const { team_row, email_row, ...rest } = row as Record<string, unknown> & { team_row?: Record<string, unknown> | null; email_row?: { email?: string } | null }
+  return { ...toUser(rest, email_row?.email ?? undefined), expand: team_row ? { team: team_row } : {} } as never
+}
