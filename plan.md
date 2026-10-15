@@ -408,6 +408,10 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
+- **Connection lock on the sign-in screens** (2026-10-15): with more than 6 employees, signing in on the Tailscale site would need a paid plan (the free plan allows 6 users), so PCs keep joining with the office setup file's key (tagged devices, 50 free). `ConnectionGate` (`src/features/auth/ConnectionGate.tsx`) wraps Login and Register.
+  - It asks the main process (`electron/main/network.ts`, IPC `network:status`) whether the server answers and what Tailscale reports (`status --json`: running, and whether the server's machine is among its devices).
+  - Until the server answers, a panel replaces the forms, with the message from `src/lib/connection.ts` (not connected, different network, server down) and Check again. It polls every 5 s and stops once the server answers.
+  - UI test: locked with no server, unlocked 2.3 s after the server started, and sign-in and Create an account still work.
 - **Office setup file** (2026-10-15): a PC that only got the app installer couldn't reach the server, because it wasn't on the agency's Tailscale. `npm run office-setup` (`scripts/office-setup/build.mjs` + `office-setup.nsi`, built with electron-builder's cached makensis) makes the private `dist\office\PSEO-Tracker-Office-Setup-<version>.exe`.
   - It packs `setup-staff-pc.ps1`, the Tailscale MSI, the app installer and the key from `.env.office` (git-ignored). It is never uploaded.
   - At run time it extracts to `$PLUGINSDIR`, which is deleted on exit, so the key doesn't stay on the PC.

@@ -43,6 +43,16 @@ export interface TrackerStatus {
   today: TodayTotals
 }
 
+/** What the sign-in screen needs to know before it lets anyone sign in or register. */
+export interface NetworkStatus {
+  /** The server answered /api/health. */
+  server: boolean
+  /** This PC's Tailscale: not installed, service off, installed but not signed in, or connected. */
+  tailscale: 'missing' | 'stopped' | 'signed_out' | 'running'
+  /** Connected to the network that has the server (it lists the server's machine). */
+  onAgencyNetwork: boolean
+}
+
 export interface TrackerApi {
   logError(message: string): void
   setSession(session: SessionInfo | null): void
@@ -56,6 +66,8 @@ export interface TrackerApi {
   getAutostart(): Promise<AutostartState>
   setAutostart(enabled: boolean): Promise<AutostartState>
   openLogsFolder(): Promise<void>
+  /** Server reachability and this PC's Tailscale state (read-only). */
+  networkStatus(): Promise<NetworkStatus>
   /** Quits the app (managers and admins); resolves false when the main process refuses. */
   quit(): Promise<boolean>
 }

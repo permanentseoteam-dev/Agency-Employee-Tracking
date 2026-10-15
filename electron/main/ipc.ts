@@ -3,6 +3,7 @@ import type { SessionInfo, TrackerSettings } from '../preload/api'
 import { autostartState, ensureAutostart, setAutostart } from './autostart'
 import { onStatus, status, today } from './engine'
 import { log, logsFolder } from './log'
+import { networkStatus } from './network'
 import { onSessionExpired, setFromRenderer } from './session'
 import { persisted } from './store'
 import { trayModel } from './trayMenu'
@@ -41,6 +42,8 @@ export function registerIpc(handlers: { quit(): void }): void {
     handlers.quit()
     return true
   })
+
+  ipcMain.handle('network:status', () => networkStatus())
 
   ipcMain.on('log:renderer-error', (_event, message: unknown) => {
     log.error('[renderer]', String(message))

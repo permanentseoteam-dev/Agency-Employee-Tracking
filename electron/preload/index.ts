@@ -21,6 +21,7 @@ const api: TrackerApi = {
   getAutostart: () => ipcRenderer.invoke('autostart:get'),
   setAutostart: (enabled) => ipcRenderer.invoke('autostart:set', enabled),
   openLogsFolder: () => ipcRenderer.invoke('logs:open'),
+  networkStatus: () => ipcRenderer.invoke('network:status'),
   quit: () => ipcRenderer.invoke('app:quit')
 }
 

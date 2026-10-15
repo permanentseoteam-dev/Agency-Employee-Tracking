@@ -108,7 +108,10 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-92 | Other people's data is private | (server check) Read another person's attendance, leave, time, live status or salary | Refused or empty |  | ✓ |
 | E-93 | Can't decide own leave | (server check) Approve your own request | Refused |  | ✓ |
 | E-94 | Can't promote yourself | (server check) Change your own role or team | Refused |  | ✓ |
-| E-95 | Server unreachable | Disconnect the network, then try to sign in or send leave | "Cannot reach the server. Check your connection..."; nothing half-saved; tracking keeps queuing |  |  |
+| E-95 | Server unreachable | Signed out: disconnect the network. Signed in: disconnect, then send leave | Signed out: the connection panel replaces sign-in (no form). Signed in: "Cannot reach the server. Check your connection..."; nothing half-saved; tracking keeps queuing |  |  |
+| E-105 | Not on the agency network | Open the app on a PC without Tailscale (or with Tailscale signed out) | "Connect this PC to the agency network first", naming the office setup file; no sign-in or Create an account form | ★ |  |
+| E-106 | Other Tailscale account | Tailscale signed in to a different account | "This PC is on a different network"; tells them to run the office setup file |  |  |
+| E-107 | Server PC off | On the agency network, stop the server (dashboard or service) | "The server isn’t answering"; Check again works; when the server is back, the sign-in form appears by itself within about 5 s | ★ |  |
 | E-96 | Smallest window | Resize the window to its minimum (960 × 600) | Every screen still usable; nothing overlaps or is cut off |  |  |
 | E-97 | Dark mode everywhere | Switch to Dark and open every screen and dialog | Readable everywhere; no white boxes |  |  |
 | E-98 | Long text | Very long leave reason, very long designation | Wraps neatly; no broken layout |  |  |

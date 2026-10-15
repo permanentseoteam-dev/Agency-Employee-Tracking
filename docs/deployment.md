@@ -98,7 +98,7 @@ Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale
 
    On success the window closes itself; on an error it stays open and shows what went wrong.
 
-**Fallback without the office file:** copy the folder `dist\staff-pc-setup` and double-click **Set up this PC.cmd**. It asks for the key when there is no `tailscale-key.txt` in the folder. Installing only `PSEO-Tracker-Setup-<version>.exe` (for example from GitHub) does **not** connect the PC: sign-in then says "Cannot reach the server".
+**Fallback without the office file:** copy the folder `dist\staff-pc-setup` and double-click **Set up this PC.cmd**. It asks for the key when there is no `tailscale-key.txt` in the folder. Installing only `PSEO-Tracker-Setup-<version>.exe` (for example from GitHub) does **not** connect the PC. The app then shows **"Connect this PC to the agency network first"** instead of sign-in and Create an account, and tells the person to run the office setup file. A PC signed in to another Tailscale account sees "This PC is on a different network". If the server PC is off, the screen says "The server isn't answering". In every case the forms appear by themselves within a few seconds once the server can be reached.
 3. The employee signs in and chooses a new password, or clicks **Create an account** on the sign-in page and fills in their name, email and a password. Then they accept the tracking notice.
 4. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
 

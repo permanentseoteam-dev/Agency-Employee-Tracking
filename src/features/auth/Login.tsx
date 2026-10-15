@@ -21,7 +21,7 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
       const status = (err as { status?: number }).status
       setError(
         status === 0
-          ? 'Cannot reach the server. Check your connection and that Tailscale is on (its icon is by the clock), then try again.'
+          ? 'Cannot reach the server. Check your connection, or run the office setup file from your admin.'
           : 'Email or password is incorrect, or your account is inactive.'
       )
     } finally {
