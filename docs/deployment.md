@@ -81,15 +81,17 @@ Open <https://login.tailscale.com/admin> and sign in with the agency's Tailscale
 
 ## Part C: staff PCs and laptops (about 5 minutes each)
 
-**Before you start:** in the app, add the employee (**Organization → Add employee**) and note their email and temporary password.
+**Before you start:** either add the employee in the app (**Organization → Add employee**) and note their email and temporary password, or let them create their own account in step 3.
 
 1. Copy the folder `F:\agency-tracker\dist\staff-pc-setup` to the PC (USB stick or Google Drive). It holds the installer, the Tailscale installer, `Set up this PC.cmd` and a short `README.txt`.
 2. On the PC, signed in to Windows **as the employee**, double-click **Set up this PC.cmd**. Click **Yes** when Windows asks, and paste the auth key from Part B when asked. The script ([setup-staff-pc.ps1](../scripts/staff-pc/setup-staff-pc.ps1)):
    - installs Tailscale and joins the agency network
    - checks that `agency-server` answers
    - installs PSEO Tracker for that Windows user and opens it
-3. The employee signs in, chooses a new password and accepts the tracking notice.
+3. The employee signs in and chooses a new password, or clicks **Create an account** on the sign-in page and fills in their name, email and a password. Then they accept the tracking notice.
 4. Check the **Live Board**: during shift hours they show as Active or Idle within a minute.
+
+**People who create their own account** are employees straight away, with no team and no salary, and they are tracked from the start. You get a bell notification, "New employee registered". Open them under **Organization → Employees** and set their team, role, designation and salary. An account you don't recognise can be deactivated there. Only devices on the agency's Tailscale can reach the sign-in page's server, and it accepts at most 5 new accounts a minute from one PC.
 
 From then on the app starts by itself (hidden in the tray) at every Windows sign-in and records active and idle time during shift hours. Employees can't turn that off. Laptops work anywhere with internet. Without a connection they keep recording and send the time later.
 

@@ -64,3 +64,33 @@ describe('todayKey', () => {
     expect(org.todayKey(300, Date.parse('2026-10-14T18:59:00Z'))).toBe('2026-10-14')
   })
 })
+
+describe('validateRegister', () => {
+  const form = { email: ' Sara@Gmail.com ', full_name: ' Sara Ahmed ', password: 'my-own-pass', phone: ' 0300 1234567 ' }
+
+  it('takes only the person’s own details, normalized', () => {
+    const { data, error } = org.validateRegister({ ...form, role: 'admin', team: 't1', active: false, monthly_salary_pkr: 1 })
+    expect(error).toBeUndefined()
+    expect(data).toEqual({ email: 'sara@gmail.com', full_name: 'Sara Ahmed', password: 'my-own-pass', phone: '0300 1234567' })
+  })
+
+  it('allows leaving the phone out', () => {
+    expect(org.validateRegister({ ...form, phone: undefined }).data.phone).toBe('')
+  })
+
+  it.each([
+    [{ full_name: '  ' }, 'full name'],
+    [{ full_name: 'x'.repeat(101) }, 'too long'],
+    [{ email: 'sara@' }, 'valid email'],
+    [{ password: 'short' }, 'The password must be at least 8'],
+    [{ password: 'x'.repeat(73) }, 'too long'],
+    [{ password: 123456789 }, 'at least 8'],
+    [{ phone: '1'.repeat(31) }, 'phone']
+  ])('rejects %o', (patch, message) => {
+    expect(org.validateRegister({ ...form, ...patch }).error).toContain(message)
+  })
+
+  it('keeps the admin wording for temporary passwords', () => {
+    expect(org.passwordProblem('short')).toBe('The temporary password must be at least 8 characters.')
+  })
+})

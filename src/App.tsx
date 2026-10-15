@@ -3,7 +3,7 @@ import { createHashRouter, Navigate, RouterProvider, useRouteError } from 'react
 import { AppShell } from '@/components/layout/AppShell'
 import { Button } from '@/components/ui/Button'
 import { ChangePassword } from '@/features/auth/ChangePassword'
-import { Login } from '@/features/auth/Login'
+import { SignedOut } from '@/features/auth/SignedOut'
 import { TrackingNotice } from '@/features/auth/TrackingNotice'
 import { AttendanceTable } from '@/features/attendance/AttendanceTable'
 import { MyAttendance } from '@/features/attendance/MyAttendance'
@@ -37,10 +37,10 @@ import { Settings } from '@/features/profile/Settings'
 import { NAV } from '@/lib/roles'
 import { useSession } from '@/stores/session'
 
-/** Sign-in steps in order: login → forced password change → tracking notice → app. */
+/** Sign-in steps in order: sign in (or create an account) → forced password change → tracking notice → app. */
 function Gate() {
   const user = useSession((s) => s.user)
-  if (!user) return <Login />
+  if (!user) return <SignedOut />
   if (user.must_change_password) return <ChangePassword />
   if (!user.tracking_consent_at) return <TrackingNotice />
   // Keyed by account: a switch remounts the shell, so every live subscription restarts as the new user.

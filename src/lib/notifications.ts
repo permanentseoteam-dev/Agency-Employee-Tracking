@@ -16,11 +16,18 @@ export interface LeavePayload {
   comment?: string
 }
 
+/** Someone used "Create an account" on the sign-in page (register.pb.js). */
+export interface RegisteredPayload {
+  user: string
+  name: string
+  email: string
+}
+
 export interface NotificationRecord {
   id: string
   user: string
   type: string
-  payload: LeavePayload | null
+  payload: LeavePayload | RegisteredPayload | null
   read_at: string
   created: string
 }
@@ -49,8 +56,12 @@ export function daysText(days: number, halfDay: boolean): string {
 
 /** The bell's two lines for a notification. */
 export function notificationText(n: Pick<NotificationRecord, 'type' | 'payload'>): { title: string; detail: string } {
-  const p = n.payload
-  if (!p) return { title: 'Notification', detail: '' }
+  if (!n.payload) return { title: 'Notification', detail: '' }
+  if (n.type === 'employee_registered') {
+    const r = n.payload as RegisteredPayload
+    return { title: 'New employee registered', detail: [r.name, r.email, 'set their team, role and salary'].filter(Boolean).join(' · ') }
+  }
+  const p = n.payload as LeavePayload
   const detail = [p.leave_type_name || 'Leave', dateRange(p.start_date, p.end_date), daysText(p.days, p.half_day)].join(' · ')
   if (n.type === 'leave_requested') {
     return { title: `${p.requester_name || 'Someone'} asked for leave`, detail }
@@ -62,10 +73,16 @@ export function notificationText(n: Pick<NotificationRecord, 'type' | 'payload'>
   return { title: 'Notification', detail: '' }
 }
 
+/** The approver's comment on a leave decision, shown in quotes under the text. */
+export function notificationComment(n: Pick<NotificationRecord, 'payload'>): string {
+  return n.payload && 'comment' in n.payload ? (n.payload.comment ?? '') : ''
+}
+
 /** Where clicking a notification goes. */
 export function notificationLink(n: Pick<NotificationRecord, 'type'>): string | null {
   if (n.type === 'leave_requested') return '/approvals'
   if (n.type === 'leave_decided') return '/my-leaves'
+  if (n.type === 'employee_registered') return '/org/employees'
   return null
 }
 

@@ -24,6 +24,8 @@ Sign in as Ayesha (admin). Admins can do everything; these tests cover what only
 | A-14 | Can't deactivate yourself | Try to deactivate Ayesha | Refused |  | ✓ |
 | A-15 | Change role or team | Make Chand a manager, or move him to Bravo | Takes effect after his next sign-in; his menu and data scope change |  |  |
 | A-16 | Long names | Add someone with a very long name and designation | Lists, cards and the detail page stay tidy |  |  |
+| A-90 | Someone creates their own account | After E-100 | The bell: "New employee registered" with their name and email; clicking it opens Organization → Employees, where they're active with no team and salary 0 | ★ | ✓ |
+| A-91 | Set up a registered person | Open them and set team, role, designation and salary | Saved; their manager sees them on the Live Board; payroll includes them once a salary is set |  |  |
 
 ## 2. Rules
 

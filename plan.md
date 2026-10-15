@@ -408,6 +408,11 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - who sees what: events that are company-wide or for your own team (a manager also sees the teams they manage, an admin sees all); leave follows the API rules (your own, a manager's teams, everyone for an admin)
   - admins add, edit and delete events (timed or all day, company-wide or one team); `events.pb.js` rejects an event that ends before it starts
   - `check:rules` 115 of 115; end-to-end 27 of 27, including the "Done when" (an approved leave and a holiday on the same month view)
+- **Create an account** (2026-10-15): the sign-in page has "Create an account". At the user's choice it works right away, for any email.
+  - `POST /api/register` (`register.pb.js`, guests): `validateRegister` in `lib/org.js` takes only name, email, password and phone. The server always makes an active `employee` with no team, `joined_on` today and salary 0 (not set), with no forced password change, and notifies the active admins (`employee_registered`, bell → Organization → Employees)
+  - migration `1791990000_register_rate_limit.js`: PocketBase rate limiting on, with only `POST /api/register` limited to 5 a minute per guest address
+  - app: `Register.tsx` and `SignedOut.tsx` switch with Login. Sign-in retries a failed email in lower case, because app-made accounts are stored in lower case and the server matches exactly
+  - checks: check:rules 159/159 (13 new), unit tests, and a UI run of register → tracking notice → app, a duplicate email, and the admin's bell
 - **Go-live setup** (2026-10-14): an office PC is the server, `agency-server` on Tailscale (the agency's tailnet), with a fresh database in `D:\PSEOTracker` run by the "PocketBase" service. The development database task is turned off.
   - `server/deploy/setup-server.ps1` does the whole server setup in one elevated run: copy the server files, service, firewall, backup task, first login (`create-first-admin.ps1`), Tailscale. Re-running it deploys `pb_hooks` and `pb_migrations` changes
   - attendance runs hourly and the backup at 13:00 PKT (copy to E: at 13:30), because the server PC may be off at night. The backup task calls PowerShell by full path, since this PC's system PATH lacks it (that made the task fail with 0x80070002)

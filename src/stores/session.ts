@@ -40,7 +40,16 @@ export const useSession = create<SessionState>((set) => {
     ready: false,
 
     async login(email, password) {
-      await pb.collection('users').authWithPassword(email.trim(), password)
+      const typed = email.trim()
+      try {
+        await pb.collection('users').authWithPassword(typed, password)
+      } catch (err) {
+        // Accounts made in the app (Add employee, Create an account) are stored in
+        // lower case and the server matches emails exactly, so also try that.
+        const lower = typed.toLowerCase()
+        if (lower === typed || (err as { status?: number }).status !== 400) throw err
+        await pb.collection('users').authWithPassword(lower, password)
+      }
     },
 
     logout() {

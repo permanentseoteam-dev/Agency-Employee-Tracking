@@ -520,6 +520,47 @@ try {
   await allowed('reactivated employee can log in', () =>
     hire.collection('users').authWithPassword('new.hire@test.local', 'another-pass-1')
   )
+
+  // --- "Create an account" on the sign-in page (register.pb.js) -------------------
+  // Exactly 5 guest calls before the rate-limit check: the 6th in a minute is refused.
+  const guest = new PocketBase(URL)
+  guest.autoCancellation(false)
+  const register = (body) => guest.send('/api/register', { method: 'POST', body })
+  const signup = { full_name: 'Sara Self', email: 'Sara.Self@test.local', password: 'own-pass-123', phone: '0300 1112223' }
+  let selfId = ''
+  await allowed('a guest registers', async () => {
+    selfId = (await register({ ...signup, role: 'admin', team: teamA.id, active: false, monthly_salary_pkr: 99 })).id
+  })
+  const self = await root.collection('users').getOne(selfId)
+  const todayPk = new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10)
+  check('registered as an active employee, whatever the request said', self.role === 'employee' && self.active === true && self.team === '')
+  check('registered: email lowercased, joined today, no forced password change',
+    self.email === 'sara.self@test.local' && self.joined_on === todayPk && self.must_change_password === false && self.phone === '0300 1112223')
+  check('registration creates the salary record as 0 (not set)',
+    (await root.collection('salaries').getFirstListItem(`user = "${selfId}"`).catch(() => null))?.monthly_salary_pkr === 0)
+  await denied('registering an existing email is refused', () => register({ ...signup, email: 'SARA.SELF@test.local' }))
+  await denied('registering with a short password is refused', () => register({ ...signup, email: 'x3@test.local', password: 'short' }))
+  await denied('registering without a name is refused', () => register({ ...signup, email: 'x4@test.local', full_name: ' ' }))
+  await allowed('a second person registers', () => register({ ...signup, email: 'second.self@test.local', full_name: 'Second Self' }))
+  const selfPb = new PocketBase(URL)
+  selfPb.autoCancellation(false)
+  await allowed('a registered person can sign in right away', () =>
+    selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123')
+  )
+  await denied('a registered person cannot make themselves admin', () => selfPb.collection('users').update(selfId, { role: 'admin' }))
+  const regNotes = await root.collection('notifications').getFullList({ filter: `type = "employee_registered" && payload.user ?= "${selfId}"` })
+  check('every active admin is notified of the registration', regNotes.length === 1 && regNotes[0].user === admin.id)
+  check('the notification names the person', regNotes[0]?.payload?.name === 'Sara Self' && regNotes[0]?.payload?.email === 'sara.self@test.local')
+  let limited = 0
+  try {
+    await register({ ...signup, email: 'sixth@test.local' })
+  } catch (e) {
+    limited = e.status
+  }
+  check('a 6th registration within a minute is refused (rate limit)', limited === 429, `status ${limited}`)
+  await allowed('the rate limit does not slow down sign-ins', async () => {
+    for (let i = 0; i < 4; i++) await selfPb.collection('users').authWithPassword('sara.self@test.local', 'own-pass-123')
+  })
 } catch (e) {
   failed++
   console.error('ERROR', e?.status ?? '', e?.message ?? e, e?.response ? JSON.stringify(e.response) : '')

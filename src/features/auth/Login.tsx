@@ -4,7 +4,7 @@ import { Field, Input } from '@/components/ui/Input'
 import { useSession } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
-export function Login() {
+export function Login({ onRegister }: { onRegister?: () => void }) {
   const login = useSession((s) => s.login)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -30,7 +30,7 @@ export function Login() {
   }
 
   return (
-    <AuthLayout title="Sign in" subtitle="Use the email and password from your admin.">
+    <AuthLayout title="Sign in" subtitle="Sign in with your email and password.">
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
         <Field label="Email" htmlFor="email">
           <Input
@@ -57,6 +57,14 @@ export function Login() {
         <Button type="submit" className="w-full" loading={busy} disabled={!email || !password}>
           Sign in
         </Button>
+        {onRegister && (
+          <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+            New here?{' '}
+            <button type="button" onClick={onRegister} className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+              Create an account
+            </button>
+          </p>
+        )}
         <p className="text-center text-xs text-slate-500">Forgot your password? Ask your admin to reset it.</p>
       </form>
     </AuthLayout>

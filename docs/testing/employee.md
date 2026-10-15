@@ -21,6 +21,11 @@ Sign in as an employee of the test company (Asma, Alpha team, unless a test says
 | E-11 | Switch account: same account | Switch account → asma@test.local | "You are already signed in as this account." |  |  |
 | E-12 | Switch account: another person | Switch account → chand@test.local / Test-pass-123 | The app now shows Chand (his pending Casual in My Leaves); the dialog warned that tracked time goes to him | ★ |  |
 | E-13 | No free role switching | Look at the top bar | Only the role label and Switch account; no "View as" dropdown |  |  |
+| E-100 | Create an account | Sign-in page → Create an account: name, email typed with some capitals, phone, the same password twice | Signed straight in → tracking notice → My Stats; Organization (as admin) lists them as an active employee with no team | ★ | – |
+| E-101 | Create an account: checks | Try a too-short password, two different passwords, then an email that already has an account | A clear error for each; no account created |  | ✓ |
+| E-102 | Create an account: back | On Create an account click "Sign in" | Back on the sign-in form |  |  |
+| E-103 | Sign in with capitals | Sign in typing your email with capital letters | Signed in |  |  |
+| E-104 | Too many sign-ups | Create 6 accounts from one PC within a minute | The 6th: "Too many sign-ups from this PC. Wait a minute and try again." |  | ✓ |
 
 ## 2. Tracking engine and tray
 

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMarkAllRead, useMarkRead, useNotifications } from '@/features/notifications/api'
 import { useNow, useTimezone } from '@/features/tracking/api'
 import { cn } from '@/lib/cn'
-import { notificationLink, notificationText, timeAgo } from '@/lib/notifications'
+import { notificationComment, notificationLink, notificationText, timeAgo } from '@/lib/notifications'
 
 /** Top-bar bell (plan §4.9): unread count, the latest notifications, mark read. */
 export function NotificationBell() {
@@ -78,7 +78,7 @@ export function NotificationBell() {
                     <span className="min-w-0 flex-1">
                       <span className={cn('block text-sm', isUnread ? 'font-semibold' : 'text-slate-700 dark:text-slate-300')}>{title}</span>
                       {detail && <span className="block text-xs text-slate-500">{detail}</span>}
-                      {n.payload?.comment && <span className="mt-0.5 block text-xs italic text-slate-500">“{n.payload.comment}”</span>}
+                      {notificationComment(n) && <span className="mt-0.5 block text-xs italic text-slate-500">“{notificationComment(n)}”</span>}
                       <span className="mt-0.5 block text-xs text-slate-400">{timeAgo(n.created, now, tz)}</span>
                     </span>
                   </DropdownMenu.Item>

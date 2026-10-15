@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dateRange, daysText, notificationLink, notificationText, timeAgo, type LeavePayload } from './notifications'
+import { dateRange, daysText, notificationComment, notificationLink, notificationText, timeAgo, type LeavePayload } from './notifications'
 
 const payload: LeavePayload = {
   request: 'r1',
@@ -37,6 +37,12 @@ describe('notificationText', () => {
     })
   })
 
+  it('describes a self-registration for the admins', () => {
+    expect(
+      notificationText({ type: 'employee_registered', payload: { user: 'u9', name: 'Sara Self', email: 'sara@gmail.com' } })
+    ).toEqual({ title: 'New employee registered', detail: 'Sara Self · sara@gmail.com · set their team, role and salary' })
+  })
+
   it('copes with unknown types and empty payloads', () => {
     expect(notificationText({ type: 'something_else', payload })).toEqual({ title: 'Notification', detail: '' })
     expect(notificationText({ type: 'leave_requested', payload: null }).title).toBe('Notification')
@@ -47,9 +53,17 @@ describe('notificationText', () => {
     expect(daysText(2.5, false)).toBe('2.5 days')
   })
 
+  it('shows a comment only for leave decisions that have one', () => {
+    expect(notificationComment({ payload: { ...payload, comment: 'Enjoy' } })).toBe('Enjoy')
+    expect(notificationComment({ payload })).toBe('')
+    expect(notificationComment({ payload: { user: 'u9', name: 'Sara', email: 's@x.com' } })).toBe('')
+    expect(notificationComment({ payload: null })).toBe('')
+  })
+
   it('links to the right screen', () => {
     expect(notificationLink({ type: 'leave_requested' })).toBe('/approvals')
     expect(notificationLink({ type: 'leave_decided' })).toBe('/my-leaves')
+    expect(notificationLink({ type: 'employee_registered' })).toBe('/org/employees')
     expect(notificationLink({ type: 'x' })).toBeNull()
   })
 })
