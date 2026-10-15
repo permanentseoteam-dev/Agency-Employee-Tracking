@@ -249,6 +249,45 @@ try {
   await allowed('the admin deletes a client', () => sbAdmin.from('clients').delete().eq('id', acme.id).select())
   check('its calendar goes with it', (await must(root.from('project_events').select('id').eq('client', acme.id))).length === 0)
 
+  // --- functions, step 3a: attendance, reports, project status ------------------------------
+  const fn = async (client, name, payload) => {
+    const { data, error } = await client.functions.invoke(name, { body: payload })
+    return { data, error: error ? Object.assign(error, { message: (await error.context?.json?.().catch(() => null))?.message ?? error.message }) : null }
+  }
+  // A finished weekday (Karachi), and a worked morning on it for emp A.
+  const day = (() => {
+    let d = new Date(Date.now() + 5 * 3600000 - 86400000)
+    while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() - 86400000)
+    return d.toISOString().slice(0, 10)
+  })()
+  const karachi = (hhmm) => new Date(Date.parse(`${day}T${hhmm}:00Z`) - 5 * 3600000).toISOString()
+  await must(root.from('activity_segments').insert({ id: `${segId.slice(0, 13)}w1`, user: empA.id, state: 'active', started_at: karachi('09:05'), ended_at: karachi('13:30') }))
+  await denied('employee cannot recompute attendance', () => fn(sbEmpA, 'attendance-recompute', { date: day }))
+  await denied('manager cannot recompute attendance', () => fn(sbMgrA, 'attendance-recompute', { date: day }))
+  await allowed('admin recomputes a finished day', () => fn(sbAdmin, 'attendance-recompute', { date: day }))
+  const [rec] = await must(sbEmpA.from('attendance').select('status, active_s').eq('date', day).eq('user', empA.id))
+  check('the day counts as Present (started 09:05, 4h25m active)', rec?.status === 'present' && rec?.active_s === 4 * 3600 + 25 * 60, JSON.stringify(rec))
+  await denied('attendance cannot be recomputed for today', () => fn(sbAdmin, 'attendance-recompute', { date: new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10) }))
+  await allowed('the hourly job runs with the service role', () => fn(root, 'attendance-recompute', { nightly: true }))
+
+  await denied('employees cannot open reports', () => fn(sbEmpA, 'reports-activity', { from: day, to: day }))
+  const rep = await fn(sbMgrA, 'reports-activity', { from: day, to: day, group: 'day' })
+  check('a manager’s report covers only their teams', !rep.error && rep.data.rows.length === 1 && rep.data.rows[0].user === empA.id && rep.data.rows[0].active_s === 4 * 3600 + 25 * 60, JSON.stringify(rep.data ?? rep.error?.message))
+  const adminRep = await fn(sbAdmin, 'reports-activity', { from: day, to: day, group: 'month', user: empA.id })
+  check('the admin reports by month for one person', !adminRep.error && adminRep.data.rows[0]?.period === day.slice(0, 7))
+
+  const beta = (await must(sbAdmin.from('clients').insert({ name: `Beta ${RUN}`, members: [empA.id, mgrA.id] }).select()))[0]
+  created.clients.push(beta.id)
+  const team = await fn(sbEmpA, 'projects-status', { client: beta.id, date: day })
+  check('a member reads their client’s team status', !team.error && team.data.members.length === 2, JSON.stringify(team.data ?? team.error?.message))
+  check('status only: no hours or times', !!team.data?.members?.every((m) => Object.keys(m).sort().join() === 'month,status,user'))
+  check('a past day shows the counted status', team.data?.members?.find((m) => m.user === empA.id)?.status === 'present')
+  await denied('someone not on the client cannot read its status', () => fn(sbEmpB, 'projects-status', { client: beta.id }))
+  await denied('no status for a day that hasn’t come yet', () => fn(sbEmpA, 'projects-status', { client: beta.id, date: '2099-01-01' }))
+  const lv = await fn(sbEmpA, 'projects-leaves', { client: beta.id, from: '2026-11-01', to: '2026-11-30' })
+  check('a member reads their client’s approved leave, without type or reason', !lv.error && lv.data.some((r) => r.user === empA.id) && lv.data.every((r) => !('reason' in r) && !('leave_type' in r)), JSON.stringify(lv.data ?? lv.error?.message))
+  await denied('someone not on the client cannot read its leave', () => fn(sbEmpB, 'projects-leaves', { client: beta.id, from: '2026-11-01', to: '2026-11-30' }))
+
   // --- old time: only trusted writers (imports, demo data) may store segments over 30 days old ---
   const oldStart = Date.now() - 40 * 86400000
   const oldSeg = (user, n) => ({ id: `${segId.slice(0, 13)}o${n}`, user, state: 'active', started_at: new Date(oldStart).toISOString(), ended_at: new Date(oldStart + 5 * 60000).toISOString() })
