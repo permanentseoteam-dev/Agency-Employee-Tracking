@@ -24,6 +24,8 @@ interface Persisted {
   queue: QueuedSegment[]
   today: DayTotals | null
   autostartInitialized: boolean
+  /** The app version that last ran here, to announce an update once (updater.ts). */
+  lastVersion: string | null
 }
 
 let store: Store<Persisted> | null = null
@@ -31,7 +33,7 @@ let store: Store<Persisted> | null = null
 export function persisted(): Store<Persisted> {
   store ??= new Store<Persisted>({
     name: 'tracker',
-    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false }
+    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false, lastVersion: null }
   })
   return store
 }

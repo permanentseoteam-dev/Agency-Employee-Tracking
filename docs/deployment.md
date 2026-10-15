@@ -121,7 +121,7 @@ Releases go to the **Releases** page of this repo, `permanentseoteam-dev/Agency-
 2. In PowerShell in `F:\agency-tracker`, with `GH_TOKEN` set, run `npm run release`. It builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes the GitHub release `v<version>` with the installer, its `.blockmap` and `latest.yml` (the file the apps check). If GitHub shows it as a draft, publish it.
 3. Copy the new installer into `dist\staff-pc-setup` (delete the old one), so new PCs get the latest version.
 
-Installed apps check at start-up and every 6 hours, download quietly, and install the update when nobody is being tracked on that PC (outside shift hours, or with the screen locked) or when the app quits.
+Installed apps check at start-up and every 6 hours and download quietly. When nobody is being tracked on that PC (outside shift hours, or with the screen locked), the update installs at once. If someone is being tracked, a **Windows notification** appears: "PSEO Tracker <version> is ready. Click here to restart and update now…". Clicking it restarts into the new version in about 10 seconds and keeps the tracked time. If it's ignored, the update installs by itself the next time nobody is being tracked, or when the app quits. On the first start of the new version, a notification says "PSEO Tracker updated to <version>". (From the first version that has this onward; 0.1.3 updates quietly.)
 
 If there is no release to find, the check fails quietly in the app log (`updater: 404`) and nothing else happens.
 

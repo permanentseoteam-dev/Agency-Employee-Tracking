@@ -96,6 +96,7 @@ These use your real setup or a test PC, not the test company. Do them before a r
 | A-84 | Installer | Build with `npm run dist`; install on a test PC | Installs as "PSEO Tracker" with the new logo; desktop and Start menu shortcuts |  | – |
 | A-85 | Start with Windows | Sign out and in on the test PC as an employee, then as a manager | Starts hidden in the tray; the employee can't turn it off; a manager can | ★ | – |
 | A-86 | Automatic update | Install an older version, publish a newer test release | Downloads by itself; installs when nobody is tracked or at quit; restarts as the new version |  | – |
+| A-92 | Update notification | On a PC that is tracking, publish a newer release and wait for the download (or restart the app) | Windows notification "PSEO Tracker <version> is ready"; clicking it restarts into the new version within about 10 s; tracked time kept; the next start shows "PSEO Tracker updated to <version>" | ★ | – |
 | A-87 | Local data survives an update | Check %APPDATA%\PSEO Tracker before and after the update | Still signed in; queued time not lost; logs kept |  | – |
 | A-88 | Admin Quit | Tray → Quit and Profile menu → Quit PSEO Tracker | Closes cleanly; queued time is sent first |  | – |
 | A-89 | Uninstall | Uninstall from Windows Settings | The app is removed and nothing keeps running |  | – |
