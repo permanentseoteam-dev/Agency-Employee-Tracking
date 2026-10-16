@@ -13,9 +13,11 @@
 // - Afterwards it compares both sides: row counts, tracked seconds per person per day,
 //   attendance and payroll totals, password hashes and pictures. It prints no names or emails.
 // --delta (switch-over step 6.7, after the main copy): PCs that hadn't updated yet still send
-//   tracked time to PocketBase. Accounts are matched by email (new ones are made); new segments
-//   are added unless that person already has time recorded then; it can run again safely.
-//   Anything else new in PocketBase is only listed, to be looked at by hand.
+//   tracked time to PocketBase. Accounts are matched by email: sign-ups since the copy are made,
+//   a password changed since the copy comes along, other account changes (role, team, on/off)
+//   are listed, never overwritten, and accounts deleted in Supabase are not made again. New
+//   segments are added unless that person already has time recorded then; it can run again
+//   safely. Anything else new in PocketBase is only listed, to be looked at by hand.
 // Reads <TARGET>_URL, _SERVICE_ROLE_KEY, _DB_HOST, _DB_PASSWORD from .env.supabase.
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -69,6 +71,9 @@ const sql = postgres({
 const TABLES = ['teams', 'salaries', 'org_settings', 'leave_types', 'star_rules', 'holidays', 'events', 'activity_segments', 'presence',
   'attendance', 'leave_requests', 'payroll_runs', 'payroll_items', 'notifications', 'star_records', 'clients', 'project_events']
 // Rows the schema migration created; the PocketBase rows replace them.
+// (DEFAULT_ROWS below.) The demo company (scripts/demo-data) is never copied: these tag it.
+const DEMO_DOMAIN = '@demo.test'
+const DEMO_TEAMS = ['Demo Alpha', 'Demo Bravo']
 const DEFAULT_ROWS = ['org_settings', 'leave_types', 'star_rules']
 const PROFILE_FIELDS = ['full_name', 'avatar', 'designation', 'phone', 'team', 'role', 'joined_on', 'left_on', 'active', 'must_change_password',
   'tracking_consent_at', 'pending_approval', 'created', 'updated']
@@ -77,15 +82,43 @@ const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
 const log = (m) => console.log(m)
 /** --delta: what PocketBase got after the main copy (see the top of this file). */
 async function deltaCopy({ collections, rowsOf, users }) {
-  const known = new Map((await sql`select lower(email) email, id::text from profile_emails`).map((r) => [r.email, r.id]))
-  if (!known.size) throw new Error('the target has no accounts: run the main copy first (without --delta)')
+  // When the main copy ran: the first account it made (every copied account keeps its old id).
+  const [{ copiedAt }] = await sql`select min(u.created_at) as "copiedAt" from auth.users u join profiles p on p.id = u.id where p.legacy_id is not null`
+  if (!copiedAt) throw new Error('the target has no copied accounts: run the main copy first (without --delta)')
+  const cutoff = new Date(copiedAt).getTime()
+  const pbTime = (v) => Date.parse(String(v ?? '').replace(' ', 'T'))
+  const known = new Map(
+    (await sql`select lower(e.email) email, p.id::text, p.role, p.team, p.active, p.pending_approval, u.encrypted_password
+      from profile_emails e join profiles p on p.id = e.id join auth.users u on u.id = e.id`).map((r) => [r.email, r])
+  )
   const teams = new Set((await sql`select id from teams`).map((r) => r.id))
   const uuidOf = new Map()
   let made = 0
+  let passwords = 0
+  let deleted = 0
+  const differs = []
   for (const u of users) {
-    const id = known.get(String(u.email).toLowerCase())
-    if (id) {
-      uuidOf.set(u.id, id)
+    const there = known.get(String(u.email).toLowerCase())
+    if (there) {
+      uuidOf.set(u.id, there.id)
+      if (pbTime(u.updated) <= cutoff) continue // not changed in PocketBase since the copy
+      // A password changed on an old app since the copy comes along, so it keeps working.
+      if (u.password && u.password !== there.encrypted_password) {
+        await sql`update auth.users set encrypted_password = ${u.password}, updated_at = now() where id = ${there.id}`
+        await sql`update profiles set must_change_password = ${!!u.must_change_password} where id = ${there.id}`
+        passwords++
+      }
+      // Anything else may also have been changed in the app since: list it, never overwrite it.
+      const what = []
+      if ((u.role || 'employee') !== there.role) what.push('role')
+      if ((u.team || null) !== there.team) what.push('team')
+      if (!!u.active !== there.active || !!u.pending_approval !== there.pending_approval) what.push('switched on/off or approval')
+      if (what.length) differs.push(`${there.id} (${what.join(', ')})`)
+      continue
+    }
+    // In PocketBase since before the copy but no longer in Supabase: deleted there on purpose.
+    if (pbTime(u.created) <= cutoff) {
+      deleted++
       continue
     }
     const { data, error } = await auth.auth.admin.createUser({
@@ -104,7 +137,8 @@ async function deltaCopy({ collections, rowsOf, users }) {
       tracking_consent_at = ${u.tracking_consent_at || null}, legacy_id = ${u.id} where id = ${data.user.id}`
     made++
   }
-  log(`  accounts: ${uuidOf.size - made} matched by email, ${made} new`)
+  log(`  accounts: ${uuidOf.size - made} matched by email, ${made} new${passwords ? `, ${passwords} new password(s) carried over` : ''}${deleted ? `, ${deleted} deleted in Supabase left out` : ''}`)
+  if (differs.length) log(`  changed in PocketBase since the copy, check by hand in Organization (account ids): ${differs.join('; ')}`)
 
   const segments = rowsOf('activity_segments').filter((r) => uuidOf.has(r.user))
   const result = await sql.begin(async (tx) => {
@@ -126,7 +160,8 @@ async function deltaCopy({ collections, rowsOf, users }) {
   if (result.added) log('  attendance: the hourly job recounts the last 7 days; for older days use Attendance → Recompute')
 
   const newer = []
-  for (const t of TABLES.filter((t) => t !== 'activity_segments' && t !== 'presence' && collections.has(t))) {
+  // Attendance is recounted by the hourly job, presence is live and notifications are made by the server: not listed.
+  for (const t of TABLES.filter((t) => !['activity_segments', 'presence', 'attendance', 'notifications'].includes(t) && collections.has(t))) {
     const ids = rowsOf(t).map((r) => r.id)
     if (!ids.length) continue
     const there = new Set((await sql.unsafe(`select id from public.${t}`)).map((r) => r.id))
@@ -150,8 +185,35 @@ try {
   const collections = new Map(pb.prepare(`select id, name, type, fields from _collections`).all().map((c) => [c.name, { ...c, fields: JSON.parse(c.fields) }]))
   const usersCol = collections.get('users')
   if (!usersCol) throw new Error('no users collection: is this a PSEO Tracker database?')
-  const rowsOf = (name) => (collections.has(name) ? pb.prepare(`select * from "${name}"`).all() : [])
+  const rawRows = (name) => (collections.has(name) ? pb.prepare(`select * from "${name}"`).all() : [])
+  // Leave out the demo company: its accounts, its teams and every row that belongs to one of them
+  // (a "user" or "team" field pointing there). Other references to a demo person are just emptied.
+  const teamsCol = collections.get('teams')
+  const demoIds = new Set(rawRows('users').filter((u) => String(u.email ?? '').toLowerCase().endsWith(DEMO_DOMAIN)).map((u) => u.id))
+  const demoTeams = new Set(rawRows('teams').filter((t) => DEMO_TEAMS.includes(t.name)).map((t) => t.id))
+  const keep = (name, row) => {
+    if (name === 'users') return !demoIds.has(row.id)
+    if (name === 'teams') return !demoTeams.has(row.id)
+    for (const f of collections.get(name)?.fields ?? []) {
+      if (f.type !== 'relation' || (f.maxSelect ?? 1) > 1) continue
+      if (f.name === 'user' && f.collectionId === usersCol.id && demoIds.has(row[f.name])) return false
+      if (f.name === 'team' && teamsCol && f.collectionId === teamsCol.id && demoTeams.has(row[f.name])) return false
+    }
+    if (name === 'notifications' && row.payload) {
+      try {
+        const payload = JSON.parse(row.payload)
+        if (demoIds.has(payload.requester) || demoIds.has(payload.user)) return false
+      } catch {}
+    }
+    return true
+  }
+  const kept = new Map()
+  const rowsOf = (name) => {
+    if (!kept.has(name)) kept.set(name, rawRows(name).filter((r) => keep(name, r)))
+    return kept.get(name)
+  }
   const users = rowsOf('users')
+  if (demoIds.size || demoTeams.size) log(`  left out: the demo company (${demoIds.size} @demo.test accounts, ${demoTeams.size} demo teams, and their rows)`)
   log(`PocketBase copy: ${users.length} accounts, ${TABLES.filter((t) => collections.has(t)).length} tables (${from})`)
 
   // ---- the Supabase side must be empty ---------------------------------------------------------
@@ -316,10 +378,13 @@ try {
     check(`switched-off and waiting accounts can't sign in: ${banned}`, banned === wantBanned, banned === wantBanned ? '' : `expected ${wantBanned}`)
 
     // Tracked seconds per person per UTC day, both sides.
-    const pbSeconds = new Map(
-      pb.prepare(`select user, substr(started_at, 1, 10) day, state, round(sum((julianday(ended_at) - julianday(started_at)) * 86400)) s
-                  from activity_segments group by 1, 2, 3`).all().map((r) => [`${uuidOf.get(r.user)}|${r.day}|${r.state}`, Number(r.s)])
-    )
+    const pbSeconds = new Map()
+    for (const r of rowsOf('activity_segments')) {
+      const key = `${uuidOf.get(r.user)}|${String(r.started_at).slice(0, 10)}|${r.state}`
+      const seconds = (Date.parse(String(r.ended_at).replace(' ', 'T')) - Date.parse(String(r.started_at).replace(' ', 'T'))) / 1000
+      pbSeconds.set(key, (pbSeconds.get(key) ?? 0) + seconds)
+    }
+    for (const [k, v] of pbSeconds) pbSeconds.set(k, Math.round(v))
     const sbSeconds = new Map(
       (await sql`select "user"::text u, to_char(started_at at time zone 'UTC', 'YYYY-MM-DD') d, state, round(sum(extract(epoch from ended_at - started_at)))::int s
                  from activity_segments group by 1, 2, 3`).map((r) => [`${r.u}|${r.d}|${r.state}`, r.s])
@@ -327,7 +392,7 @@ try {
     const dayDiff = [...new Set([...pbSeconds.keys(), ...sbSeconds.keys()])].filter((k) => Math.abs((pbSeconds.get(k) ?? 0) - (sbSeconds.get(k) ?? 0)) > 1)
     check(`tracked time: ${pbSeconds.size} person-days match to the second`, dayDiff.length === 0, dayDiff.length ? `${dayDiff.length} differ` : '')
 
-    const pbAtt = pb.prepare(`select coalesce(sum(active_s), 0) a, coalesce(sum(idle_s), 0) i, count(*) n from attendance`).get()
+    const pbAtt = rowsOf('attendance').reduce((t, r) => ({ a: t.a + Number(r.active_s || 0), i: t.i + Number(r.idle_s || 0) }), { a: 0, i: 0 })
     const [sbAtt] = await sql`select coalesce(sum(active_s), 0)::bigint a, coalesce(sum(idle_s), 0)::bigint i from attendance`
     check(`attendance totals: ${Number(sbAtt.a)} s active, ${Number(sbAtt.i)} s idle`, Number(sbAtt.a) === Number(pbAtt.a) && Number(sbAtt.i) === Number(pbAtt.i))
     const pbNet = rowsOf('payroll_items').reduce((s, r) => s + Number(r.net), 0)
