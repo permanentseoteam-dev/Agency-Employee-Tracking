@@ -22,11 +22,11 @@ npx supabase@2.121.0 functions deploy register --no-verify-jwt --project-ref <re
 ```
 
 - The database URL is `postgresql://postgres.<ref>:<database password>@<pooler host>:5432/postgres`, from the project's *Connect* page (encode special characters in the password).
-- `register` is deployed on its own with `--no-verify-jwt`: "Create an account" is used before anyone is signed in.
+- `register` takes no sign-in token ("Create an account" is used before anyone is signed in): `supabase/config.toml` sets that for every deploy, and the separate `--no-verify-jwt` line repeats it to be safe.
 - `node scripts/supabase-secrets.mjs live|staging` stores the project URL and service key in the project's Vault, for the hourly attendance job. Needed once per project.
 - `scripts/build-edge-shared.mjs` copies the shared logic (leave, attendance, payroll, stars…) into the functions, so Vitest and the server use the same code.
 
-**Settings that live on supabase.com** (Authentication): "Allow new users to sign up" off (accounts come only from the app's functions) and "Confirm email" off (there is no email service).
+**Settings that live on supabase.com** (Authentication): "Allow new users to sign up" off (accounts come only from the app's functions), "Confirm email" off (there is no email service) and minimum password length 8 (the app's rule). `supabase/config.toml` holds the same values, but only for a local stack: the hosted project must be set by hand.
 
 **What protects the data:** row-level security on every table, guard triggers (segments, payroll locks, event times, star rules, profiles), and each function checks the caller's role. `npm run check:rules` proves it: 240 checks against staging.
 
@@ -52,9 +52,9 @@ From then on the app starts by itself (in the tray) at every Windows sign-in and
 
 1. Raise `"version"` in `package.json` and commit.
 2. `.env.production` must hold the **live** `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (`scripts/check-release-env.mjs` refuses anything else, including a service-role key).
-3. With `GH_TOKEN` set, `npm run release` builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes the GitHub release `v<version>` (installer, `.blockmap`, `latest.yml`). If GitHub shows a draft, publish it. `npm run dist` builds without publishing. Release builds go to `out-release\`, never `out\`.
+3. With `GH_TOKEN` set, `npm run release` builds `dist\PSEO-Tracker-Setup-<version>.exe` and publishes the GitHub release `v<version>` (installer, `.blockmap`, `latest.yml`). It is **public at once** (`releaseType: release` in `electron-builder.yml`), and every installed app picks it up. To hold a release back, run `npm run dist` (builds without publishing) and upload the three files to a draft release by hand. Release builds go to `out-release\`, never `out\`.
 
-Installed apps check at start-up and every 6 hours and download quietly. With nobody being tracked the update installs at once; otherwise a Windows notification offers "restart and update now", and it installs by itself the next time nobody is tracked or the app quits.
+Installed apps check at start-up and **every 5 minutes** and download quietly. As soon as an update is downloaded it installs, even while someone is being tracked: a Windows notification says "Updating PSEO Tracker to <version>", and about 5 seconds later the app quits (which saves the tracked time) and restarts into the new version, with its window open or hidden as it was. A release reaches every running PC within about 5 minutes. (From 0.1.9 on; older versions check every 6 hours and ask before installing while someone is tracked.)
 
 ---
 
@@ -78,7 +78,7 @@ node scripts/restore-supabase.mjs E:\PSEOTrackerBackups\supabase\live-<date>-<ti
 It prints the row counts; sign in to a staging test build to look around. Afterwards `npm run test:env -- --stop` puts staging back to its default rows.
 
 **Restoring for real** (the live project is lost or damaged):
-1. Create a new free project, push the schema and functions to it (Part A), and store its keys in `.env.supabase` as `LIVE_*`.
+1. Create a new free project and store its keys in `.env.supabase` as `LIVE_*` (the legacy `eyJ…` keys). Then, as in Part A: `db push`, `node scripts/build-edge-shared.mjs`, `functions deploy`, `node scripts/supabase-secrets.mjs live`, and the Auth settings (sign-ups off, "Confirm email" off, minimum password length 8).
 2. `node scripts/restore-supabase.mjs E:\PSEOTrackerBackups\supabase\live-<date>-<time> --to live` (it refuses a project that already has data).
 3. If the project's address changed, release an update with the new `.env.production` (Part C).
 

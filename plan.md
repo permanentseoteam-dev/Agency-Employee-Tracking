@@ -100,7 +100,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 - **Who is tracked:** everyone with an account (employees, managers and admins).
 - **Tracking notice:** on first login, after the password change, a one-time notice explains what is tracked: active/idle time only, no screenshots or app names. Tracking starts once the user accepts it. The acceptance time is stored in `users.tracking_consent_at`.
 - **One tracker per person:** `app.requestSingleInstanceLock()` stops a second copy on the same PC. The server rejects segments that overlap an existing segment for the same user, which covers two PCs.
-- **Server validation** (`segments.pb.js`, on create). A segment is rejected if:
+- **Server validation** (the `guard_segment` trigger, on insert). A segment is rejected if:
   - `ended_at` is not after `started_at`
   - it lasts longer than 6 minutes
   - it ends more than 2 minutes after the server's current time (a PC clock set forward)
@@ -114,11 +114,11 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 - **Time format everywhere:** `Xh Ym`, for example `5h 23m`.
 - **Screens:**
   - **My Stats** (every employee): today's active and idle time, a status badge, and this week's totals.
-  - **Team Live Board** (manager/admin; a manager sees only the teams they manage, an admin sees everyone): one card or row per employee showing Active / Idle / Offline / On leave and today's active and idle time. It updates in realtime through a PocketBase subscription on `presence`. An employee counts as Offline when no heartbeat has arrived for over 2 minutes.
-  - **Reports:** daily, weekly and monthly active and idle hours per employee. Filter by team, employee and date range. Export to CSV. Totals come from the `reports.pb.js` route, which limits a manager to their own teams.
+  - **Team Live Board** (manager/admin; a manager sees only the teams they manage, an admin sees everyone): one card or row per employee showing Active / Idle / Offline / On leave and today's active and idle time. It updates live through a Supabase Realtime subscription on `presence`. An employee counts as Offline when no heartbeat has arrived for over 2 minutes.
+  - **Reports:** daily, weekly and monthly active and idle hours per employee. Filter by team, employee and date range. Export to CSV. Totals come from the `reports-activity` function, which limits a manager to their own teams.
 
 ### 4.2 Attendance
-- Marked automatically by the attendance hook. It runs every hour as a PocketBase cron job (`5 * * * *`) and recounts the 7 finished days, so a server that was off at night catches up. It can also be run on demand with `POST /api/attendance/recompute`.
+- Marked automatically by the attendance hook. It runs every hour as a pg_cron job (`5 * * * *`) calling the `attendance-recompute` function, which recounts the 7 finished days. Admins can also recount on demand (the same function).
 - No record is created for days before `joined_on` or after `left_on`.
 - **Status order (first match wins):**
   1. Holiday or weekend
@@ -134,7 +134,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 - **A manager's own leave** goes to the admins. A manager can never approve their own request.
 - **Days:** working days in the range are counted when the request is made and stored in `days`, which is 0.5 for a half day.
 - **Balances:** yearly quota per leave type minus approved days used, from the `leave_balances` view collection.
-- Each request and each decision creates an in-app notification through `notifications.pb.js`.
+- Each request and each decision creates an in-app notification from the leave functions (`leave-request`, `leave-update`).
 - **Screens:** Apply Leave, My Leaves, Approvals queue (manager), Balances.
 
 ### 4.4 Rules
@@ -152,7 +152,7 @@ These settings live in a single `org_settings` record:
 - **Deductions** = (absent days + unpaid-leave days + 0.5 × half days) × per-day rate + (late count × late penalty).
 - **Net** = monthly salary − deductions + adjustment.
 - **Adjustment (admin only):** each draft line has `adjustment_pkr` (plus or minus) and a `note`. The admin decides the final pay for anyone who joined or left mid-month, or for any other exception, for example −20,000 with the note "Left on the 18th". The app doesn't pro-rate automatically.
-- **Flow:** the admin picks a month. `POST /api/payroll/run` creates **draft** items. The admin reviews each employee's breakdown, then **finalizes**. A finalized run is locked: a hook rejects any change to it or its items.
+- **Flow:** the admin picks a month. The `payroll-run` function creates **draft** items. The admin reviews each employee's breakdown, then **finalizes**. A finalized run is locked: a guard trigger rejects any change to it or its items.
 - **Screens:** Salary Setup, Payroll Runs, Payroll Detail (admins). Managers and employees see Finance → My pay: their own salary and their lines in finalized months, read-only.
 
 ### 4.6 Working Calendar
@@ -166,13 +166,13 @@ These settings live in a single `org_settings` record:
 - The admin creates clients and picks their people from any team; one person can be on several clients. Archiving hides a client from its people.
 - **Team tab:** each person's status for a day. Past days show the counted attendance. Today is live: Present or Late once they start, "Not in yet" until the shift ends (then Absent), and Half day only once the shift is over. Next to it, this month's totals (P, L, ½, A, LV).
 - **Calendar tab:** a calendar per client with its meetings and deadlines, company holidays, and its people's approved leave (no leave type). Everyone on the client, whatever their role, can add, change and delete its events.
-- Teammates' status and leave come from `GET /api/projects/status` and `GET /api/projects/leaves` (`projects.pb.js`), for members and admins only, as statuses without hours, because attendance and leave records stay own-or-staff.
+- Teammates' status and leave come from the `projects-status` and `projects-leaves` functions, for members and admins only, as statuses without hours, because attendance and leave records stay own-or-staff.
 
 ### 4.7 Organization
 - **Teams:** each team has one manager and many employees. Each employee belongs to exactly one team.
 - **Employees:** a list and a detail page with profile, team, designation, salary, attendance and leave summary.
-- **Add employee:** the admin enters the name, email, team and a temporary password. `POST /api/org/invite` creates the account with `must_change_password = true`, and the admin shares the password with the employee. On first login the app makes the employee choose a new password. No email service is needed. SMTP can be added later for "forgot password".
-- **Forgot password:** the admin clicks **Reset password** on the employee's page. `POST /api/org/reset-password` sets a new temporary password and `must_change_password = true`, and the admin shares the new password.
+- **Add employee:** the admin enters the name, email, team and a temporary password. The `org` function (invite) creates the account with `must_change_password = true`, and the admin shares the password with the employee. On first login the app makes the employee choose a new password. No email service is needed. SMTP can be added later for "forgot password".
+- **Forgot password:** the admin clicks **Reset password** on the employee's page. The `org` function (reset-password) sets a new temporary password and `must_change_password = true`, and the admin shares the new password.
 - **Offboarding:** the admin sets `active = false` and `left_on`. An inactive user can't log in (users auth rule `active = true`). Their history stays for reports and payroll.
 
 ### 4.8 Profile icon & role switcher (top bar)
@@ -187,7 +187,7 @@ These settings live in a single `org_settings` record:
 - All role logic lives in **`src/lib/roles.ts`**, so real permissions can be added there later without touching screens.
 
 ### 4.9 Notifications
-- A bell icon in the top bar with an unread count, updated through a PocketBase realtime subscription on `notifications`.
+- A bell icon in the top bar with an unread count, updated through a Supabase Realtime subscription on `notifications`.
 - It covers new leave requests (sent to the manager) and approval or rejection decisions (sent to the employee).
 
 ---
@@ -428,7 +428,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - staff PCs: the `dist\staff-pc-setup` kit (`scripts/staff-pc/`) installs Tailscale with a tagged auth key, checks the server, and installs the app. Still to do by you: Part B of docs/deployment.md (disable key expiry for the server, the access policy, the auth key), the first staff PC, and the releases repo
 - **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/pseo-tracker-releases`), backups copied to the E: drive.
   - `electron-builder.yml`: per-user one-click NSIS installer with desktop and Start menu shortcuts, app icon (`scripts/make-icon.mjs` → `build/`), publish to the releases repo. `npm run dist` builds, `npm run release` publishes (needs `GH_TOKEN`); `scripts/check-release-env.mjs` refuses a build whose `VITE_PB_URL` is localhost, a raw IP or unset (`.env.production`)
-  - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version
+  - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version. **Since 0.1.9 (2026-10-16):** checks every 5 minutes and installs as soon as an update is downloaded, even while tracking (notification, quit saves the time, restart in about 10 s, window as it was)
   - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (daily copy of PocketBase's 13:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)
   - verified on this PC: the packaged app signs in, tracks, reaches the server and registers start-with-Windows (locked for employees); a 0.1.0 install found, downloaded and installed 0.1.1 by itself and restarted as 0.1.1; backup → copy to the backup drive → restore drill passed. Test installs and startup entries were removed afterwards
   - **still to do by you before go-live:** create the releases repo and a `GH_TOKEN`, set up the office PC with docs/deployment.md, then tick the go-live checklist at the end of that guide (clean-PC install, reboot autostart, data on the production server, a published update, a restore from E:)
