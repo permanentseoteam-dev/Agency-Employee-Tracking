@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/notifications.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/notifications.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/notifications.js
+// shared/logic/notifications.js
 var require_notifications = __commonJS({
-  "server/pb_hooks/lib/notifications.js"(exports, module) {
+  "shared/logic/notifications.js"(exports, module) {
     var DECISIONS = ["approved", "rejected"];
     function unique(ids) {
       const out = [];

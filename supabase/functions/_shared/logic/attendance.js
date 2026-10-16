@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/attendance.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/attendance.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/attendance.js
+// shared/logic/attendance.js
 var require_attendance = __commonJS({
-  "server/pb_hooks/lib/attendance.js"(exports, module) {
+  "shared/logic/attendance.js"(exports, module) {
     var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
     var DAY_MS = 864e5;
     var MAX_RANGE_DAYS = 31;

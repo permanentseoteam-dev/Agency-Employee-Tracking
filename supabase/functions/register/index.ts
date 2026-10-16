@@ -8,10 +8,14 @@ import { badRequest, body, HttpError, json, serve, sql } from '../_shared/core.t
 import { authAdmin, createAccount, emailTaken } from '../_shared/accounts.ts'
 
 serve(async (req) => {
-  // The visitor's address: the first X-Forwarded-For entry, which Supabase's edge sets.
+  // The visitor's address: the first X-Forwarded-For entry. Supabase's edge puts the real address
+  // first, so a forged header doesn't get round the limit (tried on staging: the 6th request was refused).
   const ip = (req.headers.get('x-forwarded-for') ?? '').split(',')[0].trim() || 'unknown'
   const [recent] = await sql`select count(*)::int as n from register_attempts where ip = ${ip} and at > now() - interval '1 minute'`
   if (recent.n >= 5) throw new HttpError(429, 'Too many sign-ups from here. Wait a minute and try again.')
+  // And at most 60 attempts an hour from everyone together, so many addresses can't flood the admins.
+  const [all] = await sql`select count(*)::int as n from register_attempts where at > now() - interval '1 hour'`
+  if (all.n >= 60) throw new HttpError(429, 'Too many sign-ups right now. Try again in an hour, or ask your admin to add you.')
   await sql`insert into register_attempts (ip) values (${ip})`
   await sql`delete from register_attempts where at < now() - interval '1 day'`
 

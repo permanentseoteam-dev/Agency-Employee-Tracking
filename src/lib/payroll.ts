@@ -1,5 +1,5 @@
 // Pure helpers for the finance screens. The pay itself is calculated on the server
-// (server/pb_hooks/lib/payroll.js); these explain and format the stored figures.
+// (shared/logic/payroll.js); these explain and format the stored figures.
 import { toCsv } from './csv'
 
 export interface PayrollRun {

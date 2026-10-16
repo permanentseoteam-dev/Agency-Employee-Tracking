@@ -8,13 +8,16 @@ const root = import.meta.dirname
 
 // Production-only Content-Security-Policy. Dev is left without it because the
 // React refresh preamble is an inline script that a strict CSP would block.
-function cspPlugin(pbUrl: string): Plugin {
+// The app talks only to its Supabase project: HTTPS for data, functions and pictures, and a
+// WebSocket (wss) for live updates.
+function cspPlugin(serverUrl: string): Plugin {
+  const ws = serverUrl.replace(/^http/, 'ws')
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    `img-src 'self' data: blob: ${pbUrl}`,
-    `connect-src 'self' ${pbUrl}`,
+    `img-src 'self' data: blob: ${serverUrl}`,
+    `connect-src 'self' ${serverUrl} ${ws}`,
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'none'",
@@ -33,7 +36,7 @@ function cspPlugin(pbUrl: string): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, root, 'VITE_')
-  const pbUrl = env.VITE_PB_URL ?? 'http://127.0.0.1:8090'
+  const serverUrl = env.VITE_SUPABASE_URL ?? ''
 
   return {
     main: {
@@ -58,7 +61,7 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: { '@': resolve(root, 'src') }
       },
-      plugins: [react(), tailwindcss(), cspPlugin(pbUrl)],
+      plugins: [react(), tailwindcss(), cspPlugin(serverUrl)],
       build: {
         minify: true,
         rollupOptions: {

@@ -3,11 +3,14 @@
 // expected allow/deny. Route checks (leave, payroll run, accounts, projects status…) join in
 // step 3, once the Edge Functions exist.
 // Usage: node scripts/check-rules-supabase.mjs   (reads STAGING_* from .env.supabase; never live)
-// It creates its own throwaway accounts and rows and deletes them again at the end.
+// It starts by resetting staging to its default rows (refused while npm run test:env is open),
+// creates its own throwaway accounts and rows, and deletes them again at the end.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import { resetStaging } from './test-env/server.mjs'
+import { readState } from './test-env/state.mjs'
 
 const env = Object.fromEntries(
   readFileSync(resolve(import.meta.dirname, '..', '.env.supabase'), 'utf8')
@@ -66,6 +69,12 @@ async function as(user) {
 }
 const at = (minutesAgo) => new Date(Date.now() - minutesAgo * 60000).toISOString()
 const seg = (user, minute) => ({ user, state: 'active', started_at: at(60 - minute), ended_at: at(55 - minute) })
+
+// A run that was stopped half-way leaves its rows behind (same holiday date, same payroll
+// month), and those make the next run fail. Start every run from staging's default rows.
+if (readState()) throw new Error('a test environment (npm run test:env) is using staging: stop it first (Ctrl+C or --stop)')
+await resetStaging()
+console.log('staging reset to its default rows')
 
 try {
   // --- fixtures ---------------------------------------------------------------
@@ -354,6 +363,56 @@ try {
   const adminReq = await apply(sbAdmin, { start_date: D(16), end_date: D(16) })
   await denied('a manager cannot decide the admin’s own leave', () => decide(sbMgrA, adminReq.data.id, 'approved'))
   await allowed('the admin cancels their own pending request', () => decide(sbAdmin, adminReq.data.id, 'cancelled'))
+  const daysReq = await apply(sbEmpA, { start_date: D(42), end_date: D(43) }) // clear of the requests above
+  const daysTry = await decide(sbMgrA, daysReq.data?.id, 'approved', { days: 0.5 })
+  check('a manager cannot change the days while deciding', !daysTry.error && Number(daysTry.data?.days) === 2, JSON.stringify(daysTry.data?.days ?? daysTry.error?.message))
+
+  // A manager placed in another manager's team: their leave still goes to an admin.
+  await must(root.from('profiles').update({ team: teamA.id }).eq('id', mgrB.id))
+  const mgrBReq = await apply(await as(mgrB), { start_date: D(17), end_date: D(17) })
+  await denied('a manager in another manager’s team still goes to the admins', () => decide(sbMgrA, mgrBReq.data?.id, 'approved'))
+  await allowed('an admin decides that manager’s request', () => decide(sbAdmin, mgrBReq.data?.id, 'approved'))
+  await must(root.from('profiles').update({ team: teamB.id }).eq('id', mgrB.id))
+
+  // --- leave per month (Rules → Leaves per month) ---------------------------------------------
+  const refusal = async (p) => (await p()).error?.message ?? ''
+  const dayOf = (d) => d.toISOString().slice(0, 10)
+  const firstMonday = (y, m) => { let d = new Date(Date.UTC(y, m, 1)); while (d.getUTCDay() !== 1) d = new Date(d.getTime() + 86400000); return d }
+  const decMon = firstMonday(2097, 11)
+  const dec = (n) => dayOf(new Date(decMon.getTime() + n * 86400000))
+  const febMon = firstMonday(2098, 1)
+  const workdayFrom = (key, step) => { let d = new Date(`${key}T00:00:00Z`); while ([0, 6].includes(d.getUTCDay())) d = new Date(d.getTime() + step * 86400000); return dayOf(d) }
+  await denied('a manager cannot change the monthly leave limits', () =>
+    sbMgrA.from('org_settings').update({ monthly_full_leaves: 9 }).eq('id', settings[0].id).select())
+  const febRequest = await apply(sbEmpB, { start_date: dayOf(febMon), end_date: dayOf(new Date(febMon.getTime() + 2 * 86400000)) })
+  check('with no limit, 3 days in a month are fine', Number(febRequest.data?.days) === 3, JSON.stringify(febRequest.data?.days ?? febRequest.error?.message))
+  await allowed('an admin sets the limits: 2 full days and 1 half day a month', () =>
+    sbAdmin.from('org_settings').update({ monthly_full_leaves: 2, monthly_half_leaves: 1 }).eq('id', settings[0].id).select())
+  // The second week of December, so a request from late November into early December overlaps nothing.
+  await allowed('2 full days in December fit', () => apply(sbEmpB, { start_date: dec(7), end_date: dec(8) }))
+  const third = await refusal(() => apply(sbEmpB, { start_date: dec(10), end_date: dec(10) }))
+  check('a 3rd full day in December is refused', third === 'No full-day leave left in December (limit 2 a month).', third)
+  await allowed('a half day (short leave) has its own limit', () => apply(sbEmpB, { start_date: dec(11), end_date: dec(11), half_day: true }))
+  await denied('a 2nd half day in December is refused', () => apply(sbEmpB, { start_date: dec(14), end_date: dec(14), half_day: true }))
+  const across = await refusal(() => apply(sbEmpB, { start_date: workdayFrom('2097-11-30', -1), end_date: workdayFrom('2097-12-01', 1) }))
+  check('a request into a full month is refused for that month', across.includes('in December'), across)
+  const lateApproval = await refusal(() => decide(sbAdmin, febRequest.data?.id, 'approved'))
+  check('approving leave over the limit set since is refused', lateApproval.includes('left for them in February'), lateApproval)
+  await allowed('0 means no limit again', () =>
+    sbAdmin.from('org_settings').update({ monthly_full_leaves: 0, monthly_half_leaves: 0 }).eq('id', settings[0].id).select())
+  await allowed('…and the same approval then goes through', () => decide(sbAdmin, febRequest.data?.id, 'approved'))
+
+  // --- profile pictures: images only, 5 MB at most, own folder, approved accounts only -------------
+  const png = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))
+  const upload = (client, path, body, contentType = 'image/png') => client.storage.from('avatars').upload(path, body, { contentType, upsert: true })
+  await allowed('an approved person uploads a PNG to their own folder', () => upload(sbEmpA, `${empA.id}/check.png`, png))
+  await denied('nobody uploads into someone else’s folder', () => upload(sbEmpA, `${empB.id}/check.png`, png))
+  await denied('a file that is not an image is refused', () => upload(sbEmpA, `${empA.id}/check.txt`, new TextEncoder().encode('hello'), 'text/plain'))
+  await denied('a picture over 5 MB is refused', () => upload(sbEmpA, `${empA.id}/big.png`, new Uint8Array(5 * 1024 * 1024 + 1), 'image/png'))
+  const waiting = await mkUser('waiting', 'employee', { pending_approval: true })
+  await must(root.from('profiles').update({ active: false }).eq('id', waiting.id))
+  await denied('an account that signed in but is not approved cannot upload', async () => upload(await as(waiting), `${waiting.id}/check.png`, png))
+  await root.storage.from('avatars').remove([`${empA.id}/check.png`, `${waiting.id}/check.png`])
 
   const past = await apply(sbEmpA, { leave_type: sick.id, start_date: day, end_date: day })
   await allowed('approving past leave', () => decide(sbMgrA, past.data?.id, 'approved'))

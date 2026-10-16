@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
-import { pb } from '@/lib/pb'
+import { call } from '@/lib/db'
 import { errorMessage } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
@@ -29,10 +29,7 @@ export function Register({ onSignIn }: { onSignIn: () => void }) {
     if (password !== confirm) return setError('The two passwords are different.')
     setBusy(true)
     try {
-      await pb.send('/api/register', {
-        method: 'POST',
-        body: { full_name: fullName, email, phone, password }
-      })
+      await call('register', { full_name: fullName, email, phone, password })
     } catch (err) {
       const status = (err as { status?: number }).status
       setError(

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { breakdown, formatAdjustment, formatPkr, midMonth, payrollCsv, runTotals, type PayrollItem } from './payroll'
 
-// The hand calculation from server/pb_hooks/lib/payroll.test.mjs, as stored (late days cost nothing).
+// The hand calculation from shared/logic/payroll.test.mjs, as stored (late days cost nothing).
 const item: PayrollItem = {
   id: 'i1',
   run: 'r1',

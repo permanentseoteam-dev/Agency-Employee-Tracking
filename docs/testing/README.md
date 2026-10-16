@@ -10,15 +10,15 @@ The plans live in the **PSEO Tracker test plans** Claude Doc, where each test ha
 
 ## Test setup
 
-All testing runs on a separate test company in a throwaway database on port 8099. Your real database (port 8090, `server\pb_data`) and the app on your desktop are never touched.
+All testing runs on a separate test company in the **staging** Supabase project (the `STAGING_*` keys in `.env.supabase`). The live project and the app on your desktop are never touched. Staging is for tests only: every start and stop puts it back to its default rows.
 
 | Step | Command (in `F:\agency-tracker`) | What happens |
 | --- | --- | --- |
-| 1. Start | `npm run test:env` | Starts the test database, fills it with the test company, builds the test app (`out-test/`) if the code changed, prints the accounts. Keep the window open. |
+| 1. Start | `npm run test:env` | Fills staging with the test company, builds the test app (`out-test/`, pointed at staging) if the code changed, prints the accounts. Keep the window open. |
 | 2. Open the app as someone | `npm run test:app -- --as asma@test.local` | Opens a test copy of the app already signed in. Run it again with other emails to test several roles side by side. |
-| 3. Stop | **Ctrl+C** in the test:env window, or `npm run test:env -- --stop` | Closes the test apps and the test database and deletes all test data. |
+| 3. Stop | **Ctrl+C** in the test:env window, or `npm run test:env -- --stop` | Closes the test apps and puts staging back to its default rows (test accounts and data deleted). |
 
-The test dashboard is at `http://127.0.0.1:8099/_/` (superuser `root@test.local`, password `Test-pass-123`).
+The staging dashboard is on supabase.com (your Supabase login). `npm run check:rules` (the 240 permission checks) also uses staging and resets it first, so don't run it while `test:env` is open: it refuses to.
 
 ## Test accounts
 

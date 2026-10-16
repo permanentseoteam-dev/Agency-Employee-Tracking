@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { call, must, PROFILE_WITH_TEAM, selectAll, supabase, toEmployee } from '@/lib/db'
 import type { PayrollItem, PayrollRun } from '@/lib/payroll'
 import type { Employee, Salary } from '@/features/org/api'
 
@@ -25,8 +25,8 @@ export function usePayrollRuns() {
     queryKey: financeKeys.runs,
     queryFn: async (): Promise<RunSummary[]> => {
       const [runs, items] = await Promise.all([
-        pb.collection('payroll_runs').getFullList<PayrollRun>({ sort: '-month' }),
-        pb.collection('payroll_items').getFullList<Pick<PayrollItem, 'run' | 'net'>>({ fields: 'run,net' })
+        supabase.from('payroll_runs').select('*').order('month', { ascending: false }).then((r) => must(r) as PayrollRun[]),
+        selectAll<Pick<PayrollItem, 'run' | 'net'>>(() => supabase.from('payroll_items').select('run, net').order('id'))
       ])
       return runs.map((r) => {
         const mine = items.filter((i) => i.run === r.id)
@@ -37,14 +37,15 @@ export function usePayrollRuns() {
 }
 
 export function usePayrollRun(id: string) {
-  return useQuery({ queryKey: financeKeys.run(id), queryFn: () => pb.collection('payroll_runs').getOne<PayrollRun>(id) })
+  return useQuery({ queryKey: financeKeys.run(id), queryFn: async () => must(await supabase.from('payroll_runs').select('*').eq('id', id).single()) as PayrollRun })
 }
 
 export function usePayrollLines(runId: string) {
   return useQuery({
     queryKey: financeKeys.items(runId),
     queryFn: async () => {
-      const lines = await pb.collection('payroll_items').getFullList<PayrollLine>({ filter: pb.filter('run = {:r}', { r: runId }), expand: 'user' })
+      const rows = must(await supabase.from('payroll_items').select('*, user_row:profiles!payroll_items_user_fkey(*)').eq('run', runId)) as (PayrollItem & { user_row?: Record<string, unknown> | null })[]
+      const lines: PayrollLine[] = rows.map(({ user_row, ...l }) => ({ ...l, expand: user_row ? { user: toEmployee<Employee>(user_row) } : {} }))
       return lines.sort((a, b) => (a.expand?.user?.full_name ?? '').localeCompare(b.expand?.user?.full_name ?? ''))
     }
   })
@@ -64,7 +65,7 @@ export interface RunResult {
 export function useRunPayroll() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (month: string) => pb.send<RunResult>('/api/payroll/run', { method: 'POST', body: { month } }),
+    mutationFn: (month: string) => call<RunResult>('payroll-run', { month }),
     onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all })
   })
 }
@@ -72,8 +73,8 @@ export function useRunPayroll() {
 export function useUpdateLine() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, adjustment, note }: { id: string; adjustment: number; note: string }) =>
-      pb.collection('payroll_items').update<PayrollItem>(id, { adjustment_pkr: adjustment, note }),
+    mutationFn: async ({ id, adjustment, note }: { id: string; adjustment: number; note: string }) =>
+      must(await supabase.from('payroll_items').update({ adjustment_pkr: adjustment, note }).eq('id', id).select().single()) as PayrollItem,
     onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all })
   })
 }
@@ -81,7 +82,7 @@ export function useUpdateLine() {
 export function useFinalizeRun() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('payroll_runs').update<PayrollRun>(id, { status: 'finalized' }),
+    mutationFn: async (id: string) => must(await supabase.from('payroll_runs').update({ status: 'finalized' }).eq('id', id).select().single()) as PayrollRun,
     onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all })
   })
 }
@@ -89,7 +90,7 @@ export function useFinalizeRun() {
 export function useDeleteRun() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('payroll_runs').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('payroll_runs').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: financeKeys.all })
   })
 }
@@ -101,15 +102,19 @@ export function useMyPay(userId: string) {
   return useQuery({
     queryKey: financeKeys.mine(userId),
     queryFn: async () => {
-      const [salaries, lines] = await Promise.all([
-        pb.collection('salaries').getList<Salary>(1, 1, { filter: pb.filter('user = {:u}', { u: userId }) }),
-        pb.collection('payroll_items').getFullList<MyPayLine>({
-          filter: pb.filter('user = {:u} && run.status = "finalized"', { u: userId }),
-          expand: 'run,user'
-        })
+      const [salary, rows] = await Promise.all([
+        supabase.from('salaries').select('*').eq('user', userId).maybeSingle(),
+        supabase
+          .from('payroll_items')
+          .select('*, run_row:payroll_runs!inner(*), user_row:profiles!payroll_items_user_fkey(*)')
+          .eq('user', userId)
+          .eq('run_row.status', 'finalized')
       ])
+      const lines: MyPayLine[] = (must(rows) as (PayrollItem & { run_row: PayrollRun; user_row?: Record<string, unknown> | null })[]).map(
+        ({ run_row, user_row, ...l }) => ({ ...l, expand: { run: run_row, ...(user_row ? { user: toEmployee<Employee>(user_row) } : {}) } })
+      )
       const month = (l: MyPayLine) => l.expand?.run?.month ?? ''
-      return { salary: salaries.items[0] ?? null, lines: lines.sort((a, b) => month(b).localeCompare(month(a))) }
+      return { salary: (must(salary) as Salary | null) ?? null, lines: lines.sort((a, b) => month(b).localeCompare(month(a))) }
     }
   })
 }
@@ -119,10 +124,11 @@ export function useSalaryTable() {
   return useQuery({
     queryKey: financeKeys.salaries,
     queryFn: async () => {
-      const [people, salaries] = await Promise.all([
-        pb.collection('users').getFullList<Employee>({ sort: 'full_name', expand: 'team' }),
-        pb.collection('salaries').getFullList<Salary>()
+      const [peopleRows, salaries] = await Promise.all([
+        supabase.from('profiles').select(PROFILE_WITH_TEAM).order('full_name').then((r) => must(r)),
+        supabase.from('salaries').select('*').then((r) => must(r) as Salary[])
       ])
+      const people = peopleRows.map((r) => toEmployee<Employee>(r))
       const byUser = new Map(salaries.map((s) => [s.user, s]))
       return people.map((p) => ({ person: p, salary: byUser.get(p.id) ?? null }))
     }
@@ -132,10 +138,10 @@ export function useSalaryTable() {
 export function useSaveSalaryAmount() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ userId, salary, amount }: { userId: string; salary: Salary | null; amount: number }) =>
+    mutationFn: async ({ userId, salary, amount }: { userId: string; salary: Salary | null; amount: number }) =>
       salary
-        ? pb.collection('salaries').update(salary.id, { monthly_salary_pkr: amount })
-        : pb.collection('salaries').create({ user: userId, monthly_salary_pkr: amount }),
+        ? must(await supabase.from('salaries').update({ monthly_salary_pkr: amount }).eq('id', salary.id).select().single())
+        : must(await supabase.from('salaries').insert({ user: userId, monthly_salary_pkr: amount }).select().single()),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: financeKeys.salaries })
       void qc.invalidateQueries({ queryKey: ['org'] })

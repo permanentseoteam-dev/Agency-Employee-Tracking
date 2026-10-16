@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { call, must, PROFILE_WITH_TEAM, selectAll, supabase, toEmployee } from '@/lib/db'
 import type { AttendanceRecord } from '@/lib/attendance'
 import { useSession } from '@/stores/session'
 import type { Employee } from '@/features/org/api'
@@ -15,12 +15,11 @@ export function useMonthAttendance(month: string, userId?: string) {
   return useQuery({
     queryKey: attendanceKeys.month(month, userId ?? 'visible'),
     queryFn: () =>
-      pb.collection('attendance').getFullList<AttendanceRecord>({
-        filter: userId
-          ? pb.filter('user = {:u} && date >= {:from} && date <= {:to}', { u: userId, from: `${month}-01`, to: `${month}-31` })
-          : pb.filter('date >= {:from} && date <= {:to}', { from: `${month}-01`, to: `${month}-31` }),
-        sort: 'date'
-      })
+      selectAll<AttendanceRecord>(() => {
+        let q = supabase.from('attendance').select('*').gte('date', `${month}-01`).lte('date', `${month}-31`)
+        if (userId) q = q.eq('user', userId)
+        return q.order('date').order('id')
+      }).then((rows) => rows.map((r) => ({ ...r, first_activity_at: r.first_activity_at ?? '', last_activity_at: r.last_activity_at ?? '' })))
   })
 }
 
@@ -34,12 +33,17 @@ export function useAttendancePeople(month: string) {
     queryKey: attendanceKeys.people(month, user?.id ?? ''),
     enabled: !!user,
     queryFn: async () => {
-      const employed = pb.filter('(active = true || left_on >= {:start}) && (joined_on = "" || joined_on <= {:end})', {
-        start: `${month}-01`,
-        end: `${month}-31`
-      })
-      const scope = user!.role === 'admin' ? '' : ` && ${pb.filter('team.manager = {:me}', { me: user!.id })}`
-      return pb.collection('users').getFullList<Employee>({ filter: employed + scope, sort: 'full_name', expand: 'team' })
+      const start = `${month}-01`
+      const end = `${month}-31`
+      let q = supabase.from('profiles').select(PROFILE_WITH_TEAM).order('full_name')
+      if (user!.role !== 'admin') {
+        const teams = must(await supabase.from('teams').select('id').eq('manager', user!.id)) as { id: string }[]
+        q = q.in('team', teams.map((t) => t.id))
+      }
+      // Employed during the month: still active or left on/after its first day, and joined by its last.
+      return must(await q)
+        .map((r) => toEmployee<Employee>(r))
+        .filter((p) => (p.active || (p.left_on !== '' && p.left_on >= start)) && (p.joined_on === '' || p.joined_on <= end))
     }
   })
 }
@@ -55,8 +59,7 @@ export interface RecomputeResult {
 export function useRecompute() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (range: { from: string; to: string }) =>
-      pb.send<RecomputeResult>('/api/attendance/recompute', { method: 'POST', body: range }),
+    mutationFn: (range: { from: string; to: string }) => call<RecomputeResult>('attendance-recompute', range),
     onSuccess: () => qc.invalidateQueries({ queryKey: attendanceKeys.all })
   })
 }

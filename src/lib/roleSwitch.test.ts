@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { switchTargets, viewingAs } from './roleSwitch'
-import type { UserRecord } from './pb'
+import type { UserRecord } from './db'
 
 const person = (id: string, role: UserRecord['role'], full_name: string, extra: Partial<UserRecord> = {}) =>
   ({ id, role, full_name, active: true, ...extra }) as UserRecord
 
 describe('switch role', () => {
   it('knows when the admin is viewing as someone else', () => {
-    const home = { token: 't', record: person('admin1', 'admin', 'Ayesha') }
+    const home = { session: { access_token: 'a', refresh_token: 'r' }, record: person('admin1', 'admin', 'Ayesha') }
     expect(viewingAs(home, 'emp1')).toBe(true)
     expect(viewingAs(home, 'admin1')).toBe(false)
     expect(viewingAs(null, 'emp1')).toBe(false)

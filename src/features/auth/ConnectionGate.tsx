@@ -1,25 +1,27 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Button } from '@/components/ui/Button'
 import { connectionMessage, type NetworkStatus } from '@/lib/connection'
-import { pb } from '@/lib/pb'
 import { AuthLayout } from './AuthLayout'
 
 const POLL_MS = 5000
 
 async function checkNetwork(): Promise<NetworkStatus> {
   if (window.tracker?.networkStatus) return window.tracker.networkStatus()
-  // Outside the desktop app: only the server can be checked.
+  // Outside the desktop app (development in a browser): ask Supabase directly.
   try {
-    await pb.health.check({ requestKey: null })
-    return { server: true, tailscale: 'missing', onAgencyNetwork: false }
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/auth/v1/health`, {
+      headers: { apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+      signal: AbortSignal.timeout(8000)
+    })
+    return { server: res.ok }
   } catch {
-    return { server: false, tailscale: 'missing', onAgencyNetwork: false }
+    return { server: false }
   }
 }
 
 /**
  * Sign-in and Create an account only work while this PC can reach the server.
- * Until then this explains how to connect (the office setup file) and keeps
+ * Until then this says to check the internet connection and keeps
  * checking every few seconds; the forms appear by themselves once it answers.
  */
 export function ConnectionGate({ children }: { children: ReactNode }) {

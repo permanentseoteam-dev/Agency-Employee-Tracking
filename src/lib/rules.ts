@@ -1,4 +1,4 @@
-import type { OrgSettings } from './pb'
+import type { OrgSettings } from './db'
 
 export type RulesInput = Omit<OrgSettings, 'id' | 'updated'>
 

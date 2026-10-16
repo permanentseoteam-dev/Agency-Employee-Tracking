@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { call, live, must, supabase, toUser } from '@/lib/db'
 import type { LeaveBalance, LeaveInput, LeaveRequest, LeaveStatus } from '@/lib/leave'
 import { useSession } from '@/stores/session'
 
@@ -13,7 +13,22 @@ export const leaveKeys = {
   onDay: (day: string) => ['leave', 'on-day', day] as const
 }
 
-const EXPAND = 'user,leave_type,approver'
+// A request with the people and leave type the screens show (embedded user, leave_type and approver).
+const WITH_NAMES =
+  '*, user_row:profiles!leave_requests_user_fkey(*), type_row:leave_types(*), approver_row:profiles!leave_requests_approver_fkey(*)'
+type Row = Record<string, unknown> & { user_row?: Record<string, unknown> | null; type_row?: Record<string, unknown> | null; approver_row?: Record<string, unknown> | null }
+function toRequest({ user_row, type_row, approver_row, ...r }: Row): LeaveRequest {
+  return {
+    ...(r as unknown as LeaveRequest),
+    approver: (r.approver as string | null) ?? '',
+    decided_at: (r.decided_at as string | null) ?? '',
+    expand: {
+      ...(user_row ? { user: toUser(user_row) } : {}),
+      ...(type_row ? { leave_type: type_row } : {}),
+      ...(approver_row ? { approver: toUser(approver_row) } : {})
+    }
+  } as LeaveRequest
+}
 
 /**
  * Keeps the leave lists fresh while a leave screen is open: any change to a request I
@@ -22,24 +37,7 @@ const EXPAND = 'user,leave_type,approver'
 export function useLeaveLive() {
   const qc = useQueryClient()
   const userId = useSession((s) => s.user?.id ?? '')
-  useEffect(() => {
-    if (!userId) return
-    let unsubscribe: (() => Promise<void>) | undefined
-    let cancelled = false
-    pb.collection('leave_requests')
-      .subscribe('*', () => void qc.invalidateQueries({ queryKey: leaveKeys.all }))
-      .then((fn) => {
-        if (cancelled) void fn()
-        else unsubscribe = fn
-      })
-      .catch(() => {
-        /* offline: the refetch on reconnect catches up */
-      })
-    return () => {
-      cancelled = true
-      void unsubscribe?.()
-    }
-  }, [qc, userId])
+  useEffect(() => (userId ? live('leave_requests', () => void qc.invalidateQueries({ queryKey: leaveKeys.all })) : undefined), [qc, userId])
 }
 
 /** My own requests, newest first (every status). */
@@ -48,27 +46,33 @@ export function useMyLeaves() {
   return useQuery({
     queryKey: leaveKeys.mine(userId),
     enabled: !!userId,
-    queryFn: () =>
-      pb.collection('leave_requests').getFullList<LeaveRequest>({
-        filter: pb.filter('user = {:u}', { u: userId }),
-        sort: '-start_date',
-        expand: EXPAND
-      })
+    queryFn: async () =>
+      must(await supabase.from('leave_requests').select(WITH_NAMES).eq('user', userId).order('start_date', { ascending: false })).map((r) => toRequest(r as Row))
   })
 }
 
 /**
  * This year's balances from the leave_balances view (quota − approved days). Without
- * `userId` the API rules decide whose: own, a manager's teams, or everyone for an admin.
+ * `userId` the rules decide whose: own, a manager's teams, or everyone for an admin.
  */
 export function useLeaveBalances(userId?: string) {
   return useQuery({
     queryKey: leaveKeys.balances(userId ?? 'visible'),
-    queryFn: () =>
-      pb.collection('leave_balances').getFullList<LeaveBalance>({
-        filter: userId ? pb.filter('user = {:u}', { u: userId }) : '',
-        expand: 'user,leave_type'
-      })
+    queryFn: async () => {
+      let q = supabase.from('leave_balances').select('*')
+      if (userId) q = q.eq('user', userId)
+      const rows = must(await q) as Record<string, unknown>[]
+      const [people, types] = await Promise.all([
+        supabase.from('profiles').select('*').in('id', [...new Set(rows.map((r) => r.user as string))]),
+        supabase.from('leave_types').select('*')
+      ])
+      const personOf = new Map(must(people).map((p) => [p.id as string, toUser(p)]))
+      const typeOf = new Map(must(types).map((t) => [t.id as string, t]))
+      return rows.map((b) => ({
+        ...b,
+        expand: { user: personOf.get(b.user as string), leave_type: typeOf.get(b.leave_type as string) }
+      })) as unknown as LeaveBalance[]
+    }
   })
 }
 
@@ -78,12 +82,10 @@ export function usePendingApprovals() {
   return useQuery({
     queryKey: leaveKeys.pending(userId),
     enabled: !!userId,
-    queryFn: () =>
-      pb.collection('leave_requests').getFullList<LeaveRequest>({
-        filter: pb.filter('status = "pending" && user != {:me}', { me: userId }),
-        sort: 'start_date,created',
-        expand: EXPAND
-      })
+    queryFn: async () =>
+      must(
+        await supabase.from('leave_requests').select(WITH_NAMES).eq('status', 'pending').neq('user', userId).order('start_date').order('created')
+      ).map((r) => toRequest(r as Row))
   })
 }
 
@@ -94,28 +96,28 @@ export function useDecidedLeaves(limit = 50) {
     queryKey: leaveKeys.decided(userId, limit),
     enabled: !!userId,
     queryFn: async () =>
-      (
-        await pb.collection('leave_requests').getList<LeaveRequest>(1, limit, {
-          filter: pb.filter('status != "pending" && user != {:me}', { me: userId }),
-          sort: '-decided_at,-updated',
-          expand: EXPAND
-        })
-      ).items
+      must(
+        await supabase
+          .from('leave_requests')
+          .select(WITH_NAMES)
+          .neq('status', 'pending')
+          .neq('user', userId)
+          .order('decided_at', { ascending: false, nullsFirst: false })
+          .order('updated', { ascending: false })
+          .limit(limit)
+      ).map((r) => toRequest(r as Row))
   })
 }
 
-/** Ids of the people on approved leave on a day (the API rules decide whose: own, my teams, or everyone). */
+/** Ids of the people on approved leave on a day (the rules decide whose: own, my teams, or everyone). */
 export function useOnLeave(day: string) {
   return useQuery({
     queryKey: leaveKeys.onDay(day),
     enabled: !!day,
     queryFn: async () =>
-      (
-        await pb.collection('leave_requests').getFullList<Pick<LeaveRequest, 'user'>>({
-          filter: pb.filter('status = "approved" && start_date <= {:day} && end_date >= {:day}', { day }),
-          fields: 'user'
-        })
-      ).map((r) => r.user)
+      (must(await supabase.from('leave_requests').select('user').eq('status', 'approved').lte('start_date', day).gte('end_date', day)) as { user: string }[]).map(
+        (r) => r.user
+      )
   })
 }
 
@@ -129,11 +131,9 @@ function invalidateLeave(qc: ReturnType<typeof useQueryClient>) {
 /** Sends a request. The server counts the days and sets it to pending. */
 export function useApplyLeave() {
   const qc = useQueryClient()
-  const userId = useSession((s) => s.user?.id ?? '')
   return useMutation({
     mutationFn: (input: LeaveInput) =>
-      pb.collection('leave_requests').create<LeaveRequest>({
-        user: userId,
+      call<LeaveRequest>('leave-request', {
         leave_type: input.leave_type,
         start_date: input.start_date,
         end_date: input.end_date,
@@ -148,7 +148,7 @@ export function useApplyLeave() {
 export function useCancelLeave() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('leave_requests').update<LeaveRequest>(id, { status: 'cancelled' }),
+    mutationFn: (id: string) => call<LeaveRequest>('leave-update', { id, status: 'cancelled' }),
     onSuccess: () => invalidateLeave(qc)
   })
 }
@@ -158,7 +158,7 @@ export function useDecideLeave() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, status, comment }: { id: string; status: Exclude<LeaveStatus, 'pending'>; comment?: string }) =>
-      pb.collection('leave_requests').update<LeaveRequest>(id, comment === undefined ? { status } : { status, comment: comment.trim() }),
+      call<LeaveRequest>('leave-update', comment === undefined ? { id, status } : { id, status, comment: comment.trim() }),
     onSuccess: () => invalidateLeave(qc)
   })
 }

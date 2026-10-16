@@ -1,5 +1,5 @@
 import { cn } from '@/lib/cn'
-import { pb, type UserRecord } from '@/lib/pb'
+import { avatarUrl, type UserRecord } from '@/lib/db'
 
 export function initials(name: string | undefined, fallback = '?'): string {
   const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
@@ -12,7 +12,7 @@ export function Avatar({ user, size = 32, className }: { user: UserRecord; size?
   if (user.avatar) {
     return (
       <img
-        src={pb.files.getURL(user, user.avatar)}
+        src={avatarUrl(user)}
         alt=""
         style={style}
         className={cn('rounded-full object-cover', className)}

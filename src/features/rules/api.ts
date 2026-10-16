@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb, type OrgSettings } from '@/lib/pb'
+import { live, must, supabase, type OrgSettings } from '@/lib/db'
 import type { RulesInput } from '@/lib/rules'
 
 export interface LeaveType {
@@ -19,7 +19,7 @@ export const rulesKeys = {
 export function useOrgSettings() {
   return useQuery({
     queryKey: rulesKeys.settings,
-    queryFn: async () => (await pb.collection('org_settings').getFullList<OrgSettings>({ requestKey: null }))[0] ?? null,
+    queryFn: async () => ((must(await supabase.from('org_settings').select('*').limit(1)) as OrgSettings[])[0] ?? null),
     staleTime: 5 * 60_000
   })
 }
@@ -27,8 +27,8 @@ export function useOrgSettings() {
 export function useSaveSettings() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: RulesInput }) =>
-      pb.collection('org_settings').update<OrgSettings>(id, data),
+    mutationFn: async ({ id, data }: { id: string; data: RulesInput }) =>
+      must(await supabase.from('org_settings').update(data).eq('id', id).select().single()) as OrgSettings,
     onSuccess: (saved) => qc.setQueryData(rulesKeys.settings, saved)
   })
 }
@@ -36,15 +36,17 @@ export function useSaveSettings() {
 export function useLeaveTypes() {
   return useQuery({
     queryKey: rulesKeys.leaveTypes,
-    queryFn: () => pb.collection('leave_types').getFullList<LeaveType>({ sort: 'name' })
+    queryFn: async () => must(await supabase.from('leave_types').select('*').order('name')) as LeaveType[]
   })
 }
 
 export function useSaveLeaveType() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: Omit<LeaveType, 'id'> }) =>
-      id ? pb.collection('leave_types').update(id, data) : pb.collection('leave_types').create(data),
+    mutationFn: async ({ id, data }: { id?: string; data: Omit<LeaveType, 'id'> }) =>
+      id
+        ? must(await supabase.from('leave_types').update(data).eq('id', id).select().single())
+        : must(await supabase.from('leave_types').insert(data).select().single()),
     onSuccess: () => qc.invalidateQueries({ queryKey: rulesKeys.leaveTypes })
   })
 }
@@ -52,7 +54,7 @@ export function useSaveLeaveType() {
 export function useDeleteLeaveType() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('leave_types').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('leave_types').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: rulesKeys.leaveTypes })
   })
 }
@@ -66,25 +68,13 @@ export function SettingsSync() {
   const qc = useQueryClient()
   const settings = useOrgSettings()
 
-  useEffect(() => {
-    let unsubscribe: (() => Promise<void>) | undefined
-    let cancelled = false
-    pb.collection('org_settings')
-      .subscribe<OrgSettings>('*', (e) => {
-        if (e.action === 'update' || e.action === 'create') qc.setQueryData(rulesKeys.settings, e.record)
-      })
-      .then((fn) => {
-        if (cancelled) void fn()
-        else unsubscribe = fn
-      })
-      .catch(() => {
-        /* offline: the next refetch picks changes up */
-      })
-    return () => {
-      cancelled = true
-      void unsubscribe?.()
-    }
-  }, [qc])
+  useEffect(
+    () =>
+      live('org_settings', (e) => {
+        if (e.eventType === 'UPDATE' || e.eventType === 'INSERT') qc.setQueryData(rulesKeys.settings, e.new as unknown as OrgSettings)
+      }),
+    [qc]
+  )
 
   useEffect(() => {
     if (settings.data) window.tracker.setSettings(settings.data)

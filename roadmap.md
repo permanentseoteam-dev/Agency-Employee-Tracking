@@ -1,5 +1,7 @@
 # Agency Employee Tracker — Module-Based Implementation Roadmap
 
+> Historical build log for M0–M12, written for the PocketBase version. The app has since moved to Supabase: see [plan.md](plan.md) and [docs/deployment.md](docs/deployment.md) for how it works now.
+
 ## Overview
 
 This roadmap turns [plan.md](plan.md) into 13 modules (M0–M12). Each module lists its goal, files, backend objects, tasks and a "Done when" check, so it can be built, reviewed and tested on its own.

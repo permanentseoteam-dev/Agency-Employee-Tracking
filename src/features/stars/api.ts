@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { call, must, selectAll, supabase, toUser } from '@/lib/db'
 import type { StarRecord, StarRule } from '@/lib/stars'
 
 export const starKeys = {
@@ -13,7 +13,7 @@ export function useStarRules() {
   return useQuery({
     queryKey: starKeys.rules,
     queryFn: async () => {
-      const rules = await pb.collection('star_rules').getFullList<StarRule>({ sort: 'name' })
+      const rules = must(await supabase.from('star_rules').select('*').order('name')) as StarRule[]
       // The automatic ones first, then the by-hand ones.
       return rules.sort((a, b) => Number(!a.auto) - Number(!b.auto) || a.name.localeCompare(b.name))
     },
@@ -24,8 +24,10 @@ export function useStarRules() {
 export function useSaveStarRule() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: Partial<Omit<StarRule, 'id'>> }) =>
-      id ? pb.collection('star_rules').update(id, data) : pb.collection('star_rules').create({ ...data, auto: '' }),
+    mutationFn: async ({ id, data }: { id?: string; data: Partial<Omit<StarRule, 'id'>> }) =>
+      id
+        ? must(await supabase.from('star_rules').update(data).eq('id', id).select().single())
+        : must(await supabase.from('star_rules').insert({ ...data, auto: '' }).select().single()),
     onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
   })
 }
@@ -33,7 +35,7 @@ export function useSaveStarRule() {
 export function useDeleteStarRule() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('star_rules').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('star_rules').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
   })
 }
@@ -42,14 +44,22 @@ export function useDeleteStarRule() {
 export function useStarRecords(month: string, userId?: string) {
   return useQuery({
     queryKey: starKeys.records(month, userId ?? 'visible'),
-    queryFn: () =>
-      pb.collection('star_records').getFullList<StarRecord>({
-        filter: userId
-          ? pb.filter('user = {:u} && date >= {:from} && date <= {:to}', { u: userId, from: `${month}-01`, to: `${month}-31` })
-          : pb.filter('date >= {:from} && date <= {:to}', { from: `${month}-01`, to: `${month}-31` }),
-        expand: 'given_by',
-        sort: '-date'
+    queryFn: async () => {
+      const rows = await selectAll<Record<string, unknown> & { given_row?: Record<string, unknown> | null }>(() => {
+        let q = supabase
+          .from('star_records')
+          .select('*, given_row:profiles!star_records_given_by_fkey(*)')
+          .gte('date', `${month}-01`)
+          .lte('date', `${month}-31`)
+        if (userId) q = q.eq('user', userId)
+        return q.order('date', { ascending: false }).order('id')
       })
+      return rows.map(({ given_row, ...r }) => ({
+        ...r,
+        given_by: (r.given_by as string | null) ?? '',
+        expand: given_row ? { given_by: toUser(given_row) } : {}
+      })) as unknown as StarRecord[]
+    }
   })
 }
 
@@ -57,8 +67,7 @@ export function useStarRecords(month: string, userId?: string) {
 export function useAddStarRecord() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { user: string; rule: string; date: string; note: string; excused: boolean }) =>
-      pb.collection('star_records').create(data),
+    mutationFn: (data: { user: string; rule: string; date: string; note: string; excused: boolean }) => call('star-record', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
   })
 }
@@ -67,7 +76,7 @@ export function useAddStarRecord() {
 export function useDeleteStarRecord() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('star_records').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('star_records').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
   })
 }

@@ -5,7 +5,7 @@ import { powerMonitor } from 'electron'
 import { dayRangeUtc, toDateKey } from '../../src/lib/dates'
 import type { TrackerSettings, TrackerStatus } from '../preload/api'
 import { log } from './log'
-import { expire, identity, isSignedIn, onSessionChange, pb, refresh } from './session'
+import { db, expire, identity, isSignedIn, onSessionChange, refresh } from './session'
 import { DEFAULT_SETTINGS, persisted, type DayTotals } from './store'
 import { SyncQueue } from './syncQueue'
 import { inShift, POLL_MS, TrackerMachine, type Segment } from './tracker'
@@ -30,7 +30,11 @@ export const queue = new SyncQueue({
     if (!id || !isSignedIn()) return null
     return {
       userId: id.userId,
-      create: (item) => pb.collection('activity_segments').create(item, { requestKey: null })
+      create: async (item) => {
+        const { error, status } = await db.from('activity_segments').insert(item)
+        // The shape classify() reads: status, plus Postgres's code and the guard's hint.
+        if (error) throw { status, code: error.code, hint: error.hint ?? '', message: error.message }
+      }
     }
   },
   verifySession: () => refresh(),
@@ -69,11 +73,13 @@ function remember(userId: string, entries: { id: string; state: 'active' | 'idle
 async function loadTodayFromServer(userId: string): Promise<void> {
   const { start } = dayRangeUtc(toDateKey(Date.now(), settings().timezone), settings().timezone)
   try {
-    const rows = await pb.collection('activity_segments').getFullList({
-      filter: pb.filter('user = {:user} && started_at >= {:start}', { user: userId, start }),
-      fields: 'id,state,started_at,ended_at',
-      requestKey: null
-    })
+    const { data, error } = await db
+      .from('activity_segments')
+      .select('id, state, started_at, ended_at')
+      .eq('user', userId)
+      .gte('started_at', new Date(start).toISOString())
+    if (error) throw new Error(error.message)
+    const rows = data ?? []
     remember(
       userId,
       rows.map((r) => {
@@ -85,6 +91,28 @@ async function loadTodayFromServer(userId: string): Promise<void> {
   } catch (err) {
     log.warn('could not load today’s totals from the server:', (err as Error).message)
   }
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * After the switch from PocketBase, time this PC recorded before the person signed in again
+ * still carries their old PocketBase id. It moves to them only if their profile holds that old
+ * id (profiles.legacy_id, set by the migration), so on a shared PC nobody gets someone else's time.
+ */
+async function adoptTimeFromBeforeTheSwitch(userId: string): Promise<void> {
+  const t = persisted().get('today')
+  const old = new Set(queue.pending().map((i) => i.user).filter((u) => !UUID.test(u)))
+  if (t && !UUID.test(t.userId)) old.add(t.userId)
+  if (!old.size) return
+  const { data, error } = await db.from('profiles').select('legacy_id').eq('id', userId).maybeSingle()
+  if (error || !data?.legacy_id || !old.has(data.legacy_id)) return
+  const moved = queue.reassign(data.legacy_id, userId)
+  // Read today's totals again: the open segment was closed (and counted) while we waited.
+  const latest = persisted().get('today')
+  if (latest && latest.userId === data.legacy_id) persisted().set('today', { ...latest, userId })
+  log.info(`moved ${moved} segment(s) recorded before the switch to Supabase to this account`)
+  pushStatus()
 }
 
 export function today(): { date: string; active_s: number; idle_s: number } {
@@ -168,7 +196,6 @@ function poll(): void {
 
 // ---- presence heartbeat ------------------------------------------------------
 
-let presence: { userId: string; id: string } | null = null
 let lastBeat: { status: string; at: number } | null = null
 
 function presenceStatus(): 'active' | 'idle' | 'offline' {
@@ -187,25 +214,11 @@ async function heartbeat(force = false): Promise<void> {
 
   const t = today()
   const data = { status, last_seen: new Date(now).toISOString(), today_active_s: t.active_s, today_idle_s: t.idle_s }
-  const col = pb.collection('presence')
-  try {
-    if (presence?.userId !== id.userId) {
-      try {
-        const row = await col.getFirstListItem(pb.filter('user = {:user}', { user: id.userId }), { requestKey: null })
-        presence = { userId: id.userId, id: row.id }
-      } catch (err) {
-        if ((err as { status?: number }).status !== 404) throw err
-        const row = await col.create({ user: id.userId, ...data }, { requestKey: null })
-        presence = { userId: id.userId, id: row.id }
-        return
-      }
-    }
-    await col.update(presence.id, data, { requestKey: null })
-  } catch (err) {
-    const s = (err as { status?: number }).status
+  // One row per person (unique on "user"): insert the first time, update after that.
+  const { error, status: code } = await db.from('presence').upsert({ user: id.userId, ...data }, { onConflict: 'user' })
+  if (error) {
     lastBeat = null // send again on the next poll
-    if (s === 404) presence = null
-    else if (s === 401) expire()
+    if (code === 401) expire()
   }
 }
 
@@ -270,7 +283,9 @@ export function startEngine(): void {
     const id = identity()
     const user = isSignedIn() ? (id?.userId ?? null) : null
     if (user && user !== lastSignedInUser) {
-      void loadTodayFromServer(user)
+      void adoptTimeFromBeforeTheSwitch(user)
+        .catch((err) => log.warn('could not check for time from before the switch:', (err as Error).message))
+        .finally(() => loadTodayFromServer(user))
       void queue.flush()
       lastBeat = null
     }

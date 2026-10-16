@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { pb } from '@/lib/pb'
+import { must, supabase } from '@/lib/db'
 import type { CalendarEvent, LeaveEntry } from '@/lib/calendar'
 import { daysBetween, type Holiday, type HolidayInput } from '@/lib/holidays'
 
@@ -14,7 +14,7 @@ export const calendarKeys = {
 export function useHolidays() {
   return useQuery({
     queryKey: calendarKeys.holidays,
-    queryFn: () => pb.collection('holidays').getFullList<Holiday>({ sort: 'date' })
+    queryFn: async () => must(await supabase.from('holidays').select('*').order('date')) as Holiday[]
   })
 }
 
@@ -24,10 +24,10 @@ export function useSaveHoliday() {
   return useMutation({
     mutationFn: async ({ id, input }: { id?: string; input: HolidayInput }) => {
       const name = input.name.trim()
-      if (id) return [await pb.collection('holidays').update<Holiday>(id, { date: input.from, name })]
+      if (id) return must(await supabase.from('holidays').update({ date: input.from, name }).eq('id', id).select()) as Holiday[]
       const saved: Holiday[] = []
       for (const date of daysBetween(input.from, input.to || input.from)) {
-        saved.push(await pb.collection('holidays').create<Holiday>({ date, name }))
+        saved.push(must(await supabase.from('holidays').insert({ date, name }).select().single()) as Holiday)
       }
       return saved
     },
@@ -38,7 +38,7 @@ export function useSaveHoliday() {
 export function useDeleteHoliday() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('holidays').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('holidays').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: calendarKeys.holidays })
   })
 }
@@ -47,12 +47,23 @@ export function useDeleteHoliday() {
 export function useCalendarLeaves(from: string, to: string) {
   return useQuery({
     queryKey: calendarKeys.leaves(from, to),
-    queryFn: () =>
-      pb.collection('leave_requests').getFullList<LeaveEntry>({
-        filter: pb.filter('status = "approved" && start_date <= {:to} && end_date >= {:from}', { from, to }),
-        expand: 'user,leave_type',
-        fields: 'id,user,start_date,end_date,half_day,expand.user.id,expand.user.full_name,expand.user.team,expand.leave_type.name'
-      })
+    queryFn: async () => {
+      const rows = must(
+        await supabase
+          .from('leave_requests')
+          .select('id, user, start_date, end_date, half_day, user_row:profiles!leave_requests_user_fkey(id, full_name, team), type_row:leave_types(name)')
+          .eq('status', 'approved')
+          .lte('start_date', to)
+          .gte('end_date', from)
+      ) as unknown as (Omit<LeaveEntry, 'expand'> & { user_row: { id: string; full_name: string; team: string | null } | null; type_row: { name: string } | null })[]
+      return rows.map(({ user_row, type_row, ...l }) => ({
+        ...l,
+        expand: {
+          ...(user_row ? { user: { ...user_row, team: user_row.team ?? '' } } : {}),
+          ...(type_row ? { leave_type: type_row } : {})
+        }
+      })) as LeaveEntry[]
+    }
   })
 }
 
@@ -60,11 +71,10 @@ export function useCalendarLeaves(from: string, to: string) {
 export function useCalendarEvents(start: Date, end: Date) {
   return useQuery({
     queryKey: calendarKeys.events(start.toISOString(), end.toISOString()),
-    queryFn: () =>
-      pb.collection('events').getFullList<CalendarEvent>({
-        filter: pb.filter('starts_at < {:end} && ends_at > {:start}', { start, end }),
-        sort: 'starts_at'
-      })
+    queryFn: async () =>
+      (must(
+        await supabase.from('events').select('*').lt('starts_at', end.toISOString()).gt('ends_at', start.toISOString()).order('starts_at')
+      ) as CalendarEvent[]).map((e) => ({ ...e, team: e.team ?? '' }))
   })
 }
 
@@ -73,8 +83,12 @@ export type EventData = Omit<CalendarEvent, 'id'>
 export function useSaveEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id?: string; data: EventData }) =>
-      id ? pb.collection('events').update<CalendarEvent>(id, data) : pb.collection('events').create<CalendarEvent>(data),
+    mutationFn: async ({ id, data }: { id?: string; data: EventData }) => {
+      const row = { ...data, team: data.team || null } // '' = company-wide
+      return id
+        ? (must(await supabase.from('events').update(row).eq('id', id).select().single()) as CalendarEvent)
+        : (must(await supabase.from('events').insert(row).select().single()) as CalendarEvent)
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: calendarKeys.allEvents })
   })
 }
@@ -82,7 +96,7 @@ export function useSaveEvent() {
 export function useDeleteEvent() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) => pb.collection('events').delete(id),
+    mutationFn: async (id: string) => must(await supabase.from('events').delete().eq('id', id).select()),
     onSuccess: () => qc.invalidateQueries({ queryKey: calendarKeys.allEvents })
   })
 }

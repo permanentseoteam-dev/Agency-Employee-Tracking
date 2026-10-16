@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
-import { FolderOpen, Moon, Sun } from 'lucide-react'
+import { Database, FolderOpen, Moon, Sun } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { cn } from '@/lib/cn'
+import { useSession } from '@/stores/session'
 import { useTheme, type Theme } from '@/stores/theme'
+import { DATABASE_LIMIT_BYTES, useDatabaseSize } from './api'
 
 type Autostart = Awaited<ReturnType<Window['tracker']['getAutostart']>>
 
@@ -88,6 +90,36 @@ export function Settings() {
           </Button>
         </CardContent>
       </Card>
+
+      <DatabaseUsage />
     </div>
+  )
+}
+
+/** Admins: how full the database is (the free plan allows 500 MB). */
+function DatabaseUsage() {
+  const isAdmin = useSession((s) => s.user?.role === 'admin')
+  const { data: bytes } = useDatabaseSize(isAdmin)
+  if (!isAdmin || bytes == null) return null
+  const mb = bytes / (1024 * 1024)
+  const share = Math.min(1, bytes / DATABASE_LIMIT_BYTES)
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Database</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 text-sm">
+        <p className="flex items-center gap-2">
+          <Database className="size-4 text-slate-500" aria-hidden />
+          <span>
+            <span className="font-medium">{mb < 10 ? mb.toFixed(1) : Math.round(mb)} MB</span> of 500 MB used ({Math.round(share * 100)}%)
+          </span>
+        </p>
+        <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" role="progressbar" aria-valuenow={Math.round(share * 100)} aria-valuemin={0} aria-valuemax={100} aria-label="Database used">
+          <div className={cn('h-full rounded-full', share > 0.8 ? 'bg-red-500' : share > 0.6 ? 'bg-amber-500' : 'bg-indigo-600')} style={{ width: `${Math.max(share * 100, 1)}%` }} />
+        </div>
+        <p className="text-slate-500">The free plan allows 500 MB. Only admins see this.</p>
+      </CardContent>
+    </Card>
   )
 }
