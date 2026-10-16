@@ -2,8 +2,15 @@
 @import "@fontsource-variable/plus-jakarta-sans";
 
 @custom-variant dark (&:where(.dark, .dark *));
-/* Narrow windows: the sidebar becomes an icon rail. */
-@custom-variant rail (@media (max-width: 1099px));
+/* The sidebar as an icon rail: in narrow windows, or when collapsed by hand. */
+@custom-variant rail {
+  @media (max-width: 1099px) {
+    @slot;
+  }
+  &:where([data-collapsed] *, [data-collapsed]) {
+    @slot;
+  }
+}
 
 /* Design tokens (docs/ui/ux.md, "Frosted Light Sidebar"). Components use these, not raw hex. */
 :root {

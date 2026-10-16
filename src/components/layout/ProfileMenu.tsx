@@ -2,7 +2,6 @@ import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { LogOut, Power, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { useTrackerStatus } from '@/features/tracking/api'
 import { ROLE_LABEL } from '@/lib/roles'
 import { useSession } from '@/stores/session'
 import { Avatar } from './Avatar'
@@ -16,21 +15,15 @@ export function ProfileMenu() {
   const logout = useSession((s) => s.logout)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const status = useTrackerStatus()
-  const live = status?.signedIn !== false && (status?.state === 'active' || status?.state === 'idle')
 
   return (
     <DropdownMenu.Root>
-      {/* The sidebar's bottom card: tracking state + who is signed in; it opens the account menu. */}
+      {/* The sidebar's bottom card: who is signed in; it opens the account menu. */}
       <DropdownMenu.Trigger
         aria-label="Profile menu"
-        className="mt-3 w-full rounded-[var(--radius-inner)] bg-[image:var(--brand-gradient-deep)] p-4 text-left text-white shadow-[0_14px_30px_-16px_rgba(27,42,107,.8)] outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-indigo-300 rail:p-2"
+        className="mt-3 w-full rounded-[var(--radius-inner)] bg-[image:var(--brand-gradient-deep)] p-3 text-left text-white shadow-[0_14px_30px_-16px_rgba(27,42,107,.8)] outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-indigo-300 rail:p-2"
       >
-        <span className="block text-sm font-bold rail:hidden" data-tracking={live ? 'live' : 'paused'}>
-          {live ? 'Tracking is live' : 'Tracking paused'}
-        </span>
-        <span className="mt-1 block text-[12.5px] leading-snug text-white/80 rail:hidden">Activity is counted every night at 01:00.</span>
-        <span className="mt-3 flex items-center gap-2 rail:mt-0 rail:justify-center">
+        <span className="flex items-center gap-2 rail:justify-center">
           <Avatar user={user} size={28} className="shrink-0 bg-white/20 text-white ring-0 dark:bg-white/20 dark:text-white" />
           <span className="min-w-0 truncate text-[13px] rail:hidden">
             {user.full_name || user.email} · {ROLE_LABEL[user.role]}

@@ -7,6 +7,8 @@ import {
   CalendarDays,
   Gauge,
   LayoutGrid,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plane,
   Radio,
   Search,
@@ -18,6 +20,7 @@ import { NavLink } from 'react-router-dom'
 import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 import { navFor, SECTION_LABEL, type NavIcon, type NavSection } from '@/lib/roles'
+import { useSidebar } from '@/stores/sidebar'
 import logo from '@/assets/logo.png'
 import { ProfileMenu } from './ProfileMenu'
 
@@ -39,15 +42,31 @@ const SECTIONS: NavSection[] = ['personal', 'team', 'admin']
 
 export function Sidebar() {
   const { role } = useRole()
+  const collapsed = useSidebar((s) => s.collapsed)
+  const toggle = useSidebar((s) => s.toggle)
   const [query, setQuery] = useState('')
   const q = query.trim().toLowerCase()
   const items = navFor(role).filter((item) => !q || item.label.toLowerCase().includes(q))
 
   return (
-    <aside className="glass no-drag flex w-[248px] shrink-0 flex-col rounded-[var(--radius-shell)] px-3.5 pt-[22px] pb-4 rail:w-[76px] rail:px-3">
-      <div className="mb-[22px] flex items-center gap-2.5 px-1 rail:justify-center rail:px-0">
-        <img src={logo} alt="" className="size-9 rounded-[11px] shadow-[0_6px_14px_-8px_rgba(27,42,107,.6)]" />
-        <span className="text-[17px] font-bold text-ink-900 rail:hidden">PSEO Tracker</span>
+    <aside
+      data-collapsed={collapsed || undefined}
+      className="glass no-drag flex w-[248px] shrink-0 flex-col rounded-[var(--radius-shell)] px-3.5 pt-[22px] pb-4 transition-[width] duration-200 ease-[var(--ease)] rail:w-[76px] rail:px-3"
+    >
+      <div className="mb-[22px] flex items-center gap-2.5 px-1 rail:flex-col rail:gap-3 rail:px-0">
+        <img src={logo} alt="" className="size-9 shrink-0 rounded-[11px] shadow-[0_6px_14px_-8px_rgba(27,42,107,.6)]" />
+        <span className="truncate text-[17px] font-bold text-ink-900 rail:hidden">PSEO Tracker</span>
+        {/* Narrow windows are always a rail, so the button only shows in wide ones. */}
+        <button
+          type="button"
+          onClick={toggle}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="ml-auto grid size-8 shrink-0 place-items-center rounded-lg text-ink-500 transition-colors hover:bg-indigo-500/[.08] hover:text-indigo-700 rail:ml-0 max-[1099px]:hidden dark:hover:text-indigo-200"
+        >
+          {collapsed ? <PanelLeftOpen className="size-[18px]" strokeWidth={1.8} aria-hidden /> : <PanelLeftClose className="size-[18px]" strokeWidth={1.8} aria-hidden />}
+        </button>
       </div>
       <label className="relative mb-3.5 block rail:hidden">
         <span className="sr-only">Search the menu</span>
