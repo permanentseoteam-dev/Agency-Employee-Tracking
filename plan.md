@@ -65,8 +65,8 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 │ tray.ts       tray icon + menu: Open, today's time, Quit (Quit for     │
 │               manager/admin only)                                      │
 │ autostart     app.setLoginItemSettings({ openAtLogin: true })          │
-│ updater.ts    electron-updater: check at startup + every 6 h,          │
-│               install on next restart                                  │
+│ updater.ts    electron-updater: check at startup + every 5 min,        │
+│               install at once (quit saves the time, restart ~10 s)     │
 └───────────────▲─────────────────────────────────────────────────────────┘
                 │ IPC (contextBridge preload: window.tracker.*)
 ┌───────────────┴──────── Renderer (React UI) ───────────────────────────┐
@@ -445,7 +445,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - staff PCs: the `dist\staff-pc-setup` kit (`scripts/staff-pc/`) installs Tailscale with a tagged auth key, checks the server, and installs the app. Still to do by you: Part B of docs/deployment.md (disable key expiry for the server, the access policy, the auth key), the first staff PC, and the releases repo
 - **M12 code done** (2026-10-14, committed but not pushed). Decisions: office PC + Tailscale, installers on a public releases-only repo (`permanentseoteam-dev/pseo-tracker-releases`), backups copied to the E: drive.
   - `electron-builder.yml`: per-user one-click NSIS installer with desktop and Start menu shortcuts, app icon (`scripts/make-icon.mjs` → `build/`), publish to the releases repo. `npm run dist` builds, `npm run release` publishes (needs `GH_TOKEN`); `scripts/check-release-env.mjs` refuses a build whose `VITE_PB_URL` is localhost, a raw IP or unset (`.env.production`)
-  - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version
+  - `electron/main/updater.ts`: checks at start-up and every 6 h, downloads quietly, installs when nobody is being tracked (outside shift, screen locked) or when the app quits. The tray tooltip shows the version. **Since 0.1.9 (2026-10-16):** checks every 5 minutes and installs as soon as an update is downloaded, even while tracking (notification, quit saves the time, restart in about 10 s, window as it was)
   - `server/deploy/`: `install-service.ps1` (NSSM service, 30 s graceful stop, restart on crash, port 8090 open to Tailscale addresses only, no sleep), `backup-to-drive.ps1` + `register-backup-task.ps1` (daily copy of PocketBase's 13:00 backup to E:, keeps 30), `restore-drill.ps1`. Step-by-step guide: [docs/deployment.md](docs/deployment.md)
   - verified on this PC: the packaged app signs in, tracks, reaches the server and registers start-with-Windows (locked for employees); a 0.1.0 install found, downloaded and installed 0.1.1 by itself and restarted as 0.1.1; backup → copy to the backup drive → restore drill passed. Test installs and startup entries were removed afterwards
   - **still to do by you before go-live:** create the releases repo and a `GH_TOKEN`, set up the office PC with docs/deployment.md, then tick the go-live checklist at the end of that guide (clean-PC install, reboot autostart, data on the production server, a published update, a restore from E:)
