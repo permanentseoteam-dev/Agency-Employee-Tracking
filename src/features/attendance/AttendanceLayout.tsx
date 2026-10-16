@@ -1,16 +1,16 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/cn'
 
+// Managers and admins only; employees keep My Attendance in the sidebar.
 const TABS = [
-  { to: '/approvals/pending', label: 'Pending' },
-  { to: '/approvals/decided', label: 'Decided' },
-  { to: '/approvals/balances', label: 'Team balances' }
+  { to: '/attendance/team', label: 'Team' },
+  { to: '/attendance/mine', label: 'My attendance' }
 ]
 
-export function ApprovalsLayout() {
+export function AttendanceLayout() {
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Approvals">
+    <div className="space-y-6">
+      <nav className="flex gap-1 border-b border-slate-200 dark:border-slate-800" aria-label="Attendance">
         {TABS.map((t) => (
           <NavLink
             key={t.to}

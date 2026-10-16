@@ -83,14 +83,11 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 | E-67 | Rejection with a reason | Switch account to Danish, open My Leaves | The Annual request is Rejected with "Client deadline that week" |  |  |
 | E-68 | Emergency leave | Apply for leave → Leave type | "Emergency (unpaid)" is in the list; it has no yearly limit |  |  |
 
-## 5. Calendar, notifications, profile, settings and pay
+## 5. Notifications, profile, settings and pay
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| E-70 | Month calendar | Open Calendar | The month grid shows the Test Holiday, Asma's approved leave day and "Company town hall" tomorrow 11:00–12:00 | ★ |  |
-| E-71 | Team events only for the team | As Asma (Alpha) and then as Danish (Bravo) | "Alpha sprint review" shows for Asma, not for Danish |  |  |
-| E-72 | Day view | Click a day with entries | Everything on that day is listed |  |  |
-| E-73 | Calendar is read-only | Look for add or edit buttons on Month and Holidays | None for an employee |  | ✓ |
+| E-70 | No company calendar | Look at the sidebar; open the Calendar address | No Calendar item; the address sends you back to My Stats (project calendars still work, E-85) |  | ✓ |
 | E-74 | Notification bell | After a decision on your leave, open the bell | Unread count, the decision with who decided and the comment; clicking opens My Leaves and marks it read | ★ |  |
 | E-75 | Mark all as read | Bell → Mark all as read | The badge clears; the items stay in the list |  |  |
 | E-76 | Edit profile | My Profile: change name, phone and designation, upload a photo | Saved; the photo shows in the top bar |  |  |
@@ -109,8 +106,8 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Calendar, Finance | ★ |  |
-| E-91 | Manager pages blocked | (automated) Open the Live Board, Approvals or Organization address | Sent back to My Stats |  |  |
+| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Project, Rules, Finance; My Leaves has no Pending/Decided tabs | ★ |  |
+| E-91 | Manager pages blocked | (automated) Open the Live Board, Attendance, Calendar or Organization address | Sent back to My Stats; the My Leaves → Pending address shows My Leaves |  |  |
 | E-92 | Other people's data is private | (server check) Read another person's attendance, leave, time, live status or salary | Refused or empty |  | ✓ |
 | E-93 | Can't decide own leave | (server check) Approve your own request | Refused |  | ✓ |
 | E-94 | Can't promote yourself | (server check) Change your own role or team | Refused |  | ✓ |

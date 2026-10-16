@@ -19,7 +19,6 @@ export type NavIcon =
   | 'calendar'
   | 'project'
   | 'live'
-  | 'approvals'
   | 'reports'
   | 'grid'
   | 'org'
@@ -39,13 +38,14 @@ export interface NavItem {
 
 export const NAV: NavItem[] = [
   { path: '/my-stats', label: 'My Stats', icon: 'stats', minRole: 'employee', module: 'M6' },
-  { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', module: 'M7' },
+  // Managers and admins see their own attendance as a tab inside Attendance.
+  { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', hiddenFor: ['manager', 'admin'], module: 'M7' },
+  // Managers and admins approve leave from tabs inside My Leaves.
   { path: '/my-leaves', label: 'My Leaves', icon: 'leave', minRole: 'employee', module: 'M8' },
-  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', module: 'M10' },
+  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', hiddenFor: ['employee'], module: 'M10' },
   // Everyone sees the clients they're on; only an admin sets up clients and their people.
   { path: '/projects', label: 'Project', icon: 'project', minRole: 'employee', module: 'Projects' },
   { path: '/live', label: 'Live Board', icon: 'live', minRole: 'manager', module: 'M6' },
-  { path: '/approvals', label: 'Approvals', icon: 'approvals', minRole: 'manager', module: 'M8' },
   { path: '/attendance', label: 'Attendance', icon: 'grid', minRole: 'manager', module: 'M7' },
   { path: '/reports', label: 'Reports', icon: 'reports', minRole: 'manager', module: 'M6' },
   { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', module: 'M3' },

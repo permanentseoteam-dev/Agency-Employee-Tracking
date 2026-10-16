@@ -3,12 +3,14 @@ import { Bell, CheckCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useMarkAllRead, useMarkRead, useNotifications } from '@/features/notifications/api'
 import { useNow, useTimezone } from '@/features/tracking/api'
+import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 import { notificationComment, notificationLink, notificationText, timeAgo } from '@/lib/notifications'
 
 /** Top-bar bell (plan §4.9): unread count, the latest notifications, mark read. */
 export function NotificationBell() {
   const navigate = useNavigate()
+  const { role } = useRole()
   const tz = useTimezone()
   const now = useNow(60_000)
   const notifications = useNotifications()
@@ -61,7 +63,7 @@ export function NotificationBell() {
             ) : (
               items.map((n) => {
                 const { title, detail } = notificationText(n)
-                const link = notificationLink(n)
+                const link = notificationLink(n, role)
                 const isUnread = !n.read_at
                 return (
                   <DropdownMenu.Item

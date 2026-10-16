@@ -1,6 +1,7 @@
 // Pure helpers for the notification bell (plan §4.9). The server stores facts in
 // `payload`; the wording lives here so it can change without touching old records.
 import { addDays, formatDate, toDateKey, DEFAULT_TZ } from './dates'
+import type { Role } from './db'
 
 export interface LeavePayload {
   request: string
@@ -98,11 +99,11 @@ export function notificationComment(n: Pick<NotificationRecord, 'payload'>): str
 }
 
 /** Where clicking a notification goes. */
-export function notificationLink(n: Pick<NotificationRecord, 'type'>): string | null {
-  if (n.type === 'leave_requested') return '/approvals'
+export function notificationLink(n: Pick<NotificationRecord, 'type'>, role: Role): string | null {
+  if (n.type === 'leave_requested') return '/my-leaves/pending'
   if (n.type === 'leave_decided') return '/my-leaves'
   if (n.type === 'employee_registered' || n.type === 'signup_pending') return '/org/employees'
-  if (n.type === 'stars_given') return '/my-attendance'
+  if (n.type === 'stars_given') return role === 'employee' ? '/my-attendance' : '/attendance/mine'
   return null
 }
 
