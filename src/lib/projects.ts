@@ -1,5 +1,5 @@
 // Pure helpers for the Project tab. Each person's status comes from the server
-// (GET /api/projects/status, server/pb_hooks/lib/projects.js); these count and order it.
+// (GET /api/projects/status, shared/logic/projects.js); these count and order it.
 import type { AttendanceStatus } from './attendance'
 
 /** A stored attendance status, "not_in_yet" (today, before anyone starts), or '' (not employed / not counted yet). */

@@ -1,5 +1,5 @@
 // Pure helpers for the attendance screens (plan §4.2). The statuses themselves
-// are decided on the server (server/pb_hooks/lib/attendance.js).
+// are decided on the server (shared/logic/attendance.js).
 import { addDays } from './dates'
 
 export type AttendanceStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave' | 'holiday' | 'weekend'

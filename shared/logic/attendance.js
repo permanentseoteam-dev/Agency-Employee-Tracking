@@ -1,5 +1,5 @@
-// Pure attendance rules (plan §4.2) for attendance.pb.js. No PocketBase globals
-// here, so Vitest can test the same file the hook require()s.
+// Pure attendance rules (plan §4.2). Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 const DAY_MS = 86400000
@@ -38,18 +38,18 @@ function todayKey(offsetMinutes, nowMs) {
   return dayKeyOf(nowMs, offsetMinutes)
 }
 
-/** Milliseconds for a PocketBase date ("2026-10-14 05:00:00.000Z") or an ISO string; NaN if invalid. */
+/** Milliseconds for a space-separated UTC date ("2026-10-14 05:00:00.000Z") or an ISO string; NaN if invalid. */
 function parseInstant(value) {
   if (typeof value !== 'string' || !value) return NaN
   return Date.parse(value.trim().replace(' ', 'T'))
 }
 
-/** "2026-10-14 05:00:00.000Z": the PocketBase date format, which sorts as text. */
+/** "2026-10-14 05:00:00.000Z": the space-separated UTC date format, which sorts as text. */
 function pbDate(ms) {
   return new Date(ms).toISOString().replace('T', ' ')
 }
 
-/** UTC bounds of a local day as PocketBase dates (end exclusive). */
+/** UTC bounds of a local day as space-separated UTC dates (end exclusive). */
 function dayBounds(day, offsetMinutes) {
   const start = Date.parse(day + 'T00:00:00.000Z') - offsetMinutes * 60000
   return { start: pbDate(start), end: pbDate(start + DAY_MS) }

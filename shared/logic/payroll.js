@@ -1,5 +1,5 @@
-// Pure payroll calculation (plan §4.5) for payroll.pb.js. No PocketBase globals
-// here, so Vitest can test the same file the hook require()s.
+// Pure payroll calculation (plan §4.5). Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 //
 //   per-day rate = monthly salary ÷ working days in the month (weekends and holidays excluded)
 //   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate

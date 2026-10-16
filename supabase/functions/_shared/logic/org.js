@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/org.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/org.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/org.js
+// shared/logic/org.js
 var require_org = __commonJS({
-  "server/pb_hooks/lib/org.js"(exports, module) {
+  "shared/logic/org.js"(exports, module) {
     var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
     var ROLES = ["admin", "manager", "employee"];
@@ -100,16 +100,8 @@ var require_org = __commonJS({
       }
       return { data: { userId, active: b.active, left_on: leftOn } };
     }
-    function requireAdmin(e) {
-      const auth = e.auth;
-      if (!auth || auth.collection().name !== "users" || auth.get("role") !== "admin" || !auth.getBool("active")) {
-        throw new ForbiddenError("Only admins can do this.");
-      }
-      return auth;
-    }
     module.exports = {
       ROLES,
-      requireAdmin,
       passwordProblem,
       isDateKey,
       todayKey,

@@ -1,4 +1,4 @@
-// Pure helpers for leave (plan §4.3). The server (server/pb_hooks/lib/leave.js) has
+// Pure helpers for leave (plan §4.3). The server (shared/logic/leave.js) has
 // the final say; these mirror its rules so the Apply form can preview the days and
 // show problems before sending, and the Approvals queue can offer only valid moves.
 import { addDays, isoWeekday } from './dates'

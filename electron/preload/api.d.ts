@@ -62,7 +62,7 @@ export interface TrackerApi {
   getAutostart(): Promise<AutostartState>
   setAutostart(enabled: boolean): Promise<AutostartState>
   openLogsFolder(): Promise<void>
-  /** Server reachability and this PC's Tailscale state (read-only). */
+  /** Whether this PC can reach the server (Supabase). */
   networkStatus(): Promise<NetworkStatus>
   /** Quits the app (managers and admins); resolves false when the main process refuses. */
   quit(): Promise<boolean>

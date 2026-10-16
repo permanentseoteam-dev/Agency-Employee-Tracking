@@ -1,4 +1,4 @@
-// PocketBase stores UTC. Everything shown to people, and every "which day is it"
+// The server stores UTC. Everything shown to people, and every "which day is it"
 // decision, goes through these helpers in the org timezone.
 
 export const DEFAULT_TZ = 'Asia/Karachi'

@@ -21,7 +21,7 @@ import { dirname, join, resolve } from 'node:path'
 import PocketBase from 'pocketbase'
 
 const require = createRequire(import.meta.url)
-const att = require('../../server/pb_hooks/lib/attendance.js')
+const att = require('../../shared/logic/attendance.js')
 
 export const DEMO_DOMAIN = '@demo.test'
 export const DEMO_TEAMS = ['Demo Alpha', 'Demo Bravo']

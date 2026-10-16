@@ -1,5 +1,5 @@
-// Pure rules for leave notifications (notifications.pb.js). No PocketBase
-// globals here, so Vitest can test the same file the hook require()s.
+// Pure rules for leave notifications. Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 
 const DECISIONS = ['approved', 'rejected']
 

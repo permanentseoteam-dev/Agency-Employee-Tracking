@@ -1,5 +1,6 @@
-// Pure star rules for stars.pb.js. No PocketBase globals here, so Vitest can test
-// the same file the hook require()s. Stars count against a person: each rule break
+// Pure star rules. Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
+// Stars count against a person: each rule break
 // gives the rule's stars. Automatic rules come from attendance (the app adds them
 // up); an admin gives the others by hand, or excuses an automatic one for a day.
 

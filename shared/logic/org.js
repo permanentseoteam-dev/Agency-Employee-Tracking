@@ -1,5 +1,5 @@
-// Pure input checks for the organization routes (invite.pb.js). No PocketBase
-// globals here, so Vitest can test the same file the hooks require().
+// Pure input checks for the account functions (org, register). Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
@@ -71,7 +71,7 @@ function validateInvite(body) {
 }
 
 /**
- * Validates the sign-in page's "Create an account" form (register.pb.js).
+ * Validates the sign-in page's "Create an account" form (the register function).
  * Only the person's own details are taken: role, team, joining date, status and
  * salary are always set by the server, whatever the request says.
  */
@@ -117,22 +117,8 @@ function validateSetActive(body, actingUserId) {
   return { data: { userId: userId, active: b.active, left_on: leftOn } }
 }
 
-/**
- * Throws a 403 unless the request comes from an active app admin.
- * Only called inside PocketBase, where ForbiddenError is a global.
- */
-function requireAdmin(e) {
-  const auth = e.auth
-  if (!auth || auth.collection().name !== 'users' || auth.get('role') !== 'admin' || !auth.getBool('active')) {
-    // eslint-disable-next-line no-undef
-    throw new ForbiddenError('Only admins can do this.')
-  }
-  return auth
-}
-
 module.exports = {
   ROLES: ROLES,
-  requireAdmin: requireAdmin,
   passwordProblem: passwordProblem,
   isDateKey: isDateKey,
   todayKey: todayKey,

@@ -1,5 +1,6 @@
-// Pure leave rules (plan §4.3) for leave.pb.js. No PocketBase globals here, so
-// Vitest can test the same file the hook require()s. Dates are "YYYY-MM-DD" day
+// Pure leave rules (plan §4.3). Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
+// Dates are "YYYY-MM-DD" day
 // keys in the org timezone; work days are ISO weekdays (1 = Monday … 7 = Sunday).
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/

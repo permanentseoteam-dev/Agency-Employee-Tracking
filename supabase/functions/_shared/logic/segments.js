@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/segments.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/segments.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/segments.js
+// shared/logic/segments.js
 var require_segments = __commonJS({
-  "server/pb_hooks/lib/segments.js"(exports, module) {
+  "shared/logic/segments.js"(exports, module) {
     var MINUTE = 60 * 1e3;
     var MAX_LENGTH_MS = 6 * MINUTE;
     var MAX_AHEAD_MS = 2 * MINUTE;

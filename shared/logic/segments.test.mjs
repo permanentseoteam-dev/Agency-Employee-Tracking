@@ -5,7 +5,7 @@ const NOW = Date.parse('2026-10-14T10:00:00.000Z')
 const at = (offsetMinutes) => new Date(NOW + offsetMinutes * 60000).toISOString()
 
 describe('parseInstant', () => {
-  it('reads PocketBase and ISO dates', () => {
+  it('reads space-separated and ISO dates', () => {
     expect(segments.parseInstant('2026-10-14 10:00:00.000Z')).toBe(NOW)
     expect(segments.parseInstant('2026-10-14T10:00:00.000Z')).toBe(NOW)
   })

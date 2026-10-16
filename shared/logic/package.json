@@ -1,0 +1,4 @@
+{
+  "//": "These are CommonJS (module.exports); the repo root is an ES module package.",
+  "type": "commonjs"
+}

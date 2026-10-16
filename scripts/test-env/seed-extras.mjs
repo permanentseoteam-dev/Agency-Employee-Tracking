@@ -2,13 +2,13 @@
 // - the "Emergency" leave type (unpaid, no limit), as an admin adds it in Rules → Leave types
 // - dummy pay history: the three months before this one, finalized, so every role has
 //   something under Finance. The figures go through the real formula
-//   (server/pb_hooks/lib/payroll.js), so the breakdown dialog adds up.
+//   (shared/logic/payroll.js), so the breakdown dialog adds up.
 // This month stays free for running payroll by hand (admin plan A-61).
 // - three clients for the Project tab, with people on more than one, and a few meetings
 //   on their calendars this week, each added by someone on that client
 import { createRequire } from 'node:module'
 
-const payroll = createRequire(import.meta.url)('../../server/pb_hooks/lib/payroll.js')
+const payroll = createRequire(import.meta.url)('../../shared/logic/payroll.js')
 
 const OFFSET_MIN = 300 // Asia/Karachi, no DST
 const addDays = (key, n) => new Date(Date.parse(key + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10)

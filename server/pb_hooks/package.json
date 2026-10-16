@@ -1,4 +1,0 @@
-{
-  "//": "Lets Vitest load these hook helpers as CommonJS, the format PocketBase's require() expects.",
-  "type": "commonjs"
-}

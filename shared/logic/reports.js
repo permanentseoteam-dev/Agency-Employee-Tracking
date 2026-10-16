@@ -1,5 +1,5 @@
-// Pure helpers for GET /api/reports/activity (reports.pb.js). No PocketBase
-// globals here, so Vitest can test the same file the hook require()s.
+// Pure helpers for the reports-activity function. Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 const GROUPS = ['day', 'week', 'month']
@@ -23,7 +23,7 @@ function str(v) {
   return typeof v === 'string' ? v.trim() : ''
 }
 
-/** "2026-10-14 05:00:00.000Z": the PocketBase date format, which sorts as text. */
+/** "2026-10-14 05:00:00.000Z": the space-separated UTC date format, which sorts as text. */
 function pbDate(ms) {
   return new Date(ms).toISOString().replace('T', ' ')
 }

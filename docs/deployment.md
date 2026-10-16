@@ -88,7 +88,7 @@ Anything recorded after that backup is lost, at most a day, except time a staff 
 
 ## The old PocketBase server
 
-Until the switch-over, the office PC runs PocketBase (service "PocketBase", `D:\PSEOTracker`, reached through Tailscale Funnel), set up by `server\deploy\setup-server.ps1`. After the switch it stays on for one week as a fallback ([switch-over.md](switch-over.md)), then is switched off; `D:\PSEOTracker` is kept as an archive. Tailscale and the office setup file (`npm run office-setup`) are no longer needed for staff PCs.
+Until the switch-over, the office PC runs PocketBase (service "PocketBase", from its own copy in `D:\PSEOTracker`, reached through Tailscale Funnel). Its setup and deploy scripts are no longer in this branch; they stay on `main` (`server\deploy\setup-server.ps1`) until the switch-over merge. After the switch it stays on for one week as a fallback ([switch-over.md](switch-over.md)); then stop the service (`Stop-Service PocketBase`), turn off Funnel (`tailscale funnel --https=443 off`) and keep `D:\PSEOTracker` as an archive. Staff PCs need neither Tailscale nor the old office setup file.
 
 ---
 

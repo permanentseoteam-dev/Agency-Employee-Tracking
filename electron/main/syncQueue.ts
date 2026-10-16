@@ -1,5 +1,5 @@
 // Offline-safe delivery of activity segments (plan §4.1). Every closed segment
-// is stored on disk first and then created in PocketBase with a client-made id,
+// is stored on disk first and then inserted into Supabase with a client-made id,
 // so a retry can never create a second copy (Supabase answers a repeat with 409).
 import { randomInt } from 'node:crypto'
 

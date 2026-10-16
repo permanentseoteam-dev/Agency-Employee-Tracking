@@ -13,7 +13,7 @@ export const leaveKeys = {
   onDay: (day: string) => ['leave', 'on-day', day] as const
 }
 
-// A request with the people and leave type the screens show (PocketBase: expand user,leave_type,approver).
+// A request with the people and leave type the screens show (embedded user, leave_type and approver).
 const WITH_NAMES =
   '*, user_row:profiles!leave_requests_user_fkey(*), type_row:leave_types(*), approver_row:profiles!leave_requests_approver_fkey(*)'
 type Row = Record<string, unknown> & { user_row?: Record<string, unknown> | null; type_row?: Record<string, unknown> | null; approver_row?: Record<string, unknown> | null }

@@ -1,4 +1,4 @@
-// The app's one Supabase client (was src/lib/pb.ts with PocketBase). The session is kept in
+// The app's one Supabase client. The session is kept in
 // localStorage and renewed by supabase-js; the main process gets each new token (stores/session.ts).
 import { createClient, FunctionsHttpError, type PostgrestError } from '@supabase/supabase-js'
 
@@ -48,7 +48,7 @@ export interface OrgSettings {
 
 /**
  * Every failure the screens see, with the shape errorMessage() reads: status 0 = no connection,
- * and response.message = what the server said (the same texts the PocketBase routes used).
+ * and response.message = what the server said (the texts the server functions send).
  */
 export class AppError extends Error {
   constructor(

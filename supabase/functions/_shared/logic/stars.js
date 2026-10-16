@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/stars.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/stars.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/stars.js
+// shared/logic/stars.js
 var require_stars = __commonJS({
-  "server/pb_hooks/lib/stars.js"(exports, module) {
+  "shared/logic/stars.js"(exports, module) {
     var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
     function recordProblem(input, ctx) {
       const c = ctx || {};

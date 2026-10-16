@@ -1,5 +1,5 @@
-// Pure helpers for the Project tab (projects.pb.js). No PocketBase globals here, so
-// Vitest can test the same file the hook require()s.
+// Pure helpers for the Project tab. Plain CommonJS with no server globals, so Vitest
+// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 //
 // A client's team page shows each person's status for one day:
 // - a finished day: the stored attendance status (attendance.js decides it each night)
@@ -17,7 +17,7 @@ function isDateKey(value) {
   return typeof value === 'string' && DATE_KEY.test(value) && !Number.isNaN(Date.parse(value + 'T00:00:00.000Z'))
 }
 
-/** Milliseconds for a PocketBase date ("2026-10-14 05:00:00.000Z") or an ISO string; NaN if invalid. */
+/** Milliseconds for a space-separated UTC date ("2026-10-14 05:00:00.000Z") or an ISO string; NaN if invalid. */
 function parseInstant(value) {
   if (typeof value !== 'string' || !value) return NaN
   return Date.parse(value.trim().replace(' ', 'T'))
@@ -100,7 +100,7 @@ function parseLeaveQuery(query) {
   return { data: { client: client, from: from, to: to } }
 }
 
-/** A calendar event must end after it starts (PocketBase dates sort as text). */
+/** A calendar event must end after it starts (these dates sort as text). */
 function eventTimesProblem(startsAt, endsAt) {
   const start = parseInstant(startsAt)
   const end = parseInstant(endsAt)

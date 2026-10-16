@@ -1,12 +1,12 @@
-// GENERATED from server/pb_hooks/lib/payroll.js by scripts/build-edge-shared.mjs. Do not edit.
+// GENERATED from shared/logic/payroll.js by scripts/build-edge-shared.mjs. Do not edit.
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
 
-// server/pb_hooks/lib/payroll.js
+// shared/logic/payroll.js
 var require_payroll = __commonJS({
-  "server/pb_hooks/lib/payroll.js"(exports, module) {
+  "shared/logic/payroll.js"(exports, module) {
     var MONTH = /^\d{4}-(0[1-9]|1[0-2])$/;
     var DAY_MS = 864e5;
     function isMonth(value) {

@@ -36,7 +36,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 | Desktop shell | Electron with electron-vite |
 | UI | React + TypeScript, Tailwind CSS, shadcn-style components, lucide-react icons, Radix dropdown menu |
 | State / data | Zustand (session, role, theme), TanStack Query (wrapping supabase-js), react-router |
-| Backend | **Supabase** (free plan): Postgres with row-level security and guard triggers, Auth (email + password), Realtime, Edge Functions (Deno) reusing the pure logic in `server/pb_hooks/lib`, pg_cron, Storage for profile pictures |
+| Backend | **Supabase** (free plan): Postgres with row-level security and guard triggers, Auth (email + password), Realtime, Edge Functions (Deno) reusing the pure logic in `shared/logic`, pg_cron, Storage for profile pictures |
 | Client SDK | `@supabase/supabase-js` (renderer and Electron main process; only the renderer renews the session) |
 | Offline queue | electron-store in the main process |
 | Logging | electron-log (main process, rotating file in `%APPDATA%\PSEO Tracker\logs`) |
@@ -80,7 +80,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 │                       leave-request, leave-update, attendance-recompute│
 │                       payroll-run, reports-activity, projects-status,  │
 │                       projects-leaves, star-record                     │
-│   _shared/logic       the pure lib/*.js from server/pb_hooks/lib,      │
+│   _shared/logic       the pure shared/logic/*.js,                      │
 │                       bundled by scripts/build-edge-shared.mjs         │
 │ Auth (email+password), Storage bucket "avatars"                        │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -196,7 +196,7 @@ These settings live in a single `org_settings` record:
 
 > **On Supabase:** each collection below is a Postgres table of the same name and fields (`supabase/migrations`), and `users` is Supabase Auth plus a `profiles` table (with `profile_emails` for the email, and `legacy_id`, the old PocketBase id). Ids stay 15-character text, except accounts, which are uuids. The API rules below are **row-level security** policies with the same meaning, and the hooks are guard triggers or Edge Functions. `npm run check:rules` checks all of it against staging (240 checks). The rest of this section is the original PocketBase design, kept as the reference the port follows.
 
-Every collection gets automatic `id` (15 characters), `created` and `updated` fields. "→" marks a **relation** field. Instants (`started_at`, `last_seen`, `decided_at` …) are UTC date fields shown in Asia/Karachi. **Date-only values** (`attendance.date`, `holidays.date`, leave `start_date`/`end_date`, `joined_on`, `left_on`) are `"YYYY-MM-DD"` text in Karachi time, which avoids a 5-hour shift moving them to the wrong day. The schema lives in `server/pb_migrations/1791950000_init_schema.js`, and the defaults are in `1791950100_seed_defaults.js`.
+Every collection gets automatic `id` (15 characters), `created` and `updated` fields. "→" marks a **relation** field. Instants (`started_at`, `last_seen`, `decided_at` …) are UTC date fields shown in Asia/Karachi. **Date-only values** (`attendance.date`, `holidays.date`, leave `start_date`/`end_date`, `joined_on`, `left_on`) are `"YYYY-MM-DD"` text in Karachi time, which avoids a 5-hour shift moving them to the wrong day. The PocketBase schema lived in `server/pb_migrations` (still on `main` until the switch-over); the Supabase schema is `supabase/migrations`.
 
 | Collection (type) | Fields |
 |---|---|
@@ -261,8 +261,9 @@ F:agency-tracker
 │                   (each with its screens and an api.ts of hooks)
 ├─ supabase/
 │  ├─ migrations/   schema, security, guards, hourly attendance, register limit, live sessions, realtime, legacy ids, database size
-│  └─ functions/    one folder per Edge Function, _shared/ (core.ts, stores, logic/ bundled from server/pb_hooks/lib)
-├─ server/          the old PocketBase (pb_migrations, pb_hooks, deploy); pb_hooks/lib/*.js is still the tested logic
+│  └─ functions/    one folder per Edge Function, _shared/ (core.ts, stores, logic/ bundled from shared/logic)
+├─ shared/logic/    the pure business rules (attendance, leave, payroll, stars, projects, reports, org, segments),
+│                   CommonJS, tested by Vitest and bundled into the functions
 ├─ scripts/         test-env/ (staging test company), check-rules-supabase.mjs, migrate-to-supabase.mjs,
 │                   backup-supabase.mjs, restore-supabase.mjs, register-supabase-backup-task.ps1, build-edge-shared.mjs
 ├─ docs/            deployment.md, switch-over.md, testing/
@@ -293,9 +294,9 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
 **Unit tests (Vitest)**
 - `formatDuration`: for example, 19380 s gives `5h 23m`, and 0 gives `0h 0m`.
 - Tracker state machine: feed it simulated idle readings and check the segments, including the backdated idle start.
-- Attendance status function (`server/pb_hooks/lib/attendance.js`): one case per status.
-- Payroll calculation (`server/pb_hooks/lib/payroll.js`): absences, unpaid leave, half days, late penalties, holidays, and the admin adjustment.
-- Segment validation (`server/pb_hooks/lib/segments.js`): overlapping, too long, future-dated, too old and valid cases.
+- Attendance status function (`shared/logic/attendance.js`): one case per status.
+- Payroll calculation (`shared/logic/payroll.js`): absences, unpaid leave, half days, late penalties, holidays, and the admin adjustment.
+- Segment validation (`shared/logic/segments.js`): overlapping, too long, future-dated, too old and valid cases.
 
 **Manual end-to-end on Windows**
 1. Start the server with `npm run pb` and the app with `npm run dev`. Log in as two users created by the admin, on two machines or VMs.
@@ -316,7 +317,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
 ---
 
 ## 9. Open items / needed from you
-- **Production hosting** (decided in M12: the office PC with Tailscale, backups copied to the E: drive; see [docs/deployment.md](docs/deployment.md)). Original note: an always-on office PC with Cloudflare Tunnel or Tailscale, or an Oracle Cloud Always Free VM. Either way, daily backups go to a free off-site S3 bucket (Cloudflare R2 or Backblaze B2), so a crashed or corrupted server loses at most a day of data. The office-PC option also needs `pb_data` on a non-C: drive, a UPS and the NSSM graceful stop. See [docs/pocketbase-guide.md §7](docs/pocketbase-guide.md).
+- **Production hosting** (decided in M12: the office PC with Tailscale, backups copied to the E: drive; see [docs/deployment.md](docs/deployment.md)). Original note: an always-on office PC with Cloudflare Tunnel or Tailscale, or an Oracle Cloud Always Free VM. Either way, daily backups go to a free off-site S3 bucket (Cloudflare R2 or Backblaze B2), so a crashed or corrupted server loses at most a day of data. The office-PC option also needs `pb_data` on a non-C: drive, a UPS and the NSSM graceful stop. (The PocketBase guide was removed with the move to Supabase.)
 - **Optional SMTP** for "forgot password" emails: a Gmail app password or the Brevo free plan.
 - **Role definitions:** full per-screen permissions come later, in `src/lib/roles.ts` and the API rules. The data locks in §5 apply from the start.
 - **Defaults to confirm:**
@@ -333,7 +334,7 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - electron-vite 5, Electron 44, React 19 and Tailwind v4 set up
   - secure window and file logging working
   - `formatDuration` and the Asia/Karachi date helpers, with 16 tests passing
-- Docs: this plan, [roadmap.md](roadmap.md), [docs/pocketbase-guide.md](docs/pocketbase-guide.md) and [docs/client-solutions-summary.md](docs/client-solutions-summary.md).
+- Docs: this plan, [roadmap.md](roadmap.md), [docs/client-solutions-summary.md](docs/client-solutions-summary.md).
 - **M1 done** (2026-10-14):
   - all 14 collections plus the `leave_balances` view, with the locked-down rules from §5
   - seed defaults loaded
