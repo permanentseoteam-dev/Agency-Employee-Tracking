@@ -5,11 +5,11 @@ export interface Notice {
   body: string
 }
 
-/** A new version is downloaded and waiting; clicking the notification installs it now. */
-export function readyNotice(version: string): Notice {
+/** A new version is downloaded and installs right away: the app restarts by itself. */
+export function updatingNotice(version: string): Notice {
   return {
-    title: `PSEO Tracker ${version} is ready`,
-    body: 'Click here to restart and update now (about 10 seconds; your tracked time is kept). Otherwise it updates by itself when you are not being tracked.'
+    title: `Updating PSEO Tracker to ${version}`,
+    body: 'The app restarts in about 10 seconds. Your tracked time is kept; nothing to do.'
   }
 }
 

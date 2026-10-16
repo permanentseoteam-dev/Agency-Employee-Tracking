@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { isFirstStartAfterUpdate, readyNotice, updatedNotice } from './updateNotice'
+import { isFirstStartAfterUpdate, updatedNotice, updatingNotice } from './updateNotice'
 
 describe('update notifications', () => {
-  it('names the version and the two ways it installs', () => {
-    const n = readyNotice('0.1.5')
-    expect(n.title).toBe('PSEO Tracker 0.1.5 is ready')
-    expect(n.body).toContain('Click here to restart and update now')
-    expect(n.body).toContain('updates by itself when you are not being tracked')
+  it('says the update installs now, by itself, and keeps the tracked time', () => {
+    const n = updatingNotice('0.1.9')
+    expect(n.title).toBe('Updating PSEO Tracker to 0.1.9')
+    expect(n.body).toContain('restarts in about 10 seconds')
+    expect(n.body).toContain('tracked time is kept')
   })
 
   it('confirms an update after it installed', () => {

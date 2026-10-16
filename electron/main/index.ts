@@ -6,6 +6,7 @@ import { onStatus, shutdown, startEngine, status, stopNow } from './engine'
 import { registerIpc } from './ipc'
 import { initLog, log } from './log'
 import { startSessionRefresh } from './session'
+import { persisted } from './store'
 import { createTray } from './tray'
 import { startUpdater } from './updater'
 
@@ -104,9 +105,12 @@ if (!app.requestSingleInstanceLock()) {
     onStatus(updateTray)
 
     // The renderer always loads (it hands the session to the tracker); started at login it stays hidden.
-    win = createWindow(!process.argv.includes(HIDDEN_ARG))
+    // After an automatic update the window comes back as it was (the installer starts the app plainly).
+    const afterUpdate = persisted().get('showWindowAfterUpdate')
+    if (afterUpdate !== null) persisted().set('showWindowAfterUpdate', null)
+    win = createWindow(afterUpdate ?? !process.argv.includes(HIDDEN_ARG))
 
-    startUpdater(() => status().state !== 'off')
+    startUpdater(() => persisted().set('showWindowAfterUpdate', !!win && !win.isDestroyed() && win.isVisible()))
   })
 
   // Close the open segment and give the queue a moment to sync before exiting.
