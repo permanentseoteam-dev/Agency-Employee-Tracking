@@ -47,7 +47,7 @@ describe('notificationText', () => {
     expect(
       notificationText({ type: 'signup_pending', payload: { user: 'u9', name: 'Sara Self', email: 'sara@gmail.com' } })
     ).toEqual({ title: 'New sign-up waiting for approval', detail: 'Sara Self · sara@gmail.com · approve or reject it in Organization' })
-    expect(notificationLink({ type: 'signup_pending' })).toBe('/org/employees')
+    expect(notificationLink({ type: 'signup_pending' }, 'admin')).toBe('/org/employees')
   })
 
   it('tells someone an admin gave them stars', () => {
@@ -57,7 +57,9 @@ describe('notificationText', () => {
       detail: 'Phone in meetings · 14 Oct 2026 · Client call · by Ayesha'
     })
     expect(notificationText({ type: 'stars_given', payload: { ...stars, stars: 0, note: '' } }).title).toBe('A rule break was noted')
-    expect(notificationLink({ type: 'stars_given' })).toBe('/my-attendance')
+    expect(notificationLink({ type: 'stars_given' }, 'employee')).toBe('/my-attendance')
+    // Managers and admins see their own attendance as a tab inside Attendance.
+    expect(notificationLink({ type: 'stars_given' }, 'manager')).toBe('/attendance/mine')
   })
 
   it('copes with unknown types and empty payloads', () => {
@@ -78,10 +80,10 @@ describe('notificationText', () => {
   })
 
   it('links to the right screen', () => {
-    expect(notificationLink({ type: 'leave_requested' })).toBe('/approvals')
-    expect(notificationLink({ type: 'leave_decided' })).toBe('/my-leaves')
-    expect(notificationLink({ type: 'employee_registered' })).toBe('/org/employees')
-    expect(notificationLink({ type: 'x' })).toBeNull()
+    expect(notificationLink({ type: 'leave_requested' }, 'manager')).toBe('/my-leaves/pending')
+    expect(notificationLink({ type: 'leave_decided' }, 'employee')).toBe('/my-leaves')
+    expect(notificationLink({ type: 'employee_registered' }, 'admin')).toBe('/org/employees')
+    expect(notificationLink({ type: 'x' }, 'employee')).toBeNull()
   })
 })
 

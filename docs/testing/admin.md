@@ -60,12 +60,12 @@ Sign in as Ayesha (admin). Admins can do everything; these tests cover what only
 | A-40 | Attendance for everyone | Open Attendance; team filter | Both teams; the filter narrows to one |  | ✓ |
 | A-41 | Recount days | Add a holiday on a past day, then Recount days over that range | That day changes to Holiday for everyone | ★ | ✓ |
 | A-42 | Recount limits | Recount today or a range longer than 31 days | A clear message; nothing changes |  | ✓ |
-| A-43 | A manager's request | Approvals → Pending | Sana's Casual request is there; approving it notifies Sana | ★ | ✓ |
+| A-43 | A manager's request | My Leaves → Pending | Sana's Casual request is there; approving it notifies Sana | ★ | ✓ |
 | A-44 | Reverse an approval | Decided → Reject an approved request | Rejected; the days return to the balance; the employee is notified |  | ✓ |
 | A-45 | Approve a rejection | Decided → Approve Danish's rejected request | Approved; the balance goes down |  | ✓ |
 | A-46 | Cancel approved leave | Decided → Cancel leave | Cancelled; the days return; past days' attendance is recounted |  | ✓ |
 | A-47 | Cancelled stays cancelled | Try to approve a cancelled request | Not offered; refused by the server |  | ✓ |
-| A-48 | Team balances for everyone | Approvals → Team balances | Both teams; search works |  | ✓ |
+| A-48 | Team balances for everyone | My Leaves → Team balances | Both teams; search works |  | ✓ |
 | A-49 | Live Board for everyone | Open the Live Board | Both teams; the team filter works |  |  |
 | A-50 | Reports for everyone | Reports, both teams, CSV export | Every team; the CSV matches the screen |  |  |
 

@@ -9,11 +9,11 @@ Sign in as Bilal (manager of Alpha). Sana manages Bravo; use her to check team b
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
 | M-01 | Sign in | Sign in as bilal@test.local | Lands on the Live Board; the top bar shows "Manager" | ★ |  |
-| M-02 | Manager menu | Look at the sidebar | My Stats, My Attendance, My Leaves, Calendar, Project, Live Board, Approvals, Attendance, Reports, Rules; no Organization or Finance (hidden for managers for now) |  |  |
+| M-02 | Manager menu | Look at the sidebar | My Stats, My Leaves, Calendar, Project, Live Board, Attendance, Reports, Rules; no Organization or Finance (hidden for managers for now). Own attendance is Attendance → My attendance; approvals are tabs in My Leaves |  |  |
 | M-03 | Own tracking and leave | Run E-20 to E-22, E-40 and E-50 to E-63 once as Bilal | Same results as for an employee |  |  |
 | M-04 | Quit from the tray | Right-click the tray icon → Quit | Quit is there; the app closes cleanly (no error) | ★ | – |
 | M-05 | Quit from the profile menu | Profile menu → Quit PSEO Tracker | The app closes cleanly |  |  |
-| M-06 | Own leave goes to the admins | Bilal applies for Casual leave | Not in his own Approvals; it appears in the admin's Pending and the admin's bell rings | ★ | ✓ |
+| M-06 | Own leave goes to the admins | Bilal applies for Casual leave | Not in his own My Leaves → Pending; it appears in the admin's Pending and the admin's bell rings | ★ | ✓ |
 | M-07 | Switch account | Switch account to asma@test.local, then back to bilal@test.local | Employee view as Asma; getting back needs Bilal's password |  |  |
 
 ## 2. Live Board
@@ -30,15 +30,15 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 | M-15 | New hire appears | The admin adds an employee to Alpha | A new card appears without refreshing |  | ✓ |
 | M-16 | Search and filters | Search a name; click Active, Idle, On leave, Offline | The list narrows; the counts on the buttons are right |  |  |
 
-## 3. Approvals
+## 3. Approvals (My Leaves tabs)
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| M-20 | Pending queue | Approvals → Pending | Chand's Casual request with days, reason and his paid days left; Sana's request is not there | ★ | ✓ |
+| M-20 | Pending queue | My Leaves → Pending | Chand's Casual request with days, reason and his paid days left; Sana's request is not there | ★ | ✓ |
 | M-21 | Approve with a comment | Approve Chand's request with a comment | It leaves Pending; Chand's balance goes down; Chand's bell shows the approval and the comment | ★ | ✓ |
 | M-22 | Reject with a reason | Have Asma apply, then reject it with a reason | Asma sees Rejected and the reason; her balance is unchanged |  |  |
-| M-23 | Decided history | Approvals → Decided | Who, when and the comment for each decision; no buttons to change a decision |  | ✓ |
-| M-24 | Team balances | Approvals → Team balances | Alpha people only; days left and used per type; the search works |  | ✓ |
+| M-23 | Decided history | My Leaves → Decided | Who, when and the comment for each decision; no buttons to change a decision |  | ✓ |
+| M-24 | Team balances | My Leaves → Team balances | Alpha people only; days left and used per type; the search works |  | ✓ |
 | M-25 | New requests arrive live | Keep Pending open while Asma applies | It appears without refreshing |  | ✓ |
 | M-26 | Can't change a decision | (server check) Reverse an approval as a manager | Refused: only an admin can |  | ✓ |
 | M-27 | Other teams and managers | (server check) Decide a Bravo request, or a manager's request in your team | Refused: managers' leave is decided by an admin |  | ✓ |
@@ -61,8 +61,9 @@ Keep a second test app open as an Alpha employee (`npm run test:app -- --as asma
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
 | M-40 | Team leave on the calendar | Open Calendar | Approved leave of Alpha people shows; Bravo people's does not |  | ✓ |
+| M-46 | Team events only for the team | As Bilal (Alpha) and then as Sana (Bravo) | "Alpha sprint review" shows for Bilal, not for Sana |  |  |
 | M-41 | No calendar editing | Look for add or edit on Month and Holidays | None for a manager |  | ✓ |
-| M-42 | Bell on a new request | Asma applies for leave | Bilal's bell goes up by one: "Asma Khan asked for leave"; clicking it opens Approvals | ★ | ✓ |
+| M-42 | Bell on a new request | Asma applies for leave | Bilal's bell goes up by one: "Asma Khan asked for leave"; clicking it opens My Leaves → Pending | ★ | ✓ |
 | M-43 | Other teams don't ring | Danish (Bravo) applies | Bilal's bell does not change |  | ✓ |
 | M-44 | Project: own clients only | Project as Bilal | Only Acme Dental; the team's status and month totals; no New client, Edit, Add people or × | ★ | ✓ |
 | M-45 | Project calendar | Acme Dental → Calendar → add "Test call" tomorrow 10:00; edit it; delete it | All allowed; the day view says "Added by Bilal Manager"; Asma sees it too |  | ✓ |

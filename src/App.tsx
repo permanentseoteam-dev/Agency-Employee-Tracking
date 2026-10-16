@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { ChangePassword } from '@/features/auth/ChangePassword'
 import { SignedOut } from '@/features/auth/SignedOut'
 import { TrackingNotice } from '@/features/auth/TrackingNotice'
+import { AttendanceLayout } from '@/features/attendance/AttendanceLayout'
 import { AttendanceTable } from '@/features/attendance/AttendanceTable'
 import { MyAttendance } from '@/features/attendance/MyAttendance'
 import { CalendarLayout } from '@/features/calendar/CalendarLayout'
@@ -19,10 +20,10 @@ import { EmployeeDetail } from '@/features/org/EmployeeDetail'
 import { Employees } from '@/features/org/Employees'
 import { InviteEmployee } from '@/features/org/InviteEmployee'
 import { Approvals } from '@/features/leave/Approvals'
-import { ApprovalsLayout } from '@/features/leave/ApprovalsLayout'
 import { DecidedLeaves } from '@/features/leave/DecidedLeaves'
 import { TeamBalances } from '@/features/leave/TeamBalances'
 import { MyLeaves } from '@/features/leave/MyLeaves'
+import { MyLeavesLayout } from '@/features/leave/MyLeavesLayout'
 import { OrgLayout } from '@/features/org/OrgLayout'
 import { TeamDetail } from '@/features/org/TeamDetail'
 import { Teams } from '@/features/org/Teams'
@@ -78,7 +79,7 @@ function CrashScreen() {
 }
 
 /** Sidebar sections that have real screens; the rest show a placeholder until their module. */
-const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance', '/my-leaves', '/approvals', '/projects'])
+const BUILT = new Set(['/org', '/rules', '/my-stats', '/live', '/reports', '/calendar', '/attendance', '/my-attendance', '/finance', '/my-leaves', '/projects'])
 
 // Hash routing, because the packaged app loads index.html from disk. The router
 // stays mounted for the whole app life; the Gate decides what the root shows.
@@ -151,18 +152,26 @@ const router = createHashRouter([
       },
       { path: 'my-stats', element: <MyStats /> },
       { path: 'my-attendance', element: <MyAttendance /> },
-      { path: 'my-leaves', element: <MyLeaves /> },
       {
-        path: 'approvals',
-        element: <ApprovalsLayout />,
+        // Approvals live here as tabs for managers and admins.
+        path: 'my-leaves',
+        element: <MyLeavesLayout />,
         children: [
-          { index: true, element: <Navigate to="/approvals/pending" replace /> },
+          { index: true, element: <MyLeaves /> },
           { path: 'pending', element: <Approvals /> },
           { path: 'decided', element: <DecidedLeaves /> },
           { path: 'balances', element: <TeamBalances /> }
         ]
       },
-      { path: 'attendance', element: <AttendanceTable /> },
+      {
+        path: 'attendance',
+        element: <AttendanceLayout />,
+        children: [
+          { index: true, element: <Navigate to="/attendance/team" replace /> },
+          { path: 'team', element: <AttendanceTable /> },
+          { path: 'mine', element: <MyAttendance /> }
+        ]
+      },
       { path: 'live', element: <LiveBoard /> },
       { path: 'reports', element: <Reports /> },
       { path: 'profile', element: <MyProfile /> },
