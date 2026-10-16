@@ -1,7 +1,7 @@
 {
   "name": "pseo-tracker",
   "productName": "PSEO Tracker",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Employee activity, attendance, leave and payroll tracker for the agency",
   "author": "Permanent SEO",
   "main": "out/main/index.js",
