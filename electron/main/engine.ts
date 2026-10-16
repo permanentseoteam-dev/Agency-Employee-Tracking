@@ -108,7 +108,9 @@ async function adoptTimeFromBeforeTheSwitch(userId: string): Promise<void> {
   const { data, error } = await db.from('profiles').select('legacy_id').eq('id', userId).maybeSingle()
   if (error || !data?.legacy_id || !old.has(data.legacy_id)) return
   const moved = queue.reassign(data.legacy_id, userId)
-  if (t && t.userId === data.legacy_id) persisted().set('today', { ...t, userId })
+  // Read today's totals again: the open segment was closed (and counted) while we waited.
+  const latest = persisted().get('today')
+  if (latest && latest.userId === data.legacy_id) persisted().set('today', { ...latest, userId })
   log.info(`moved ${moved} segment(s) recorded before the switch to Supabase to this account`)
   pushStatus()
 }
