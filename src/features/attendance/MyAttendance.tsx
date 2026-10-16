@@ -3,14 +3,23 @@ import { Card } from '@/components/ui/Card'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { useOrgSettings } from '@/features/rules/api'
 import { COUNTED, STATUS_LABEL, countStatuses, employedOn, monthDays, monthOf } from '@/lib/attendance'
-import { cn } from '@/lib/cn'
+import { InfoBanner } from '@/components/ui/InfoBanner'
+import { StatCard, StatGrid, type StatTone } from '@/components/ui/StatCard'
 import { formatDayKey, formatTime, toDateKey, DEFAULT_TZ } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
 import { useSession } from '@/stores/session'
 import { StarsCard } from '@/features/stars/StarsList'
 import { useMonthAttendance } from './api'
 import { MonthPicker } from './MonthPicker'
-import { AttendanceBadge, STATUS_CLASS } from './status'
+import { AttendanceBadge } from './status'
+
+const STATUS_TONE: Partial<Record<string, StatTone>> = {
+  present: 'success',
+  late: 'warning',
+  half_day: 'orange',
+  absent: 'danger',
+  on_leave: 'info'
+}
 
 export function MyAttendance() {
   const user = useSession((s) => s.user)!
@@ -29,17 +38,15 @@ export function MyAttendance() {
   const time = (value: string) => (value ? formatTime(value.replace(' ', 'T'), tz) : '—')
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <MonthPicker month={month} max={monthOf(today)} onChange={setMonth} />
-        <div className="ml-auto flex flex-wrap gap-2" aria-label="Month totals">
-          {COUNTED.map((s) => (
-            <span key={s} className={cn('rounded-md px-2.5 py-1 text-sm', STATUS_CLASS[s])} data-count={s}>
-              {STATUS_LABEL[s]} <span className="font-semibold tabular-nums">{counts[s]}</span>
-            </span>
-          ))}
-        </div>
-      </div>
+    <div className="mx-auto max-w-5xl space-y-[18px]">
+      <MonthPicker month={month} max={monthOf(today)} onChange={setMonth} />
+      <StatGrid aria-label="Month totals" className="grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
+        {COUNTED.map((s) => (
+          <div key={s} data-count={s}>
+            <StatCard label={STATUS_LABEL[s]} value={counts[s]} tone={STATUS_TONE[s] ?? 'neutral'} className="h-full" />
+          </div>
+        ))}
+      </StatGrid>
 
       <Card>
         {records.isLoading ? (
@@ -89,10 +96,10 @@ export function MyAttendance() {
         )}
       </Card>
       <StarsCard userId={user.id} month={month} attendance={records.data ?? []} />
-      <p className="text-xs text-slate-500">
+      <InfoBanner>
         Counted every night at 01:00 from your tracked time. Late means your first activity came after the shift start plus the
         grace period; Half day means less active time than the half-day minimum.
-      </p>
+      </InfoBanner>
     </div>
   )
 }

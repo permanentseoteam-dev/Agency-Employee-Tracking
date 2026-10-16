@@ -196,5 +196,11 @@ export default function App() {
       </div>
     )
   }
-  return <RouterProvider router={router} />
+  return (
+    <>
+      {/* The native title bar is hidden: this strip moves the window; the Windows buttons sit on its right. */}
+      <div aria-hidden className="drag fixed inset-x-0 top-0 h-8" />
+      <RouterProvider router={router} />
+    </>
+  )
 }

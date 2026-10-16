@@ -29,15 +29,16 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       className={cn(
-        'm-auto w-full max-w-md rounded-lg border border-slate-200 bg-white p-0 text-slate-900 shadow-xl',
-        'backdrop:bg-slate-950/50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100',
+        'm-auto w-full max-w-md rounded-[var(--radius-shell)] border border-[var(--glass-border-color)] p-0 text-ink-900',
+        'bg-white/90 shadow-[var(--glass-shadow-hover)] backdrop-blur-xl dark:bg-slate-900/95',
+        'backdrop:bg-[rgba(14,21,48,.35)] backdrop:backdrop-blur-[6px]',
         className
       )}
     >
-      <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-        <h2 className="text-base font-semibold">{title}</h2>
+      <div className="px-6 pt-5 pb-1">
+        <h2 className="text-base font-bold">{title}</h2>
       </div>
-      <div className="px-5 py-4">{children}</div>
+      <div className="px-6 py-4">{children}</div>
     </dialog>
   )
 }

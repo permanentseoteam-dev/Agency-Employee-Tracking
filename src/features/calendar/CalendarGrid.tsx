@@ -80,7 +80,7 @@ export function CalendarGrid({
                 <span
                   className={cn(
                     'flex size-6 items-center justify-center rounded-full text-xs font-semibold',
-                    d === today ? 'bg-indigo-600 text-white' : 'text-slate-700 dark:text-slate-300'
+                    d === today ? 'bg-indigo-500 text-white ring-2 ring-indigo-500 ring-offset-2 ring-offset-transparent' : 'text-slate-700 dark:text-slate-300'
                   )}
                 >
                   {Number(d.slice(8))}

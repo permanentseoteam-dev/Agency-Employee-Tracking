@@ -2,10 +2,9 @@ import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type Se
 import { cn } from '@/lib/cn'
 
 const FIELD =
-  'h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 placeholder:text-slate-400 ' +
-  'focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ' +
-  'disabled:cursor-not-allowed disabled:bg-slate-100 ' +
-  'dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:disabled:bg-slate-900'
+  'h-10 w-full rounded-[var(--radius-control)] border border-line bg-[var(--glass-strong)] px-3 text-sm text-ink-900 placeholder:text-ink-400 ' +
+  'transition-shadow focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60 ' +
+  'disabled:cursor-not-allowed disabled:opacity-60'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -22,7 +21,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
 })
 
 export function Label({ className, ...props }: LabelHTMLAttributes<HTMLLabelElement>) {
-  return <label className={cn('mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300', className)} {...props} />
+  return <label className={cn('mb-1.5 block text-sm font-medium text-ink-700', className)} {...props} />
 }
 
 /** Label + control + optional error, stacked. */
@@ -44,9 +43,9 @@ export function Field({
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {error ? (
-        <p className="mt-1 text-xs text-red-600">{error}</p>
+        <p className="mt-1 text-xs text-[var(--danger-text)]">{error}</p>
       ) : hint ? (
-        <p className="mt-1 text-xs text-slate-500">{hint}</p>
+        <p className="mt-1 text-xs text-ink-500">{hint}</p>
       ) : null}
     </div>
   )

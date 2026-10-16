@@ -1,11 +1,11 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus } from 'lucide-react'
+import { Plus, Users } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input, Select } from '@/components/ui/Input'
-import { Table, Td, Th } from '@/components/ui/Table'
 import { FormError } from '@/features/auth/AuthLayout'
 import { errorMessage } from '@/stores/session'
 import { useEmployees, useSaveTeam, useTeams, type Team } from './api'
@@ -28,42 +28,34 @@ export function Teams() {
           <Plus className="size-4" aria-hidden /> New team
         </Button>
       </div>
-      <Card>
-        {teams.isLoading ? (
-          <p className="p-6 text-sm text-slate-500">Loading teams…</p>
-        ) : !teams.data?.length ? (
-          <p className="p-6 text-sm text-slate-500">No teams yet. Create one, then add people to it.</p>
-        ) : (
-          <Table>
-            <thead>
-              <tr>
-                <Th>Team</Th>
-                <Th>Manager</Th>
-                <Th>Active members</Th>
-                <Th className="w-24" />
-              </tr>
-            </thead>
-            <tbody>
-              {teams.data.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <Td>
-                    <Link to={`/org/teams/${t.id}`} className="font-medium text-slate-900 hover:underline dark:text-slate-100">
-                      {t.name}
-                    </Link>
-                  </Td>
-                  <Td>{t.expand?.manager?.full_name ?? <span className="text-slate-400">No manager</span>}</Td>
-                  <Td>{memberCount.get(t.id) ?? 0}</Td>
-                  <Td>
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
-                      Edit
-                    </Button>
-                  </Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        )}
-      </Card>
+      {teams.isLoading ? (
+        <Card className="p-6 text-sm text-ink-500">Loading teams…</Card>
+      ) : !teams.data?.length ? (
+        <Card>
+          <EmptyState icon={Users} title="No teams yet" hint="Create one, then add people to it." />
+        </Card>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-3.5">
+          {teams.data.map((t) => (
+            <Card key={t.id} lift className="flex flex-col gap-3 p-5">
+              <div className="flex items-start justify-between gap-2">
+                <Link to={`/org/teams/${t.id}`} className="text-base font-bold text-ink-900 hover:text-indigo-700 hover:underline">
+                  {t.name}
+                </Link>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
+                  Edit
+                </Button>
+              </div>
+              <div className="text-[13px] text-ink-500">
+                Manager: {t.expand?.manager?.full_name ?? <span className="text-ink-400">No manager</span>}
+              </div>
+              <div className="text-[13px] text-ink-500">
+                Active members <span className="ml-1 text-lg font-bold text-ink-900 tabular-nums">{memberCount.get(t.id) ?? 0}</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
       {editing && <TeamDialog team={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
     </div>
   )

@@ -148,7 +148,7 @@ export function AttendanceTable() {
             <table className="border-collapse text-xs" aria-label="Attendance grid">
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-10 min-w-44 border-b border-slate-200 bg-white px-3 py-2 text-left font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900">
+                  <th className="sticky left-0 z-10 min-w-44 border-b border-slate-200 bg-slate-50 px-3 py-2 text-left font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-900">
                     Employee
                   </th>
                   {days.map((d) => {
@@ -186,7 +186,7 @@ export function AttendanceTable() {
                   const counts = countStatuses([...(mine?.values() ?? [])])
                   return (
                     <tr key={p.id} data-person={p.id}>
-                      <td className="sticky left-0 z-10 border-b border-slate-100 bg-white px-3 py-1.5 dark:border-slate-800/60 dark:bg-slate-900">
+                      <td className="sticky left-0 z-10 border-b border-slate-100 bg-slate-50 px-3 py-1.5 dark:border-slate-800/60 dark:bg-slate-900">
                         <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{p.full_name || p.email}</span>
                         <span className="block truncate text-slate-500">{p.expand?.team?.name ?? 'No team'}</span>
                       </td>

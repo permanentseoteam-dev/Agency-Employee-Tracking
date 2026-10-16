@@ -53,15 +53,17 @@ export function ClientPage() {
         )}
       </div>
 
-      <nav className="inline-flex rounded-md border border-slate-200 bg-white p-0.5 dark:border-slate-800 dark:bg-slate-900" aria-label={`${client.name} sections`}>
+      <nav className="glass inline-flex rounded-full p-1" aria-label={`${client.name} sections`}>
         {SECTIONS.map((s) => (
           <NavLink
             key={s.to}
             to={s.to}
             className={({ isActive }) =>
               cn(
-                'rounded px-3 py-1.5 text-sm font-medium',
-                isActive ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-900 dark:hover:text-slate-100'
+                'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                isActive
+                  ? 'bg-[var(--nav-active-bg)] text-indigo-700 shadow-[0_4px_12px_-6px_rgba(27,42,107,.35)] dark:text-indigo-200'
+                  : 'text-ink-500 hover:text-ink-900'
               )
             }
           >

@@ -1,6 +1,154 @@
 @import "tailwindcss";
+@import "@fontsource-variable/plus-jakarta-sans";
 
 @custom-variant dark (&:where(.dark, .dark *));
+/* Narrow windows: the sidebar becomes an icon rail. */
+@custom-variant rail (@media (max-width: 1099px));
+
+/* Design tokens (docs/ui/ux.md, "Frosted Light Sidebar"). Components use these, not raw hex. */
+:root {
+  --brand-50: #eef3ff;
+  --brand-100: #dce6ff;
+  --brand-200: #b9ccff;
+  --brand-300: #8ba9ff;
+  --brand-400: #5c84ff;
+  --brand-500: #2f5bff;
+  --brand-600: #2447e0;
+  --brand-700: #1d38b3;
+  --brand-800: #1b2a6b;
+  --brand-900: #121c4a;
+  --brand-gradient: linear-gradient(160deg, #2f5bff 0%, #1d38b3 100%);
+  --brand-gradient-deep: linear-gradient(160deg, #2f5bff 0%, #1b2a6b 100%);
+
+  --ink-900: #0e1530;
+  --ink-700: #4a5272;
+  --ink-500: #5b6385;
+  --ink-400: #6b7393;
+  --line: rgba(27, 42, 107, 0.08);
+  --line-strong: rgba(27, 42, 107, 0.14);
+
+  --success: #12b76a;
+  --success-text: #0e8a50;
+  --success-bg: #e7f8ef;
+  --warning: #f79009;
+  --warning-text: #b54708;
+  --warning-bg: #fef4e6;
+  --orange: #f26b1d;
+  --orange-text: #b54708;
+  --orange-bg: #fff0e6;
+  --danger: #f04438;
+  --danger-text: #b42318;
+  --danger-bg: #fdeceb;
+  --info: #2f5bff;
+  --info-text: #1d38b3;
+  --info-bg: #eef3ff;
+  --neutral-bg: #f1f3f9;
+  --neutral-text: #4a5272;
+
+  --app-bg: linear-gradient(135deg, #dce6ff 0%, #f4f7ff 40%, #e9eeff 100%);
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.75);
+  --glass-border-color: rgba(255, 255, 255, 0.9);
+  --glass-border: 1px solid var(--glass-border-color);
+  --glass-blur: blur(22px) saturate(170%);
+  --glass-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 12px 32px -14px rgba(27, 42, 107, 0.2);
+  --glass-shadow-hover: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 40px -16px rgba(27, 42, 107, 0.28);
+  --nav-active-bg: #ffffff;
+  --chart-grid: rgba(27, 42, 107, 0.1);
+  --tooltip-bg: #0e1530;
+
+  --radius-shell: 24px;
+  --radius-card: 20px;
+  --radius-inner: 18px;
+  --radius-control: 12px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dark {
+  /* Navy fills (Week active) would vanish on the dark background. */
+  --brand-800: #8ba9ff;
+  --ink-900: #e8ecff;
+  --ink-700: #b8c0e0;
+  --ink-500: #9aa3c7;
+  --ink-400: #8790b5;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+
+  --success-text: #3be08e;
+  --success-bg: rgba(18, 183, 106, 0.16);
+  --warning-text: #fdb022;
+  --warning-bg: rgba(247, 144, 9, 0.16);
+  --orange-text: #fdb022;
+  --orange-bg: rgba(242, 107, 29, 0.18);
+  --danger-text: #f97066;
+  --danger-bg: rgba(240, 68, 56, 0.16);
+  --info-text: #b9ccff;
+  --info-bg: rgba(47, 91, 255, 0.18);
+  --neutral-bg: rgba(255, 255, 255, 0.07);
+  --neutral-text: #b8c0e0;
+
+  --app-bg: #070b1f;
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-strong: rgba(255, 255, 255, 0.07);
+  --glass-border-color: rgba(255, 255, 255, 0.09);
+  --glass-shadow: 0 12px 32px -14px rgba(0, 0, 0, 0.6);
+  --glass-shadow-hover: 0 18px 40px -16px rgba(0, 0, 0, 0.7);
+  --nav-active-bg: rgba(255, 255, 255, 0.1);
+  --chart-grid: rgba(255, 255, 255, 0.08);
+  --tooltip-bg: #2f5bff;
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.94);
+  }
+  .dark {
+    --glass-bg: rgba(20, 26, 56, 0.96);
+  }
+}
+
+/* Existing pages use slate/indigo utilities: point them at the brand and ink scales. */
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", system-ui, sans-serif;
+
+  --color-indigo-50: #eef3ff;
+  --color-indigo-100: #dce6ff;
+  --color-indigo-200: #b9ccff;
+  --color-indigo-300: #8ba9ff;
+  --color-indigo-400: #5c84ff;
+  --color-indigo-500: #2f5bff;
+  --color-indigo-600: #2447e0;
+  --color-indigo-700: #1d38b3;
+  --color-indigo-800: #1b2a6b;
+  --color-indigo-900: #121c4a;
+  --color-indigo-950: #0b1238;
+
+  --color-slate-50: #f5f7fc;
+  --color-slate-100: #eef1f8;
+  --color-slate-200: #e1e6f2;
+  --color-slate-300: #c9d0e4;
+  --color-slate-400: #8f97b5;
+  --color-slate-500: #5b6385;
+  --color-slate-600: #4a5272;
+  --color-slate-700: #363e5e;
+  --color-slate-800: #1e2547;
+  --color-slate-900: #0e1530;
+  --color-slate-950: #070b1f;
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-ink-900: var(--ink-900);
+  --color-ink-700: var(--ink-700);
+  --color-ink-500: var(--ink-500);
+  --color-ink-400: var(--ink-400);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+}
 
 html,
 body,
@@ -9,5 +157,114 @@ body,
 }
 
 body {
-  @apply bg-white text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  background: var(--app-bg);
+  color: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-400);
+  outline-offset: 2px;
+}
+
+table,
+time,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Glass surfaces */
+.glass {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  border: var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius-card);
+  transition:
+    transform 200ms var(--ease),
+    box-shadow 200ms var(--ease);
+}
+
+.glass-card.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+/* Window drag strip (the native title bar is hidden). */
+.drag {
+  -webkit-app-region: drag;
+}
+.drag button,
+.drag a,
+.drag input,
+.drag select,
+.drag [role="button"] {
+  -webkit-app-region: no-drag;
+}
+
+/* Motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-enter > * > * {
+  animation: fade-up 220ms var(--ease) both;
+}
+.page-enter > * > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+.page-enter > * > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+.page-enter > * > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+.page-enter > * > *:nth-child(n + 5) {
+  animation-delay: 160ms;
+}
+
+@keyframes pulse-dot {
+  0% {
+    box-shadow: 0 0 0 0 rgba(18, 183, 106, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(18, 183, 106, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(18, 183, 106, 0);
+  }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.8s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter > * > *,
+  .pulse-dot {
+    animation: none;
+  }
+  .glass-card,
+  .glass-card.lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
 }

@@ -79,7 +79,7 @@ export function Approvals() {
                           <Button size="sm" onClick={() => setDeciding({ request: r, status: 'approved' })}>
                             Approve
                           </Button>
-                          <Button size="sm" variant="secondary" onClick={() => setDeciding({ request: r, status: 'rejected' })}>
+                          <Button size="sm" variant="danger-soft" onClick={() => setDeciding({ request: r, status: 'rejected' })}>
                             Reject
                           </Button>
                         </div>

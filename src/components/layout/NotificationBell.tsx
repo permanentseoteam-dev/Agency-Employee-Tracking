@@ -23,13 +23,13 @@ export function NotificationBell() {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="relative rounded-md p-2 text-slate-500 outline-none hover:bg-slate-100 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        className="glass relative grid size-11 place-items-center rounded-[var(--radius-control)] text-ink-900 outline-none transition-transform duration-200 hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
-        <Bell className="size-5" aria-hidden />
+        <Bell className="size-[18px]" strokeWidth={1.8} aria-hidden />
         {unread > 0 && (
           <span
             data-unread-count={unread}
-            className="absolute right-0.5 top-0.5 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] font-semibold leading-4 text-white"
+            className="absolute -top-1 -right-1 min-w-[18px] rounded-full bg-[var(--danger)] px-1 text-center text-[10px] leading-[18px] font-semibold text-white ring-2 ring-white dark:ring-slate-950"
           >
             {unread > 9 ? '9+' : unread}
           </span>
@@ -39,9 +39,9 @@ export function NotificationBell() {
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 w-96 rounded-md border border-slate-200 bg-white text-slate-900 shadow-lg dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+          className="glass z-50 w-96 overflow-hidden rounded-2xl bg-white/90 text-ink-900 dark:bg-slate-900/95"
         >
-          <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-sm font-semibold">Notifications</p>
             {unread > 0 && (
               <DropdownMenu.Item

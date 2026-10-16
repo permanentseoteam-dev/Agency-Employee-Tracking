@@ -25,11 +25,18 @@ export type NavIcon =
   | 'rules'
   | 'finance'
 
+export type NavSection = 'personal' | 'team' | 'admin'
+
+/** Sidebar group labels; the personal group has no label. */
+export const SECTION_LABEL: Record<NavSection, string> = { personal: 'Personal', team: 'Team', admin: 'Admin' }
+
 export interface NavItem {
   path: string
   label: string
   icon: NavIcon
   minRole: Role
+  /** Sidebar group (look only, no effect on access). */
+  section: NavSection
   /** Roles that don't get this item even though they rank high enough. */
   hiddenFor?: Role[]
   /** Module that builds the screen, shown on placeholders until then. */
@@ -37,22 +44,22 @@ export interface NavItem {
 }
 
 export const NAV: NavItem[] = [
-  { path: '/my-stats', label: 'My Stats', icon: 'stats', minRole: 'employee', module: 'M6' },
+  { path: '/my-stats', label: 'My Stats', icon: 'stats', minRole: 'employee', section: 'personal', module: 'M6' },
   // Managers and admins see their own attendance as a tab inside Attendance.
-  { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', hiddenFor: ['manager', 'admin'], module: 'M7' },
+  { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', section: 'personal', hiddenFor: ['manager', 'admin'], module: 'M7' },
   // Managers and admins approve leave from tabs inside My Leaves.
-  { path: '/my-leaves', label: 'My Leaves', icon: 'leave', minRole: 'employee', module: 'M8' },
-  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', hiddenFor: ['employee'], module: 'M10' },
+  { path: '/my-leaves', label: 'My Leaves', icon: 'leave', minRole: 'employee', section: 'personal', module: 'M8' },
+  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', section: 'personal', hiddenFor: ['employee'], module: 'M10' },
   // Everyone sees the clients they're on; only an admin sets up clients and their people.
-  { path: '/projects', label: 'Project', icon: 'project', minRole: 'employee', module: 'Projects' },
-  { path: '/live', label: 'Live Board', icon: 'live', minRole: 'manager', module: 'M6' },
-  { path: '/attendance', label: 'Attendance', icon: 'grid', minRole: 'manager', module: 'M7' },
-  { path: '/reports', label: 'Reports', icon: 'reports', minRole: 'manager', module: 'M6' },
-  { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', module: 'M3' },
+  { path: '/projects', label: 'Project', icon: 'project', minRole: 'employee', section: 'team', module: 'Projects' },
+  { path: '/live', label: 'Live Board', icon: 'live', minRole: 'manager', section: 'team', module: 'M6' },
+  { path: '/attendance', label: 'Attendance', icon: 'grid', minRole: 'manager', section: 'team', module: 'M7' },
+  { path: '/reports', label: 'Reports', icon: 'reports', minRole: 'manager', section: 'team', module: 'M6' },
+  { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', section: 'admin', module: 'M3' },
   // Everyone reads the rules (work hours, leave, stars); only an admin changes them.
-  { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'employee', module: 'M4' },
+  { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'employee', section: 'admin', module: 'M4' },
   // Managers don't see Finance for now (2026-10-15); employees see their own pay, admins everything.
-  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', hiddenFor: ['manager'], module: 'M11' }
+  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', section: 'admin', hiddenFor: ['manager'], module: 'M11' }
 ]
 
 /** Pages every signed-in user can open, whatever role is selected. */

@@ -43,6 +43,9 @@ if (!app.requestSingleInstanceLock()) {
       title: 'PSEO Tracker',
       icon: appIcon,
       autoHideMenuBar: true,
+      // The frosted design draws its own top area; Windows keeps the native buttons on top.
+      titleBarStyle: 'hidden',
+      titleBarOverlay: { color: '#00000000', symbolColor: '#6B7393', height: 32 },
       webPreferences: {
         preload: join(here, '../preload/index.cjs'),
         contextIsolation: true,

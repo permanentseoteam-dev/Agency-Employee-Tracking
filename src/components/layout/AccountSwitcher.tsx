@@ -62,21 +62,21 @@ export function AccountSwitcher() {
   return (
     <div className="flex items-center gap-2 text-sm">
       {asSomeoneElse ? (
-        <span className="rounded-md bg-amber-100 px-2 py-1 text-amber-800 dark:bg-amber-950 dark:text-amber-300" data-role={role} data-viewing-as={user.email}>
+        <span className="rounded-full bg-[var(--warning-bg)] px-3 py-1.5 font-semibold text-[var(--warning-text)]" data-role={role} data-viewing-as={user.email}>
           Viewing as {user.full_name || user.email} · {ROLE_LABEL[role]}
         </span>
       ) : (
-        <span className="text-slate-500 dark:text-slate-400" data-role={role}>
+        <span className="rounded-full bg-[var(--info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)]" data-role={role}>
           {ROLE_LABEL[role]}
         </span>
       )}
       {asSomeoneElse && (
-        <Button type="button" variant="secondary" size="sm" onClick={() => void switchTo(home!.record)}>
+        <Button type="button" variant="secondary" onClick={() => void switchTo(home!.record)}>
           <Undo2 className="size-4" aria-hidden /> Back to me
         </Button>
       )}
       {canSwitch && (
-        <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
           <ArrowLeftRight className="size-4" aria-hidden /> Switch role
         </Button>
       )}

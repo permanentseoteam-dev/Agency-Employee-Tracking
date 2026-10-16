@@ -69,7 +69,7 @@ export function DecideDialog({ request, status, onClose }: { request: LeaveReque
             value={comment}
             placeholder={PLACEHOLDER[status]}
             onChange={(e) => setComment(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-700 dark:bg-slate-950"
+            className="w-full rounded-[var(--radius-control)] border border-line bg-[var(--glass-strong)] px-3 py-2 text-sm text-ink-900 placeholder:text-ink-400 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-400/60"
           />
         </Field>
         <FormError message={error} />

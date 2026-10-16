@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Calculator } from 'lucide-react'
+import { Calculator, Wallet } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { InfoBanner } from '@/components/ui/InfoBanner'
 import { Field, Input } from '@/components/ui/Input'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { FormError } from '@/features/auth/AuthLayout'
@@ -41,7 +43,7 @@ export function PayrollRuns() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-[18px]">
       <Card>
         <CardHeader>
           <CardTitle>Run payroll</CardTitle>
@@ -59,10 +61,10 @@ export function PayrollRuns() {
             </Button>
           </div>
           <FormError message={error} />
-          <p className="text-sm text-slate-500">
+          <InfoBanner>
             Builds a draft from salaries, attendance and unpaid leave, after counting the month’s attendance again. Review it, set adjustments for anyone who
             joined or left mid-month, then finalize. {month === current && 'This month hasn’t ended yet, so only the days so far are counted.'}
-          </p>
+          </InfoBanner>
         </CardContent>
       </Card>
 
@@ -72,7 +74,7 @@ export function PayrollRuns() {
         ) : runs.isError ? (
           <p className="p-6 text-sm text-red-600">Could not load payroll runs.</p>
         ) : !runs.data?.length ? (
-          <p className="p-6 text-sm text-slate-500">No payroll runs yet.</p>
+          <EmptyState icon={Wallet} title="No payroll runs yet" hint="Pick a month above and run payroll to build the first draft." />
         ) : (
           <Table>
             <thead>
@@ -90,14 +92,23 @@ export function PayrollRuns() {
                   key={r.id}
                   data-run={r.month}
                   onClick={() => navigate(`/finance/payroll/${r.id}`)}
-                  className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                  className="cursor-pointer"
                 >
                   <Td className="font-medium">{monthLabel(r.month)}</Td>
                   <Td>
                     <RunStatusBadge status={r.status} />
                   </Td>
-                  <Td className="text-right tabular-nums">{r.people}</Td>
-                  <Td className="whitespace-nowrap text-right tabular-nums">{formatPkr(r.net)}</Td>
+                  {r.people === 0 && r.net === 0 ? (
+                    // An empty draft: say why instead of a bare "PKR 0".
+                    <Td colSpan={2} className="text-right text-[13px] text-ink-500">
+                      No salaries in this draft yet - set them under Salaries, then recount.
+                    </Td>
+                  ) : (
+                    <>
+                      <Td className="text-right tabular-nums">{r.people}</Td>
+                      <Td className="whitespace-nowrap text-right font-semibold tabular-nums">{formatPkr(r.net)}</Td>
+                    </>
+                  )}
                   <Td>{formatDate(r.updated.replace(' ', 'T'), tz)}</Td>
                 </tr>
               ))}
