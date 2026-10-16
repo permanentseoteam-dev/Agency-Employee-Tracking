@@ -29,8 +29,23 @@ else {
     claims = JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString())
   } catch {}
   const ref = url.slice('https://'.length).split('.')[0]
-  if (claims.role !== 'anon') problem = 'VITE_SUPABASE_ANON_KEY is not an anon key. Never put the service-role key in the app.'
+  if (claims.role !== 'anon') problem = 'VITE_SUPABASE_ANON_KEY is not an anon key (copy the legacy "anon" key, the one starting eyJ). Never put the service-role key in the app.'
   else if (claims.ref !== ref) problem = `VITE_SUPABASE_ANON_KEY belongs to project ${claims.ref}, not ${ref}.`
+  else {
+    // Staff must get the live project, never the test one: compare with .env.supabase when it is here.
+    const keysFile = resolve(import.meta.dirname, '..', '.env.supabase')
+    const projects = existsSync(keysFile)
+      ? Object.fromEntries(
+          readFileSync(keysFile, 'utf8')
+            .split(/\r?\n/)
+            .map((l) => l.match(/^(STAGING_URL|LIVE_URL)=("?)(.*?)\2\s*(#.*)?$/))
+            .filter(Boolean)
+            .map((m) => [m[1], m[3].replace(/\/+$/, '')])
+        )
+      : {}
+    if (projects.STAGING_URL === url) problem = `VITE_SUPABASE_URL is the STAGING project (${url}). Releases must use the live project.`
+    else if (projects.LIVE_URL && projects.LIVE_URL !== url) problem = `VITE_SUPABASE_URL (${url}) is not the live project in .env.supabase (LIVE_URL).`
+  }
 }
 
 if (problem) {
