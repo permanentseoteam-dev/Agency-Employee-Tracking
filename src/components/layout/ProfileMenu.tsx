@@ -35,9 +35,9 @@ export function ProfileMenu() {
           side="right"
           align="end"
           sideOffset={12}
-          className="glass z-50 min-w-56 rounded-2xl bg-white/90 p-1.5 text-ink-900 dark:bg-slate-900/95"
+          className="glass z-50 min-w-56 max-w-80 rounded-2xl bg-white/90 p-1.5 text-ink-900 dark:bg-slate-900/95"
         >
-          <div className="px-2 py-2">
+          <div className="px-2 py-2 wrap-anywhere">
             <p className="text-sm font-medium">{user.full_name || user.email}</p>
             <p className="text-xs text-ink-500">{user.email}</p>
             <p className="text-xs text-ink-500">{ROLE_LABEL[user.role]}</p>

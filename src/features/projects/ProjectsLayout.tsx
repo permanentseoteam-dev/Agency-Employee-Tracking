@@ -25,7 +25,7 @@ export function ProjectsLayout() {
   if (!currentId && list[0]) return <Navigate to={`/projects/${list[0].id}/team`} replace />
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="mx-auto max-w-7xl space-y-5">
       <div className="flex items-end gap-2 border-b border-slate-200 dark:border-slate-800">
         <nav className="-mb-px flex min-w-0 flex-1 gap-1 overflow-x-auto" aria-label="Clients">
           {list.map((c) => (
@@ -35,7 +35,7 @@ export function ProjectsLayout() {
               data-client={c.id}
               className={() =>
                 cn(
-                  'whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
+                  'flex max-w-64 shrink-0 items-center whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium',
                   c.id === currentId
                     ? 'border-indigo-600 text-indigo-700 dark:text-indigo-300'
                     : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-slate-100',
@@ -43,9 +43,9 @@ export function ProjectsLayout() {
                 )
               }
             >
-              {c.name}
-              <span className="ml-1.5 text-xs font-normal text-slate-400">{c.members.length}</span>
-              {c.archived && <span className="ml-1 text-xs font-normal text-slate-400">(archived)</span>}
+              <span className="min-w-0 truncate">{c.name}</span>
+              <span className="ml-1.5 shrink-0 text-xs font-normal text-slate-400">{c.members.length}</span>
+              {c.archived && <span className="ml-1 shrink-0 text-xs font-normal text-slate-400">(archived)</span>}
             </NavLink>
           ))}
         </nav>

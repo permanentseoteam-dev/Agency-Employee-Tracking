@@ -49,9 +49,9 @@ export function LiveBoard() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Input aria-label="Search people" placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} className="w-64" />
+        <Input aria-label="Search people" placeholder="Search by name" value={search} onChange={(e) => setSearch(e.target.value)} className="min-w-0 max-w-xs flex-1 basis-56" />
         {teams.length > 1 && (
-          <Select aria-label="Filter by team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-48">
+          <Select aria-label="Filter by team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-48 max-w-full">
             <option value="">All teams</option>
             {teams.map(([id, name]) => (
               <option key={id} value={id}>
@@ -60,7 +60,7 @@ export function LiveBoard() {
             ))}
           </Select>
         )}
-        <div role="group" aria-label="Filter by status" className="ml-auto flex gap-2">
+        <div role="group" aria-label="Filter by status" className="ml-auto flex flex-wrap gap-2">
           {FILTERS.map((s) => (
             <button
               key={s}
@@ -68,7 +68,7 @@ export function LiveBoard() {
               aria-pressed={only === s}
               onClick={() => setOnly(only === s ? '' : s)}
               className={cn(
-                'rounded-md border px-3 py-1.5 text-sm',
+                'rounded-md border px-3 py-1.5 text-sm whitespace-nowrap',
                 only === s
                   ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
                   : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -89,9 +89,9 @@ export function LiveBoard() {
           {cards.length === 0 ? 'Nobody to show yet. People appear here once they are in a team you manage.' : 'Nobody matches these filters.'}
         </Card>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {shown.map(({ person, rec, status, today }) => (
-            <Card key={person.id} className="p-4" data-person={person.id} data-status={status}>
+            <Card key={person.id} className="min-w-0 p-4" data-person={person.id} data-status={status}>
               <div className="flex items-center gap-3">
                 <Avatar user={person} size={36} />
                 <div className="min-w-0 flex-1">

@@ -67,9 +67,9 @@ export function Approvals() {
                   <tr key={r.id} data-request={r.id}>
                     <Td className="font-medium">{r.expand?.user?.full_name ?? '—'}</Td>
                     <Td>{r.expand?.leave_type?.name ?? '—'}</Td>
-                    <Td className="tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
                     <Td className="text-right tabular-nums">{daysText(r.days, r.half_day)}</Td>
-                    <Td className="max-w-xs text-slate-600 dark:text-slate-400">{r.reason || '—'}</Td>
+                    <Td className="max-w-xs text-slate-600 wrap-anywhere dark:text-slate-400">{r.reason || '—'}</Td>
                     <Td className="text-right tabular-nums" data-left={balance?.remaining ?? ''}>
                       {!paid ? 'Unpaid' : balance ? `${balance.remaining} of ${balance.quota}` : '—'}
                     </Td>

@@ -46,7 +46,7 @@ export function Reports() {
   const badRange = params.to < params.from
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-7xl space-y-4">
       <Card className="p-4">
         <div className="flex flex-wrap gap-2">
           {presets.map((p) => (
@@ -55,7 +55,7 @@ export function Reports() {
             </Button>
           ))}
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 @3xl/page:grid-cols-3 @5xl/page:grid-cols-5">
           <Field label="From" htmlFor="from">
             <Input id="from" type="date" value={params.from} max={params.to} onChange={(e) => e.target.value && set({ from: e.target.value })} />
           </Field>
@@ -93,8 +93,8 @@ export function Reports() {
       </Card>
 
       <Card>
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-          <p className="text-sm text-slate-600 dark:text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+          <p className="min-w-0 text-sm text-slate-600 dark:text-slate-400">
             {rows.length} row{rows.length === 1 ? '' : 's'} · Total{' '}
             <span className="font-semibold text-slate-900 dark:text-slate-100" data-total="active">{formatDuration(totals.active_s)}</span> active,{' '}
             <span className="font-semibold text-slate-900 dark:text-slate-100" data-total="idle">{formatDuration(totals.idle_s)}</span> idle
@@ -130,9 +130,9 @@ export function Reports() {
                 <tr key={`${r.user}-${r.period}`} data-row>
                   <Td className="font-medium">{r.full_name}</Td>
                   <Td>{r.team || <span className="text-slate-400">—</span>}</Td>
-                  <Td className="tabular-nums">{r.period}</Td>
-                  <Td className="text-right tabular-nums">{formatDuration(r.active_s)}</Td>
-                  <Td className="text-right tabular-nums">{formatDuration(r.idle_s)}</Td>
+                  <Td className="tabular-nums whitespace-nowrap">{r.period}</Td>
+                  <Td className="text-right tabular-nums whitespace-nowrap">{formatDuration(r.active_s)}</Td>
+                  <Td className="text-right tabular-nums whitespace-nowrap">{formatDuration(r.idle_s)}</Td>
                 </tr>
               ))}
             </tbody>

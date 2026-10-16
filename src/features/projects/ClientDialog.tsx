@@ -60,7 +60,7 @@ export function ClientDialog({ client, onClose }: { client: Client | null; onClo
           </label>
         )}
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={save.isPending}>
             {client ? 'Save' : 'Add client'}
           </Button>

@@ -34,9 +34,9 @@ export function StatCard({
 }) {
   const color = DOT[tone]
   return (
-    <div className={cn('glass-card lift flex flex-col gap-2.5 p-[18px]', className)}>
+    <div className={cn('glass-card lift flex min-w-0 flex-col gap-2.5 p-[18px]', className)}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[13px] text-ink-500">{label}</span>
+        <span className="min-w-0 text-[13px] text-ink-500">{label}</span>
         <span className="size-2 shrink-0 rounded-full" style={{ background: color }} aria-hidden />
       </div>
       <div className="text-[28px] leading-tight font-bold tracking-[-.01em] text-ink-900 tabular-nums" {...valueProps}>

@@ -47,7 +47,7 @@ export function DecideDialog({ request, status, onClose }: { request: LeaveReque
   return (
     <Dialog open onClose={onClose} title={title}>
       <form onSubmit={onSubmit} className="space-y-4" noValidate>
-        <p className="text-sm">
+        <p className="text-sm wrap-break-word">
           <span className="font-medium">{request.expand?.user?.full_name ?? 'Someone'}</span> ·{' '}
           {request.expand?.leave_type?.name ?? 'Leave'} · {dateRange(request.start_date, request.end_date)} ·{' '}
           {daysText(request.days, request.half_day)}
@@ -73,7 +73,7 @@ export function DecideDialog({ request, status, onClose }: { request: LeaveReque
           />
         </Field>
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" variant={status === 'approved' ? 'primary' : 'danger'} loading={decide.isPending}>
             {MOVE_LABEL[status]}
           </Button>

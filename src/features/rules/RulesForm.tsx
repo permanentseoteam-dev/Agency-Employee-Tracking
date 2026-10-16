@@ -99,7 +99,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
       {readOnly && <ReadOnlyNote />}
       <fieldset disabled={readOnly} className="space-y-6">
         <Section title="Shift" description="Tracking runs only inside these hours on working days. Times are Pakistan time.">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
             <Field label="Shift starts" htmlFor="shift_start" error={errors.shift_start}>
               <Input id="shift_start" type="time" value={form.shift_start} onChange={(e) => set('shift_start', e.target.value)} />
             </Field>
@@ -136,7 +136,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
         </Section>
 
         <Section title="Attendance" description="How each working day is marked.">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
             <Field label="Grace period (minutes)" htmlFor="grace_minutes" error={errors.grace_minutes} hint="First activity after shift start + grace = Late.">
               <Input id="grace_minutes" inputMode="numeric" value={form.grace_minutes} onChange={(e) => set('grace_minutes', e.target.value)} />
             </Field>
@@ -150,7 +150,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
         </Section>
 
         <Section title="Leaves per month" description="Most leave one person can take in a calendar month, any leave type. The yearly days per leave type still apply.">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
             <Field label="Full-day leaves" htmlFor="monthly_full_leaves" error={errors.monthly_full_leaves} hint="Working days a month. 0 = no limit.">
               <Input id="monthly_full_leaves" inputMode="numeric" value={form.monthly_full_leaves} onChange={(e) => set('monthly_full_leaves', e.target.value)} />
             </Field>
@@ -161,7 +161,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
         </Section>
 
         <Section title="Tracking">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
             <Field label="Idle after (minutes)" htmlFor="idle_threshold_minutes" error={errors.idle_threshold_minutes} hint="No keyboard or mouse input for this long = Idle.">
               <Input id="idle_threshold_minutes" inputMode="numeric" value={form.idle_threshold_minutes} onChange={(e) => set('idle_threshold_minutes', e.target.value)} />
             </Field>
@@ -170,7 +170,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
       </fieldset>
 
       {!readOnly && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Button type="submit" loading={save.isPending}>
             Save rules
           </Button>

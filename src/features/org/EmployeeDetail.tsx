@@ -53,16 +53,16 @@ function EmployeeView({ employee }: { employee: Employee }) {
       <Link to="/org/employees" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
         <ArrowLeft className="size-4" aria-hidden /> Employees
       </Link>
-      <div className="flex items-center gap-4">
-        <Avatar user={employee} size={56} />
-        <div>
-          <h2 className="text-xl font-semibold">{employee.full_name || '(no name)'}</h2>
-          <p className="text-sm text-slate-500">
+      <div className="flex flex-wrap items-center gap-4">
+        <Avatar user={employee} size={56} className="shrink-0" />
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold wrap-break-word">{employee.full_name || '(no name)'}</h2>
+          <p className="text-sm wrap-break-word text-slate-500">
             {employee.email} · {ROLE_LABEL[employee.role]}
             {employee.expand?.team ? ` · ${employee.expand.team.name}` : ''}
           </p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto shrink-0">
           {pending ? (
             <Badge tone="amber">Waiting for approval</Badge>
           ) : employee.active ? (
@@ -85,10 +85,10 @@ function EmployeeView({ employee }: { employee: Employee }) {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="min-w-0 space-y-6 @4xl:col-span-2">
           <DetailsCard employee={employee} isSelf={isSelf} />
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-6 @2xl:grid-cols-2">
             <Card>
               <CardHeader>
                 <CardTitle>Attendance this month</CardTitle>
@@ -103,7 +103,7 @@ function EmployeeView({ employee }: { employee: Employee }) {
             </Card>
           </div>
         </div>
-        <div className="space-y-6">
+        <div className="grid min-w-0 content-start items-start gap-6 @2xl:grid-cols-2 @4xl:grid-cols-1">
           <SalaryCard employee={employee} />
           {!pending && <AccountCard employee={employee} isSelf={isSelf} />}
         </div>
@@ -159,7 +159,7 @@ function DetailsCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
             <Field label="Full name" htmlFor="d_full_name">
               <Input id="d_full_name" value={form.full_name} maxLength={100} onChange={(e) => set('full_name', e.target.value)} />
             </Field>
@@ -342,8 +342,8 @@ function AccountCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
         {resetDone ? (
           <div className="space-y-4 text-sm">
             <p>The new temporary password is below. They must choose their own at the next sign-in, and they have been signed out everywhere.</p>
-            <pre className="rounded-md bg-slate-100 p-3 font-mono dark:bg-slate-950">{resetDone}</pre>
-            <div className="flex gap-2">
+            <pre className="rounded-md bg-slate-100 p-3 font-mono break-all whitespace-pre-wrap dark:bg-slate-950">{resetDone}</pre>
+            <div className="flex flex-wrap gap-2">
               <CopyButton text={resetDone} />
               <Button size="sm" onClick={() => setResetOpen(false)}>
                 Done
@@ -356,7 +356,7 @@ function AccountCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
               <TempPasswordInput id="r_password" value={password} onChange={setPassword} />
             </Field>
             <FormError message={error} />
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button type="submit" loading={reset.isPending}>
                 Reset password
               </Button>
@@ -375,7 +375,7 @@ function AccountCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
             <Input id="left_on" type="date" value={leftOn} onChange={(e) => setLeftOn(e.target.value)} />
           </Field>
           <FormError message={error} />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" variant="danger" loading={setActive.isPending}>
               Deactivate
             </Button>

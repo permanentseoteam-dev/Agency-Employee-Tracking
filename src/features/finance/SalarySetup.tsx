@@ -29,7 +29,7 @@ export function SalarySetup() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Input aria-label="Search employees" placeholder="Search name or email" value={search} onChange={(e) => setSearch(e.target.value)} className="w-72" />
+        <Input aria-label="Search employees" placeholder="Search name or email" value={search} onChange={(e) => setSearch(e.target.value)} className="w-full max-w-72" />
         <label className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <input type="checkbox" className="size-4 accent-indigo-600" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
           Show former employees
@@ -97,16 +97,16 @@ function SalaryRow({ person, salary }: { person: Employee; salary: Salary | null
   return (
     <tr data-person={person.id}>
       <Td>
-        <span className="block font-medium text-slate-900 dark:text-slate-100">{person.full_name || '(no name)'}</span>
-        <span className="block text-xs text-slate-500">{person.email}</span>
+        <span className="block font-medium wrap-anywhere text-slate-900 dark:text-slate-100">{person.full_name || '(no name)'}</span>
+        <span className="block text-xs wrap-anywhere text-slate-500">{person.email}</span>
       </Td>
       <Td>{person.expand?.team?.name ?? <span className="text-slate-400">—</span>}</Td>
       <Td>
         {ROLE_LABEL[person.role]} {!person.active && <Badge className="ml-1">Left {person.left_on}</Badge>}
       </Td>
-      <Td className="tabular-nums">{person.joined_on || <span className="text-slate-400">—</span>}</Td>
+      <Td className="whitespace-nowrap tabular-nums">{person.joined_on || <span className="text-slate-400">—</span>}</Td>
       <Td>
-        <form onSubmit={onSubmit} className="flex items-center gap-2">
+        <form onSubmit={onSubmit} className="flex flex-wrap items-center gap-2">
           <Input
             aria-label={`Monthly salary for ${person.full_name}`}
             inputMode="numeric"
@@ -116,7 +116,7 @@ function SalaryRow({ person, salary }: { person: Employee; salary: Salary | null
               setText(e.target.value)
               setStatus(null)
             }}
-            className="h-9 w-36 text-right tabular-nums"
+            className="h-9 w-36 shrink-0 text-right tabular-nums"
           />
           {dirty ? (
             <Button type="submit" size="sm" loading={save.isPending}>

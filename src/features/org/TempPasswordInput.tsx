@@ -8,8 +8,8 @@ import { generateTempPassword } from '@/lib/password'
 export function TempPasswordInput({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-2">
-      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />
-      <Button type="button" variant="secondary" onClick={() => onChange(generateTempPassword())} title="Generate a password">
+      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} autoComplete="off" spellCheck={false} className="min-w-0 font-mono" />
+      <Button type="button" variant="secondary" className="shrink-0" onClick={() => onChange(generateTempPassword())} title="Generate a password">
         <RefreshCw className="size-4" aria-hidden /> Generate
       </Button>
     </div>

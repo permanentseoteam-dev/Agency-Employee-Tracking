@@ -22,7 +22,7 @@ export function MyPay() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 @xl/page:grid-cols-2 @5xl/page:grid-cols-3">
         <Total label="Monthly salary" value={salary?.monthly_salary_pkr ? formatPkr(salary.monthly_salary_pkr) : 'Not set yet'} strong />
         <Total
           label={latest?.expand?.run ? `Net pay, ${monthLabel(latest.expand.run.month)}` : 'Latest net pay'}
@@ -59,7 +59,7 @@ export function MyPay() {
                   onClick={() => setOpen(i)}
                   className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
                 >
-                  <Td className="font-medium">{i.expand?.run ? monthLabel(i.expand.run.month) : '—'}</Td>
+                  <Td className="whitespace-nowrap font-medium">{i.expand?.run ? monthLabel(i.expand.run.month) : '—'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{formatPkr(i.base)}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.working_days}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.absent_days || '–'}</Td>
@@ -76,7 +76,7 @@ export function MyPay() {
           </Table>
         )}
       </Card>
-      <p className="text-xs text-slate-500">
+      <p className="max-w-4xl text-xs text-slate-500">
         Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate. Late
         days cost nothing: they give stars instead. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
       </p>

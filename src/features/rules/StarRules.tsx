@@ -33,8 +33,8 @@ export function StarRules() {
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyNote />}
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-4 @3xl:flex-nowrap">
+        <p className="min-w-0 text-sm text-slate-500">
           Each rule break gives these stars. More stars is worse; stars never change pay. Automatic rules come from attendance; an admin gives
           the others by hand from Attendance.
         </p>
@@ -65,14 +65,14 @@ export function StarRules() {
             <tbody>
               {rules.data.map((r) => (
                 <tr key={r.id} data-star-rule={r.auto || r.name}>
-                  <Td>
+                  <Td className="wrap-anywhere">
                     <span className="font-medium">{r.name}</span>
                     {r.description && <span className="block text-xs text-slate-500">{r.description}</span>}
                   </Td>
                   <Td className="text-right font-semibold tabular-nums">{r.stars}</Td>
                   <Td>{r.auto ? <Badge tone="amber">Automatic</Badge> : <Badge tone="blue">By hand</Badge>}</Td>
                   {!readOnly && (
-                    <Td className="text-right">
+                    <Td className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" onClick={() => setEditing(r)}>
                         Edit
                       </Button>

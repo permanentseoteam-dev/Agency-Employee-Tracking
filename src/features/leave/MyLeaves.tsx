@@ -42,7 +42,7 @@ export function MyLeaves() {
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Balances {year}</h2>
         <Button className="ml-auto" onClick={() => setApplying(true)}>
@@ -50,11 +50,11 @@ export function MyLeaves() {
         </Button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3" aria-label="Balances">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3" aria-label="Balances">
         {rows.map((row) => (
           <Card key={row.type.id} className="p-4" data-balance={row.type.name} data-left={row.left ?? ''}>
             <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">{row.type.name}</span>
+              <span className="min-w-0 font-medium wrap-break-word">{row.type.name}</span>
               {!row.type.paid && <Badge>Unpaid</Badge>}
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">
@@ -95,7 +95,7 @@ export function MyLeaves() {
               {shown.map((r) => (
                 <tr key={r.id} data-request={r.id} data-status={r.status}>
                   <Td>{r.expand?.leave_type?.name ?? '—'}</Td>
-                  <Td className="tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
+                  <Td className="whitespace-nowrap tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
                   <Td className="text-right tabular-nums">{daysText(r.days, r.half_day)}</Td>
                   <Td>
                     <LeaveStatusBadge status={r.status} />
@@ -106,7 +106,7 @@ export function MyLeaves() {
                     ) : r.decided_at ? (
                       <>
                         {r.expand?.approver?.full_name ?? 'Someone'} · {formatDate(r.decided_at.replace(' ', 'T'), tz)}
-                        {r.comment && <span className="block text-xs italic">“{r.comment}”</span>}
+                        {r.comment && <span className="block text-xs italic wrap-anywhere">“{r.comment}”</span>}
                       </>
                     ) : (
                       '—'

@@ -80,7 +80,7 @@ export function MyStats() {
   const log = days.filter((d) => d <= today).reverse()
 
   return (
-    <div className="mx-auto max-w-6xl space-y-[18px]">
+    <div className="mx-auto max-w-7xl space-y-[18px]">
       <StatGrid>
         <StatCard label="Active today" value={formatDuration(todayActive)} tone="success" progress={share(todayActive, todayTracked)} />
         <StatCard label="Idle today" value={formatDuration(todayIdle)} tone="warning" progress={share(todayIdle, todayTracked)} />
@@ -133,7 +133,7 @@ export function MyStats() {
       )}
 
       <Card>
-        <CardHeader className="flex items-center justify-between">
+        <CardHeader className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle>Attendance log</CardTitle>
           <StatusBadge status={live} />
         </CardHeader>
@@ -165,10 +165,10 @@ export function MyStats() {
                       <span className="text-ink-400">Not counted yet</span>
                     )}
                   </Td>
-                  <Td className={r?.first_activity_at ? undefined : 'text-ink-400'}>{time(r?.first_activity_at)}</Td>
-                  <Td className={r?.last_activity_at ? undefined : 'text-ink-400'}>{time(r?.last_activity_at)}</Td>
-                  <Td className={active ? 'text-right font-semibold' : 'text-right text-ink-400'}>{formatDuration(active)}</Td>
-                  <Td className={idle ? 'text-right' : 'text-right text-ink-400'}>{formatDuration(idle)}</Td>
+                  <Td className={r?.first_activity_at ? 'whitespace-nowrap' : 'whitespace-nowrap text-ink-400'}>{time(r?.first_activity_at)}</Td>
+                  <Td className={r?.last_activity_at ? 'whitespace-nowrap' : 'whitespace-nowrap text-ink-400'}>{time(r?.last_activity_at)}</Td>
+                  <Td className={active ? 'text-right font-semibold whitespace-nowrap' : 'text-right whitespace-nowrap text-ink-400'}>{formatDuration(active)}</Td>
+                  <Td className={idle ? 'text-right whitespace-nowrap' : 'text-right whitespace-nowrap text-ink-400'}>{formatDuration(idle)}</Td>
                 </tr>
               )
             })}
@@ -203,7 +203,7 @@ export function MyStats() {
                   const total = sumDays(byDay, w.from, w.to)
                   return (
                     <tr key={w.from} className={w.from <= today && today <= w.to ? 'bg-indigo-500/[.05]' : undefined}>
-                      <Td className="font-semibold">{weekLabel(w.from, w.to)}</Td>
+                      <Td className="font-semibold whitespace-nowrap">{weekLabel(w.from, w.to)}</Td>
                       <Td className="text-right">{w.from > today ? '-' : formatDuration(total.active_s)}</Td>
                       <Td className="text-right">{w.from > today ? '-' : formatDuration(total.idle_s)}</Td>
                     </tr>

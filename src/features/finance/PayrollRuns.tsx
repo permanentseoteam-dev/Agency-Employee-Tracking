@@ -50,18 +50,18 @@ export function PayrollRuns() {
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
-            <div className="w-56">
+            <div className="w-56 max-w-full">
               <Field label="Month" htmlFor="pay_month">
                 <Input id="pay_month" type="month" value={month} max={current} onChange={(e) => e.target.value && setMonth(e.target.value)} />
               </Field>
             </div>
-            <Button onClick={() => void onRun()} loading={runPayroll.isPending} disabled={finalized || month > current}>
+            <Button className="max-w-full" onClick={() => void onRun()} loading={runPayroll.isPending} disabled={finalized || month > current}>
               <Calculator className="size-4" aria-hidden />
               {finalized ? `${monthLabel(month)} is finalized` : existing ? `Recount the ${monthLabel(month)} draft` : `Run payroll for ${monthLabel(month)}`}
             </Button>
           </div>
           <FormError message={error} />
-          <InfoBanner>
+          <InfoBanner className="max-w-4xl">
             Builds a draft from salaries, attendance and unpaid leave, after counting the month’s attendance again. Review it, set adjustments for anyone who
             joined or left mid-month, then finalize. {month === current && 'This month hasn’t ended yet, so only the days so far are counted.'}
           </InfoBanner>
@@ -94,7 +94,7 @@ export function PayrollRuns() {
                   onClick={() => navigate(`/finance/payroll/${r.id}`)}
                   className="cursor-pointer"
                 >
-                  <Td className="font-medium">{monthLabel(r.month)}</Td>
+                  <Td className="whitespace-nowrap font-medium">{monthLabel(r.month)}</Td>
                   <Td>
                     <RunStatusBadge status={r.status} />
                   </Td>
@@ -109,7 +109,7 @@ export function PayrollRuns() {
                       <Td className="whitespace-nowrap text-right font-semibold tabular-nums">{formatPkr(r.net)}</Td>
                     </>
                   )}
-                  <Td>{formatDate(r.updated.replace(' ', 'T'), tz)}</Td>
+                  <Td className="whitespace-nowrap">{formatDate(r.updated.replace(' ', 'T'), tz)}</Td>
                 </tr>
               ))}
             </tbody>

@@ -50,7 +50,7 @@ export function Register({ onSignIn }: { onSignIn: () => void }) {
     return (
       <AuthLayout title="Account created" subtitle="It now waits for your admin's approval.">
         <div className="space-y-4" data-signup-done>
-          <p className="text-sm text-slate-600 dark:text-slate-300">
+          <p className="text-sm wrap-break-word text-slate-600 dark:text-slate-300">
             Your admin has been told. Once they approve your account, sign in here with <strong>{email.trim().toLowerCase()}</strong> and
             the password you chose.
           </p>

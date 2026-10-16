@@ -116,7 +116,7 @@ export function Sidebar() {
                         >
                           <Icon className={isActive ? 'size-[15px]' : 'size-[18px]'} strokeWidth={1.8} aria-hidden />
                         </span>
-                        <span className="rail:sr-only">{item.label}</span>
+                        <span className="min-w-0 truncate rail:sr-only">{item.label}</span>
                       </>
                     )}
                   </NavLink>

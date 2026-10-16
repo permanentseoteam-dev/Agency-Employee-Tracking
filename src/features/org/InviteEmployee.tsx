@@ -64,7 +64,7 @@ export function InviteEmployee() {
           <p className="text-sm text-slate-600 dark:text-slate-400">
             Share these sign-in details with them. The password is shown only now.
           </p>
-          <pre className="rounded-md bg-slate-100 p-3 font-mono text-sm whitespace-pre-wrap dark:bg-slate-950">{message}</pre>
+          <pre className="rounded-md bg-slate-100 p-3 font-mono text-sm wrap-break-word whitespace-pre-wrap dark:bg-slate-950">{message}</pre>
           <div className="flex flex-wrap gap-2">
             <CopyButton text={message} label="Copy details" />
             <Button variant="secondary" size="sm" onClick={() => navigate(`/org/employees/${created.id}`)}>
@@ -94,7 +94,7 @@ export function InviteEmployee() {
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
             <Field label="Full name" htmlFor="full_name">
               <Input id="full_name" value={form.full_name} maxLength={100} onChange={(e) => set('full_name', e.target.value)} autoFocus />
             </Field>
@@ -137,7 +137,7 @@ export function InviteEmployee() {
             <TempPasswordInput id="password" value={form.password} onChange={(v) => set('password', v)} />
           </Field>
           <FormError message={error} />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={invite.isPending} disabled={!form.full_name.trim() || !form.email.trim()}>
               Add employee
             </Button>

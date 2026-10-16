@@ -71,7 +71,7 @@ export function CalendarGrid({
               onClick={() => onOpenDay(d)}
               onKeyDown={(e) => e.key === 'Enter' && onOpenDay(d)}
               className={cn(
-                'min-h-28 cursor-pointer border-b border-r border-slate-100 p-1.5 text-left outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-slate-800/60 dark:hover:bg-slate-800/40',
+                'min-h-28 min-w-0 cursor-pointer border-b border-r border-slate-100 p-1.5 text-left outline-none @6xl:min-h-32 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 dark:border-slate-800/60 dark:hover:bg-slate-800/40',
                 (info.off || info.holiday) && 'bg-slate-50/80 dark:bg-slate-900/60',
                 !inMonth && 'opacity-45'
               )}
@@ -163,7 +163,7 @@ export function DayDialog({
                 <li key={e.id} className="flex items-start gap-3" data-event={e.id}>
                   <span className="w-24 shrink-0 tabular-nums text-slate-500">{eventTimeLabel(e, day, tz)}</span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-medium">{e.title}</span>
+                    <span className="block font-medium wrap-break-word">{e.title}</span>
                     <span className="block text-xs text-slate-500">{eventNote(e)}</span>
                     {e.description && <span className="mt-0.5 block whitespace-pre-line text-xs text-slate-600 dark:text-slate-400">{e.description}</span>}
                   </span>
@@ -182,7 +182,7 @@ export function DayDialog({
             <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Off</h3>
             <ul className="space-y-1">
               {info.leaves.map((l) => (
-                <li key={l.id} data-off={l.user}>
+                <li key={l.id} data-off={l.user} className="wrap-break-word">
                   <span className="font-medium">{l.expand?.user?.full_name ?? 'Someone'}</span>
                   <span className="text-slate-500">
                     {' '}
@@ -195,7 +195,7 @@ export function DayDialog({
           </section>
         )}
         {empty && !info.off && <p className="text-slate-500">Nothing on this day.</p>}
-        <div className="flex gap-2 pt-1">
+        <div className="flex flex-wrap gap-2 pt-1">
           {canEdit && (
             <Button size="sm" onClick={() => onEdit(null)}>
               <Plus className="size-4" aria-hidden /> Add event on this day

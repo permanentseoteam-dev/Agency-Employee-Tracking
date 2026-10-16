@@ -31,8 +31,8 @@ export function LeaveTypes() {
   return (
     <div className="space-y-4">
       {readOnly && <ReadOnlyNote />}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">Quotas are per calendar year. Unpaid leave is deducted in payroll.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-0 text-sm text-slate-500">Quotas are per calendar year. Unpaid leave is deducted in payroll.</p>
         {!readOnly && (
           <Button onClick={() => setEditing('new')}>
             <Plus className="size-4" aria-hidden /> New leave type
@@ -58,11 +58,11 @@ export function LeaveTypes() {
             <tbody>
               {types.data.map((t) => (
                 <tr key={t.id}>
-                  <Td className="font-medium">{t.name}</Td>
+                  <Td className="font-medium wrap-anywhere">{t.name}</Td>
                   <Td>{t.yearly_quota_days}</Td>
                   <Td>{t.paid ? <Badge tone="green">Paid</Badge> : <Badge tone="amber">Unpaid</Badge>}</Td>
                   {!readOnly && (
-                    <Td className="text-right">
+                    <Td className="text-right whitespace-nowrap">
                       <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
                         Edit
                       </Button>

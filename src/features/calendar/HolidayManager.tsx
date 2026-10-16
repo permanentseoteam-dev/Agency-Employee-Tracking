@@ -91,7 +91,7 @@ export function HolidayManager() {
                 return (
                   <tr key={h.id} data-holiday={h.date} className={past ? 'text-slate-400 dark:text-slate-500' : undefined}>
                     <Td className="tabular-nums">{formatDayKey(h.date)}</Td>
-                    <Td className={past ? undefined : 'font-medium'}>{h.name}</Td>
+                    <Td className={past ? 'wrap-anywhere' : 'font-medium wrap-anywhere'}>{h.name}</Td>
                     <Td>
                       {h.date === today ? (
                         <Badge tone="blue">Today</Badge>
@@ -100,7 +100,7 @@ export function HolidayManager() {
                       ) : null}
                     </Td>
                     {isAdmin && (
-                      <Td className="text-right">
+                      <Td className="whitespace-nowrap text-right">
                         <Button variant="ghost" size="sm" onClick={() => setEditing(h)}>
                           Edit
                         </Button>
@@ -180,7 +180,7 @@ function HolidayDialog({
           )}
         </div>
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={save.isPending}>
             Save
           </Button>

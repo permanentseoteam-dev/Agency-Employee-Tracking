@@ -24,7 +24,7 @@ export function Settings() {
   ]
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
@@ -83,8 +83,8 @@ export function Settings() {
         <CardHeader>
           <CardTitle>Troubleshooting</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-between gap-4 text-sm">
-          <p className="text-slate-500">If something goes wrong, send the log file to your admin.</p>
+        <CardContent className="flex flex-wrap items-center justify-between gap-4 text-sm">
+          <p className="min-w-0 text-slate-500">If something goes wrong, send the log file to your admin.</p>
           <Button variant="secondary" size="sm" onClick={() => void window.tracker.openLogsFolder()}>
             <FolderOpen className="size-4" aria-hidden /> Open logs folder
           </Button>

@@ -37,7 +37,7 @@ export function Employees() {
     <div className="space-y-4">
       <PendingSignups people={pending} />
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative w-72 max-w-full">
+        <div className="relative w-full min-w-0 @2xl:w-72">
           <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
           <Input
             aria-label="Search employees"
@@ -47,7 +47,7 @@ export function Employees() {
             className="pl-9"
           />
         </div>
-        <Select aria-label="Filter by team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-48">
+        <Select aria-label="Filter by team" value={team} onChange={(e) => setTeam(e.target.value)} className="w-full @2xl:w-48">
           <option value="">All teams</option>
           {teams.data?.map((t) => (
             <option key={t.id} value={t.id}>
@@ -56,11 +56,11 @@ export function Employees() {
           ))}
           <option value="none">No team</option>
         </Select>
-        <label className="flex items-center gap-2.5 text-sm text-ink-700">
+        <label className="flex shrink-0 items-center gap-2.5 text-sm whitespace-nowrap text-ink-700">
           <Toggle checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
           Show inactive
         </label>
-        <Button className="ml-auto" onClick={() => navigate('/org/employees/new')}>
+        <Button className="ml-auto shrink-0" onClick={() => navigate('/org/employees/new')}>
           <UserPlus className="size-4" aria-hidden /> Add employee
         </Button>
       </div>
@@ -89,10 +89,10 @@ export function Employees() {
                 <tr key={e.id}>
                   <Td>
                     <Link to={`/org/employees/${e.id}`} className="flex items-center gap-3">
-                      <Avatar user={e} size={28} />
-                      <span>
-                        <span className="block font-semibold text-ink-900">{e.full_name || '(no name)'}</span>
-                        <span className="block text-[12.5px] text-ink-500">{e.email}</span>
+                      <Avatar user={e} size={28} className="shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block font-semibold wrap-break-word text-ink-900">{e.full_name || '(no name)'}</span>
+                        <span className="block text-[12.5px] break-all text-ink-500">{e.email}</span>
                       </span>
                     </Link>
                   </Td>
@@ -101,7 +101,7 @@ export function Employees() {
                     <Badge tone="blue">{ROLE_LABEL[e.role]}</Badge>
                   </Td>
                   <Td>{e.designation || <span className="text-ink-400">-</span>}</Td>
-                  <Td>{e.joined_on || <span className="text-ink-400">-</span>}</Td>
+                  <Td className="whitespace-nowrap">{e.joined_on || <span className="text-ink-400">-</span>}</Td>
                   <Td>{e.active ? <Badge tone="green">Active</Badge> : <Badge>Inactive</Badge>}</Td>
                 </tr>
               ))}

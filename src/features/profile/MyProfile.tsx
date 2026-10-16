@@ -78,14 +78,14 @@ export function MyProfile() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Photo</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center gap-4">
+        <CardContent className="flex flex-wrap items-center gap-4">
           <Avatar user={user} size={64} />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="secondary" size="sm" disabled={busy} onClick={() => fileRef.current?.click()}>
               Upload photo
             </Button>
@@ -117,7 +117,7 @@ export function MyProfile() {
             <Field label="Full name" htmlFor="full_name">
               <Input id="full_name" value={fullName} maxLength={100} onChange={(e) => setFullName(e.target.value)} />
             </Field>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2">
               <Field label="Phone" htmlFor="phone">
                 <Input id="phone" value={phone} maxLength={30} onChange={(e) => setPhone(e.target.value)} />
               </Field>
@@ -125,18 +125,18 @@ export function MyProfile() {
                 <Input id="designation" value={designation} maxLength={100} onChange={(e) => setDesignation(e.target.value)} />
               </Field>
             </div>
-            <dl className="grid grid-cols-3 gap-4 rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-950">
-              <div>
+            <dl className="grid grid-cols-1 gap-4 rounded-md bg-slate-50 p-3 text-sm @xl:grid-cols-3 dark:bg-slate-950">
+              <div className="min-w-0">
                 <dt className="text-xs text-slate-500">Email</dt>
                 <dd className="truncate">{user.email}</dd>
               </div>
-              <div>
+              <div className="min-w-0">
                 <dt className="text-xs text-slate-500">Role</dt>
                 <dd>{ROLE_LABEL[user.role]}</dd>
               </div>
-              <div>
+              <div className="min-w-0">
                 <dt className="text-xs text-slate-500">Team</dt>
-                <dd>{user.team ? (team.data?.name ?? '…') : 'No team'}</dd>
+                <dd className="truncate">{user.team ? (team.data?.name ?? '…') : 'No team'}</dd>
               </div>
             </dl>
             <p className="text-xs text-slate-500">Email, role and team are changed by an admin.</p>

@@ -42,7 +42,7 @@ export function TeamBalances() {
           placeholder="Search by name"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="ml-auto h-9 w-56"
+          className="ml-auto h-9 w-56 max-w-full"
         />
       </div>
       <Card>

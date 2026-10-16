@@ -3,7 +3,7 @@ import { cn } from '@/lib/cn'
 
 /** Frosted glass card (docs/ui/ux.md). `lift` adds the 2px hover lift. */
 export function Card({ className, lift, ...props }: HTMLAttributes<HTMLDivElement> & { lift?: boolean }) {
-  return <div className={cn('glass-card', lift && 'lift', className)} {...props} />
+  return <div className={cn('glass-card min-w-0', lift && 'lift', className)} {...props} />
 }
 
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -11,11 +11,11 @@ export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElemen
 }
 
 export function CardTitle({ className, ...props }: HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn('text-base font-bold text-ink-900', className)} {...props} />
+  return <h2 className={cn('text-base font-bold text-ink-900 wrap-break-word', className)} {...props} />
 }
 
 export function CardSubtitle({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={cn('text-[12.5px] text-ink-500', className)} {...props} />
+  return <p className={cn('text-[12.5px] text-ink-500 wrap-break-word', className)} {...props} />
 }
 
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {

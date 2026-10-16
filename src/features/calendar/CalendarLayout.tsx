@@ -8,7 +8,7 @@ const TABS = [
 
 export function CalendarLayout() {
   return (
-    <div className="mx-auto max-w-6xl space-y-[18px]">
+    <div className="mx-auto max-w-7xl space-y-[18px]">
       <TabNav label="Calendar" tabs={TABS} />
       <Outlet />
     </div>

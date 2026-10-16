@@ -68,7 +68,7 @@ export function PendingSignups({ people }: { people: Employee[] }) {
           {people.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center gap-4 py-3" data-pending-signup={p.email}>
               <Link to={`/org/employees/${p.id}`} className="flex min-w-0 flex-1 items-center gap-3">
-                <Avatar user={p} size={28} />
+                <Avatar user={p} size={28} className="shrink-0" />
                 <span className="min-w-0">
                   <span className="block truncate font-medium text-slate-900 dark:text-slate-100">{p.full_name || '(no name)'}</span>
                   <span className="block truncate text-xs text-slate-500">

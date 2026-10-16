@@ -57,7 +57,7 @@ export function DecidedLeaves() {
                   <tr key={r.id} data-request={r.id} data-status={r.status}>
                     <Td className="font-medium">{r.expand?.user?.full_name ?? '—'}</Td>
                     <Td>{r.expand?.leave_type?.name ?? '—'}</Td>
-                    <Td className="tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
+                    <Td className="whitespace-nowrap tabular-nums">{dateRange(r.start_date, r.end_date)}</Td>
                     <Td className="text-right tabular-nums">{daysText(r.days, r.half_day)}</Td>
                     <Td>
                       <LeaveStatusBadge status={r.status} />
@@ -66,7 +66,7 @@ export function DecidedLeaves() {
                       {r.decided_at ? (
                         <>
                           {r.expand?.approver?.full_name ?? 'Someone'} · {formatDate(r.decided_at.replace(' ', 'T'), tz)}
-                          {r.comment && <span className="block text-xs italic">“{r.comment}”</span>}
+                          {r.comment && <span className="block text-xs italic wrap-anywhere">“{r.comment}”</span>}
                         </>
                       ) : (
                         'Cancelled by the employee'

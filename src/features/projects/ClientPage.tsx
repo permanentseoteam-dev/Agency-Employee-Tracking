@@ -38,8 +38,8 @@ export function ClientPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h2 className="text-lg font-semibold">{client.name}</h2>
-        {client.description && <span className="text-sm text-slate-500">{client.description}</span>}
+        <h2 className="min-w-0 text-lg font-semibold wrap-break-word">{client.name}</h2>
+        {client.description && <span className="min-w-0 text-sm text-slate-500 wrap-break-word">{client.description}</span>}
         {client.archived && <Badge>Archived</Badge>}
         {isAdmin && (
           <div className="ml-auto flex gap-2">
@@ -53,14 +53,14 @@ export function ClientPage() {
         )}
       </div>
 
-      <nav className="glass inline-flex rounded-full p-1" aria-label={`${client.name} sections`}>
+      <nav className="glass inline-flex max-w-full flex-wrap rounded-full p-1" aria-label={`${client.name} sections`}>
         {SECTIONS.map((s) => (
           <NavLink
             key={s.to}
             to={s.to}
             className={({ isActive }) =>
               cn(
-                'rounded-full px-4 py-1.5 text-sm font-semibold transition-colors',
+                'rounded-full px-4 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors',
                 isActive
                   ? 'bg-[var(--nav-active-bg)] text-indigo-700 shadow-[0_4px_12px_-6px_rgba(27,42,107,.35)] dark:text-indigo-200'
                   : 'text-ink-500 hover:text-ink-900'

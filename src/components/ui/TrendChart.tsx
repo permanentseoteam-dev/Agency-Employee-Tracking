@@ -1,4 +1,5 @@
 import { useId } from 'react'
+import { cn } from '@/lib/cn'
 import { formatDuration } from '@/lib/format'
 
 export interface TrendPoint {
@@ -68,9 +69,9 @@ export function TrendChart({ title, subtitle, points }: { title: string; subtitl
   const summary = points.map((p) => `${p.label}: active ${formatDuration(p.active_s)}, idle ${formatDuration(p.idle_s)}`).join('; ')
 
   return (
-    <div className="glass-card px-6 py-[22px]">
+    <div className="glass-card min-w-0 px-5 py-[22px] @3xl/page:px-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-bold text-ink-900">{title}</h2>
           {subtitle && <p className="text-[12.5px] text-ink-500">{subtitle}</p>}
         </div>
@@ -100,7 +101,7 @@ export function TrendChart({ title, subtitle, points }: { title: string; subtitl
               stroke={t === 0 ? 'var(--line-strong)' : 'var(--chart-grid)'}
               strokeDasharray={t === 0 ? undefined : '4 6'}
             />
-            <text x={0} y={y(t * 3600) + 4} fontSize="12" fill="var(--ink-400)">
+            <text x={0} y={y(t * 3600) + 4} fontSize="12" fill="var(--ink-400)" className="@max-4xl/page:text-[15px]">
               {t}h
             </text>
           </g>
@@ -114,7 +115,7 @@ export function TrendChart({ title, subtitle, points }: { title: string; subtitl
             fontSize="13"
             fontWeight={p.today ? 700 : 400}
             fill={p.today ? 'var(--brand-700)' : 'var(--ink-400)'}
-            className={p.today ? 'dark:fill-indigo-300' : undefined}
+            className={cn('@max-4xl/page:text-[16px]', p.today && 'dark:fill-indigo-300')}
           >
             {p.today ? `${p.label} · today` : p.label}
           </text>
@@ -128,7 +129,7 @@ export function TrendChart({ title, subtitle, points }: { title: string; subtitl
             <circle cx={active[peak][0]} cy={active[peak][1]} r="8" fill="white" stroke="var(--brand-500)" strokeWidth="3" />
             <g transform={`translate(${Math.min(Math.max(active[peak][0], PAD.left + 50), W - 60)}, ${Math.max(active[peak][1] - 34, 18)})`}>
               <rect x="-50" y="-17" width="100" height="32" rx="16" fill="var(--tooltip-bg)" />
-              <text y="5" textAnchor="middle" fontSize="14" fontWeight="600" fill="white">
+              <text y="5" textAnchor="middle" fontSize="14" fontWeight="600" fill="white" className="@max-4xl/page:text-[17px]">
                 {formatDuration(points[peak].active_s)}
               </text>
             </g>

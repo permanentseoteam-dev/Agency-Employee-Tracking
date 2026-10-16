@@ -38,19 +38,20 @@ export function AppShell() {
       </div>
       <div className="relative z-10 flex min-w-0 flex-1 flex-col">
         <header className="drag flex shrink-0 items-end justify-between gap-4 px-1.5 pt-6 pb-4">
-          <div className="min-w-0">
-            <p className="text-[13px] text-ink-500">
+          <div className="min-w-40 flex-1">
+            <p className="truncate text-[13px] text-ink-500">
               {section} / {title}
             </p>
             <h1 className="truncate text-[28px] leading-tight font-bold tracking-[-.02em] text-ink-900">{title}</h1>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center justify-end gap-2.5">
             <AccountSwitcher />
             <NotificationBell />
           </div>
         </header>
         <main className="-mx-2 flex-1 overflow-y-auto px-3.5 pt-2.5 pb-5">
-          <div key={top} className="page-enter">
+          {/* @container: pages size themselves to this area (it changes with the sidebar), not to the window. */}
+          <div key={top} className="page-enter @container/page">
             <Outlet />
           </div>
         </main>

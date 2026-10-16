@@ -39,14 +39,14 @@ export function Teams() {
           {teams.data.map((t) => (
             <Card key={t.id} lift className="flex flex-col gap-3 p-5">
               <div className="flex items-start justify-between gap-2">
-                <Link to={`/org/teams/${t.id}`} className="text-base font-bold text-ink-900 hover:text-indigo-700 hover:underline">
+                <Link to={`/org/teams/${t.id}`} className="min-w-0 text-base font-bold wrap-break-word text-ink-900 hover:text-indigo-700 hover:underline">
                   {t.name}
                 </Link>
-                <Button variant="ghost" size="sm" onClick={() => setEditing(t)}>
+                <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setEditing(t)}>
                   Edit
                 </Button>
               </div>
-              <div className="text-[13px] text-ink-500">
+              <div className="text-[13px] wrap-break-word text-ink-500">
                 Manager: {t.expand?.manager?.full_name ?? <span className="text-ink-400">No manager</span>}
               </div>
               <div className="text-[13px] text-ink-500">
@@ -100,7 +100,7 @@ export function TeamDialog({ team, onClose }: { team: Team | null; onClose: () =
           </Select>
         </Field>
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={save.isPending}>
             Save team
           </Button>

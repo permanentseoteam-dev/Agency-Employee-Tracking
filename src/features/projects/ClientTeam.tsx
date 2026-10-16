@@ -37,7 +37,7 @@ export function TeamStatusBadge({ status }: { status: TeamStatus }) {
   if (!status) return <span className="text-slate-400">—</span>
   return (
     <span
-      className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', status === 'not_in_yet' ? NOT_IN_YET_CLASS : STATUS_CLASS[status])}
+      className={cn('inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium', status === 'not_in_yet' ? NOT_IN_YET_CLASS : STATUS_CLASS[status])}
       data-status={status}
     >
       {TEAM_STATUS_LABEL[status]}
@@ -115,7 +115,7 @@ export function ClientTeam() {
               aria-pressed={only === s}
               onClick={() => setOnly(only === s ? null : s)}
               className={cn(
-                'flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm',
+                'flex items-center gap-2 whitespace-nowrap rounded-md border px-3 py-1.5 text-sm',
                 only === s
                   ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300'
                   : 'border-slate-300 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800'
@@ -160,7 +160,7 @@ export function ClientTeam() {
                   <Td>
                     <span className="flex items-center gap-3">
                       <Avatar user={r.person} size={32} />
-                      <span className="min-w-0">
+                      <span className="min-w-0 max-w-60 @6xl/page:max-w-96">
                         <span className="block truncate font-medium text-slate-900 dark:text-slate-100">
                           {r.person.full_name}
                           {r.person.id === me.id && <span className="ml-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400">You</span>}

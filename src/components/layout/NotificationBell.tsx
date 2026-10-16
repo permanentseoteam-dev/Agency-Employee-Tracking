@@ -23,7 +23,7 @@ export function NotificationBell() {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
-        className="glass relative grid size-11 place-items-center rounded-[var(--radius-control)] text-ink-900 outline-none transition-transform duration-200 hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-indigo-400"
+        className="glass relative grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-ink-900 outline-none transition-transform duration-200 hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-indigo-400"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} aria-hidden />
         {unread > 0 && (
@@ -39,7 +39,7 @@ export function NotificationBell() {
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="glass z-50 w-96 overflow-hidden rounded-2xl bg-white/90 text-ink-900 dark:bg-slate-900/95"
+          className="glass z-50 w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl bg-white/90 text-ink-900 dark:bg-slate-900/95"
         >
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
             <p className="text-sm font-semibold">Notifications</p>
@@ -77,7 +77,7 @@ export function NotificationBell() {
                     className="flex cursor-default gap-2 rounded px-2 py-2 outline-none data-[highlighted]:bg-slate-100 dark:data-[highlighted]:bg-slate-800"
                   >
                     <span className={cn('mt-1.5 size-2 shrink-0 rounded-full', isUnread ? 'bg-indigo-600' : 'bg-transparent')} aria-hidden />
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 wrap-break-word">
                       <span className={cn('block text-sm', isUnread ? 'font-semibold' : 'text-slate-700 dark:text-slate-300')}>{title}</span>
                       {detail && <span className="block text-xs text-slate-500">{detail}</span>}
                       {notificationComment(n) && <span className="mt-0.5 block text-xs italic text-slate-500">“{notificationComment(n)}”</span>}

@@ -57,7 +57,7 @@ export function StarsList({ lines, admin }: { lines: StarLine[]; admin?: boolean
         <tbody>
           {lines.map((l) => (
             <tr key={`${l.date}|${l.rule.id}`} data-star-line={l.rule.auto || 'hand'} data-excused={l.excused || undefined}>
-              <Td className={cn('tabular-nums', l.excused && 'text-slate-400 line-through')}>{formatDayKey(l.date)}</Td>
+              <Td className={cn('tabular-nums whitespace-nowrap', l.excused && 'text-slate-400 line-through')}>{formatDayKey(l.date)}</Td>
               <Td className={cn(l.excused && 'text-slate-400 line-through')}>
                 {l.rule.name}
                 {l.record?.note && <span className="block text-xs text-slate-500 no-underline">{l.record.note}</span>}
@@ -75,7 +75,7 @@ export function StarsList({ lines, admin }: { lines: StarLine[]; admin?: boolean
                 )}
               </Td>
               {admin && (
-                <Td className="text-right">
+                <Td className="text-right whitespace-nowrap">
                   {l.automatic && !l.excused && (
                     <Button
                       variant="ghost"
@@ -105,7 +105,7 @@ export function StarsCard({ userId, month, attendance }: { userId: string; month
   const { lines, loading, failed } = usePersonStars(userId, month, attendance)
   return (
     <Card data-stars-card>
-      <CardHeader className="flex items-center justify-between">
+      <CardHeader className="flex flex-wrap items-center justify-between gap-3">
         <CardTitle className="flex items-center gap-2">
           <Star className="size-4 text-amber-500" aria-hidden /> Stars this month
         </CardTitle>
@@ -168,13 +168,13 @@ export function StarsDialog({
   }
 
   return (
-    <Dialog open onClose={onClose} title={`Stars: ${person.full_name}`} className="max-w-2xl">
+    <Dialog open onClose={onClose} title={`Stars: ${person.full_name}`} className="w-[calc(100%-2rem)] max-w-2xl">
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-400" data-star-total>
           {loading ? 'Loading…' : failed ? 'Stars aren’t available right now.' : `${starsText(starTotal(lines))} this month`}
         </p>
         {!loading && !failed && (
-          <div className="max-h-80 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800">
+          <div className="max-h-[min(20rem,35vh)] overflow-y-auto rounded-md border border-slate-200 dark:border-slate-800">
             <StarsList lines={lines} admin={admin} />
           </div>
         )}

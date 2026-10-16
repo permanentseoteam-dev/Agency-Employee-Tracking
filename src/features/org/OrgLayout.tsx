@@ -8,7 +8,7 @@ const TABS = [
 
 export function OrgLayout() {
   return (
-    <div className="mx-auto max-w-6xl space-y-[18px]">
+    <div className="mx-auto max-w-7xl min-w-0 space-y-[18px]">
       <TabNav label="Organization" tabs={TABS} />
       <Outlet />
     </div>

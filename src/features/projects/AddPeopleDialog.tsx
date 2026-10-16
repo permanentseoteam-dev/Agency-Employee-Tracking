@@ -62,7 +62,7 @@ export function AddPeopleDialog({ client, onClose }: { client: Client; onClose: 
                 data-candidate={p.id}
                 className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-3 py-2 last:border-b-0 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50"
               >
-                <input type="checkbox" className="size-4 accent-indigo-600" checked={picked.has(p.id)} onChange={() => toggle(p.id)} />
+                <input type="checkbox" className="size-4 shrink-0 accent-indigo-600" checked={picked.has(p.id)} onChange={() => toggle(p.id)} />
                 <Avatar user={p} size={28} />
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{p.full_name}</span>
@@ -75,7 +75,7 @@ export function AddPeopleDialog({ client, onClose }: { client: Client; onClose: 
           )}
         </div>
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={() => void onAdd()} loading={change.isPending} disabled={picked.size === 0}>
             {picked.size ? `Add ${picked.size} ${picked.size === 1 ? 'person' : 'people'}` : 'Add'}
           </Button>

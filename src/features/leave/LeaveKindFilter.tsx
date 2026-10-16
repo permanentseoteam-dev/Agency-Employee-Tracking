@@ -9,7 +9,7 @@ export function byKind<T extends { half_day: boolean }>(rows: T[], kind: LeaveKi
 
 export function LeaveKindFilter({ value, onChange }: { value: LeaveKind; onChange: (kind: LeaveKind) => void }) {
   return (
-    <Select aria-label="Filter by kind of leave" value={value} onChange={(e) => onChange(e.target.value as LeaveKind)} className="w-56">
+    <Select aria-label="Filter by kind of leave" value={value} onChange={(e) => onChange(e.target.value as LeaveKind)} className="w-56 max-w-full">
       <option value="all">All leave</option>
       <option value="full">Full days</option>
       <option value="half">Half days (short leave)</option>

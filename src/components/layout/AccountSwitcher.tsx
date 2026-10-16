@@ -60,13 +60,13 @@ export function AccountSwitcher() {
 
   const canSwitch = role === 'admin' || asSomeoneElse
   return (
-    <div className="flex items-center gap-2 text-sm">
+    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
       {asSomeoneElse ? (
-        <span className="rounded-full bg-[var(--warning-bg)] px-3 py-1.5 font-semibold text-[var(--warning-text)]" data-role={role} data-viewing-as={user.email}>
+        <span className="min-w-0 max-w-[clamp(10rem,24vw,20rem)] truncate rounded-full bg-[var(--warning-bg)] px-3 py-1.5 font-semibold text-[var(--warning-text)]" data-role={role} data-viewing-as={user.email}>
           Viewing as {user.full_name || user.email} · {ROLE_LABEL[role]}
         </span>
       ) : (
-        <span className="rounded-full bg-[var(--info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)]" data-role={role}>
+        <span className="shrink-0 rounded-full bg-[var(--info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)]" data-role={role}>
           {ROLE_LABEL[role]}
         </span>
       )}
@@ -132,7 +132,7 @@ function SwitchRoleDialog({
         </p>
         <Input aria-label="Search people" placeholder="Search by name or email" value={search} autoFocus onChange={(e) => setSearch(e.target.value)} />
         <FormError message={error} />
-        <ul className="max-h-80 divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
+        <ul className="max-h-[min(20rem,45dvh)] divide-y divide-slate-200 overflow-y-auto rounded-md border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
           {people.isLoading && <li className="px-3 py-2 text-sm text-slate-500">Loading…</li>}
           {people.isError && <li className="px-3 py-2 text-sm text-red-600">{errorMessage(people.error, 'Could not load people.')}</li>}
           {list.map((p) => (

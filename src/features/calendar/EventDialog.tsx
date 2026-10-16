@@ -158,7 +158,7 @@ export function EventForm({
           />
         </Field>
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={saving}>
             Save
           </Button>

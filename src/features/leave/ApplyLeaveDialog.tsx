@@ -74,7 +74,7 @@ export function ApplyLeaveDialog({ today, mine, onClose }: { today: string; mine
             ))}
           </Select>
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 [&>*]:min-w-0">
           <Field label="From" htmlFor="lv_start" error={shown.start_date}>
             <Input
               id="lv_start"
@@ -141,7 +141,7 @@ export function ApplyLeaveDialog({ today, mine, onClose }: { today: string; mine
           </p>
         )}
         <FormError message={error} />
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button type="submit" loading={apply.isPending} disabled={!ready}>
             Send request
           </Button>

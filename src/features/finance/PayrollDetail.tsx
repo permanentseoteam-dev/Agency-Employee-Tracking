@@ -117,7 +117,7 @@ export function PayrollDetail() {
       <FormError message={error} />
       {!draft && (
         <p className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300" data-locked>
-          <Lock className="size-4" aria-hidden /> Finalized on {formatDate(r.updated.replace(' ', 'T'), tz)}. This run is locked and can’t be changed.
+          <Lock className="size-4 shrink-0" aria-hidden /> Finalized on {formatDate(r.updated.replace(' ', 'T'), tz)}. This run is locked and can’t be changed.
         </p>
       )}
       {draft && r.month === current && (
@@ -135,7 +135,7 @@ export function PayrollDetail() {
         </p>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 @2xl/page:grid-cols-3 @5xl/page:grid-cols-5">
         <Total label="People" value={String(items.length)} />
         <Total label="Salaries" value={formatPkr(totals.base)} />
         <Total label="Deductions" value={formatPkr(-totals.deductions)} />
@@ -152,7 +152,7 @@ export function PayrollDetail() {
           <Table>
             <thead>
               <tr>
-                <Th>Employee</Th>
+                <Th className="min-w-40">Employee</Th>
                 <Th className="text-right">Salary</Th>
                 <Th className="text-right" title="Working days in the month">
                   Days
@@ -177,7 +177,7 @@ export function PayrollDetail() {
                     className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   >
                     <Td>
-                      <span className="block font-medium text-slate-900 dark:text-slate-100">{person?.full_name ?? i.user}</span>
+                      <span className="block font-medium wrap-anywhere text-slate-900 dark:text-slate-100">{person?.full_name ?? i.user}</span>
                       {mid && (
                         <span className="mt-0.5 flex flex-wrap gap-1">
                           <Badge tone="blue">{mid === 'joined' ? `Joined ${formatDayKey(person!.joined_on)}` : `Left ${formatDayKey(person!.left_on)}`}</Badge>
@@ -204,7 +204,7 @@ export function PayrollDetail() {
           </Table>
         )}
       </Card>
-      <p className="text-xs text-slate-500">
+      <p className="max-w-4xl text-xs text-slate-500">
         Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate. Late days
         cost nothing: they give stars instead. Click a line for its breakdown{draft ? ' and to set an adjustment' : ''}.
       </p>
@@ -217,8 +217,8 @@ export function PayrollDetail() {
 export function Total({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <Card className="px-4 py-3">
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={cn('mt-1 whitespace-nowrap tabular-nums', strong ? 'text-lg font-semibold' : 'font-medium')} data-total={label}>
+      <div className="truncate text-xs text-slate-500">{label}</div>
+      <div className={cn('mt-1 truncate tabular-nums', strong ? 'text-lg font-semibold' : 'font-medium')} data-total={label}>
         {value}
       </div>
     </Card>
@@ -228,11 +228,11 @@ export function Total({ label, value, strong }: { label: string; value: string; 
 function Row({ label, detail, amount, strong }: { label: string; detail?: string; amount: ReactNode; strong?: boolean }) {
   return (
     <div className={cn('flex items-baseline justify-between gap-4 py-1 text-sm', strong && 'border-t border-slate-200 pt-2 font-semibold dark:border-slate-800')}>
-      <span>
+      <span className="min-w-0 wrap-anywhere">
         {label}
         {detail && <span className="ml-2 text-xs text-slate-500">{detail}</span>}
       </span>
-      <span className="tabular-nums">{amount}</span>
+      <span className="shrink-0 whitespace-nowrap tabular-nums">{amount}</span>
     </div>
   )
 }
@@ -279,7 +279,7 @@ export function LineDialog({ line, month, editable, onClose }: { line: PayrollLi
 
       {editable ? (
         <form onSubmit={onSubmit} className="mt-4 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field label="Adjustment (PKR)" htmlFor="adj" hint="Minus to deduct, plus to add.">
               <Input id="adj" inputMode="numeric" value={adjustment} placeholder="0" onChange={(e) => setAdjustment(e.target.value)} autoFocus />
             </Field>
@@ -288,7 +288,7 @@ export function LineDialog({ line, month, editable, onClose }: { line: PayrollLi
             </Field>
           </div>
           <FormError message={error} />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button type="submit" loading={update.isPending}>
               Save
             </Button>

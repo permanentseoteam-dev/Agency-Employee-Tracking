@@ -54,14 +54,14 @@ export function TeamDetail() {
       <Link to="/org/teams" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
         <ArrowLeft className="size-4" aria-hidden /> Teams
       </Link>
-      <div className="flex items-center gap-3">
-        <div>
-          <h2 className="text-xl font-semibold">{team.name}</h2>
-          <p className="text-sm text-slate-500">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold wrap-break-word">{team.name}</h2>
+          <p className="text-sm wrap-break-word text-slate-500">
             Manager: {team.expand?.manager?.full_name ?? 'none'} · {activeMembers.length} active members
           </p>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex shrink-0 flex-wrap gap-2">
           <Button variant="secondary" onClick={() => setEditing(true)}>
             Edit team
           </Button>
@@ -93,8 +93,8 @@ export function TeamDetail() {
               {members.map((m) => (
                 <tr key={m.id}>
                   <Td>
-                    <Link to={`/org/employees/${m.id}`} className="flex items-center gap-3 hover:underline">
-                      <Avatar user={m} size={28} />
+                    <Link to={`/org/employees/${m.id}`} className="flex items-center gap-3 wrap-break-word hover:underline">
+                      <Avatar user={m} size={28} className="shrink-0" />
                       {m.full_name}
                     </Link>
                   </Td>

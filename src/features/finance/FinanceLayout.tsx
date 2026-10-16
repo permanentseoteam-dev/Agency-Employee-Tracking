@@ -17,14 +17,14 @@ export function FinanceLayout() {
   if (role !== 'admin') {
     if (pathname !== MY_PAY) return <Navigate to={MY_PAY} replace />
     return (
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-7xl">
         <Outlet />
       </div>
     )
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-[18px]">
+    <div className="mx-auto max-w-7xl space-y-[18px]">
       <TabNav label="Finance" tabs={TABS} />
       <Outlet />
     </div>
