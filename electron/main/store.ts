@@ -26,6 +26,8 @@ interface Persisted {
   autostartInitialized: boolean
   /** The app version that last ran here, to announce an update once (updater.ts). */
   lastVersion: string | null
+  /** Set just before an automatic update: whether the window was open, so the restarted app matches. */
+  showWindowAfterUpdate: boolean | null
 }
 
 let store: Store<Persisted> | null = null
@@ -33,7 +35,7 @@ let store: Store<Persisted> | null = null
 export function persisted(): Store<Persisted> {
   store ??= new Store<Persisted>({
     name: 'tracker',
-    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false, lastVersion: null }
+    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false, lastVersion: null, showWindowAfterUpdate: null }
   })
   return store
 }
