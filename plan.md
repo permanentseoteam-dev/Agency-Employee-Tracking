@@ -7,7 +7,7 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 - **Currency:** PKR
 - **Timezone:** Asia/Karachi
 - **Project path:** `F:\agency-tracker`
-- **Backend:** PocketBase, self-hosted and free. It replaced Supabase to avoid usage-based billing. See [docs/pocketbase-guide.md](docs/pocketbase-guide.md).
+- **Backend:** Supabase, free plan (hosted Postgres, sign-in, live updates, server functions, file storage): a **live** project and a **staging** project for tests. It replaced the self-hosted PocketBase on the office PC (2026-10-15/16, branch `supabase-app`), so no office PC has to be on or reachable. See [docs/deployment.md](docs/deployment.md) and [docs/switch-over.md](docs/switch-over.md).
 
 ---
 
@@ -35,16 +35,16 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 |---|---|
 | Desktop shell | Electron with electron-vite |
 | UI | React + TypeScript, Tailwind CSS, shadcn-style components, lucide-react icons, Radix dropdown menu |
-| State / data | Zustand (session, role, theme), TanStack Query (wrapping the PocketBase SDK), react-router |
-| Backend | **PocketBase**, a single `pocketbase.exe` that bundles the SQLite database, auth, REST API, realtime, JS hooks, cron, file storage, backups and an admin dashboard |
-| Client SDK | `pocketbase` npm package (used in both the renderer and the Electron main process) |
+| State / data | Zustand (session, role, theme), TanStack Query (wrapping supabase-js), react-router |
+| Backend | **Supabase** (free plan): Postgres with row-level security and guard triggers, Auth (email + password), Realtime, Edge Functions (Deno) reusing the pure logic in `server/pb_hooks/lib`, pg_cron, Storage for profile pictures |
+| Client SDK | `@supabase/supabase-js` (renderer and Electron main process; only the renderer renews the session) |
 | Offline queue | electron-store in the main process |
 | Logging | electron-log (main process, rotating file in `%APPDATA%\PSEO Tracker\logs`) |
-| App security | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, a strict Content-Security-Policy (only the app itself and the PocketBase URL), no remote content |
+| App security | `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, a strict Content-Security-Policy (only the app itself and the Supabase project), no remote content |
 | Tests | Vitest |
 | Packaging | electron-builder, NSIS installer for Windows |
 | Auto-update | electron-updater, publishing to GitHub Releases in a public releases-only repo (free, no token in the app) |
-| Hosting | Development: `pocketbase.exe` on the developer PC. Production (chosen in M12): an always-on office PC running it as a Windows service and reached through Cloudflare Tunnel or Tailscale, **or** an Oracle Cloud Always Free VM. All of these are free. Use a stable hostname (a Tailscale machine name or a subdomain), never a raw IP, because the address is built into the app. |
+| Hosting | Supabase hosts the live and staging projects (free plan). This PC only runs the daily backup to `E:` (`scripts/backup-supabase.mjs`). |
 
 ---
 
@@ -56,39 +56,35 @@ A Windows desktop app for the agency. It tracks employee activity (active and id
 │ tracker.ts    every 15s: powerMonitor.getSystemIdleTime()              │
 │               → state active | idle → open/close activity segments     │
 │               → presence heartbeat (status + today totals)             │
-│ syncQueue.ts  segments queued in electron-store → created in           │
-│               PocketBase with retry/backoff (idempotent: client-made   │
-│               15-char record id, duplicate = already synced,           │
-│               rejected by server validation = logged and dropped)      │
-│ session       authRefresh() at startup + every 12 h; on 401 keep       │
-│               queuing, tray shows "Signed out – sign in to sync"       │
-│ tray.ts       tray icon + menu: Open, today's time, Quit (Quit for     │
-│               manager/admin only)                                      │
-│ autostart     app.setLoginItemSettings({ openAtLogin: true })          │
-│ updater.ts    electron-updater: check at startup + every 6 h,          │
-│               install on next restart                                  │
+│ syncQueue.ts  segments queued in electron-store → inserted into        │
+│               activity_segments with retry/backoff (client-made 15-char│
+│               id: a duplicate = already synced; a guard-trigger        │
+│               rejection = logged and dropped)                          │
+│ session.ts    writes with the token the renderer hands over (only the  │
+│               renderer renews it); on a dead session keep queuing      │
+│ tray.ts, autostart, updater.ts (electron-updater, GitHub Releases)     │
 └───────────────▲─────────────────────────────────────────────────────────┘
                 │ IPC (contextBridge preload: window.tracker.*)
 ┌───────────────┴──────── Renderer (React UI) ───────────────────────────┐
-│ All screens. Talks to PocketBase with the user's auth token and hands  │
-│ the token to the main process so the tracker writes as that user.      │
+│ All screens. Each feature's api.ts talks to Supabase (src/lib/db.ts):  │
+│ tables through row-level security, Edge Functions for logic, Realtime. │
 └───────────────▲─────────────────────────────────────────────────────────┘
-                │ HTTP(S) REST + realtime (server-sent events)
-┌───────────────┴──────────── PocketBase server ─────────────────────────┐
-│ pocketbase.exe serve   → SQLite (pb_data/) · auth · API rules ·        │
-│                          realtime · admin dashboard (/_/) · backups    │
-│ pb_hooks/  invite.pb.js         POST /api/org/invite,                  │
-│                                 POST /api/org/reset-password           │
-│            segments.pb.js       validate segments (overlap, length,    │
-│                                 future-dated, older than 30 days)      │
-│            attendance.pb.js     cron hourly    + POST /api/attendance/ │
-│                                 recompute                              │
-│            payroll.pb.js        POST /api/payroll/run, finalize lock   │
-│            notifications.pb.js  leave_requests → notifications         │
-│            reports.pb.js        GET /api/reports/activity              │
-│            lib/attendance.js, lib/payroll.js, lib/segments.js          │
-│                                 (pure logic, unit-tested)              │
+                │ HTTPS (REST, functions, storage) + WebSocket (Realtime)
+┌───────────────┴──────────── Supabase (live project) ───────────────────┐
+│ supabase/migrations   tables, the leave_balances view, row-level       │
+│                       security (is_admin, is_staff_for, is_member,     │
+│                       live sessions), guard triggers, pg_cron hourly   │
+│                       attendance, database_size()                      │
+│ supabase/functions    register, org (invite, reset-password,           │
+│                       set-active, approve, reject, switch-to),         │
+│                       leave-request, leave-update, attendance-recompute│
+│                       payroll-run, reports-activity, projects-status,  │
+│                       projects-leaves, star-record                     │
+│   _shared/logic       the pure lib/*.js from server/pb_hooks/lib,      │
+│                       bundled by scripts/build-edge-shared.mjs         │
+│ Auth (email+password), Storage bucket "avatars"                        │
 └─────────────────────────────────────────────────────────────────────────┘
+  This PC: scripts/backup-supabase.mjs every day → E:PSEOTrackerBackupssupabase
 ```
 
 ---
@@ -196,7 +192,9 @@ These settings live in a single `org_settings` record:
 
 ---
 
-## 5. Collections (PocketBase)
+## 5. Collections (now Supabase tables)
+
+> **On Supabase:** each collection below is a Postgres table of the same name and fields (`supabase/migrations`), and `users` is Supabase Auth plus a `profiles` table (with `profile_emails` for the email, and `legacy_id`, the old PocketBase id). Ids stay 15-character text, except accounts, which are uuids. The API rules below are **row-level security** policies with the same meaning, and the hooks are guard triggers or Edge Functions. `npm run check:rules` checks all of it against staging (240 checks). The rest of this section is the original PocketBase design, kept as the reference the port follows.
 
 Every collection gets automatic `id` (15 characters), `created` and `updated` fields. "→" marks a **relation** field. Instants (`started_at`, `last_seen`, `decided_at` …) are UTC date fields shown in Asia/Karachi. **Date-only values** (`attendance.date`, `holidays.date`, leave `start_date`/`end_date`, `joined_on`, `left_on`) are `"YYYY-MM-DD"` text in Karachi time, which avoids a 5-hour shift moving them to the wrong day. The schema lives in `server/pb_migrations/1791950000_init_schema.js`, and the defaults are in `1791950100_seed_defaults.js`.
 
@@ -252,39 +250,23 @@ The custom routes `/api/org/invite`, `/api/org/reset-password`, `/api/payroll/ru
 ## 6. Project structure
 
 ```
-F:\agency-tracker
-├─ electron/
-│  ├─ main/      index.ts, tracker.ts, engine.ts, syncQueue.ts, session.ts, tray.ts, updater.ts, log.ts, ipc.ts
-│  └─ preload/   index.ts
+F:agency-tracker
+├─ electron/main/   index.ts, tracker.ts, engine.ts, syncQueue.ts, session.ts, network.ts, tray.ts, updater.ts, log.ts, ipc.ts
+├─ electron/preload/index.ts
 ├─ src/
-│  ├─ lib/       pb.ts (PocketBase client), format.ts (formatDuration → "5h 23m"), dates.ts, roles.ts
-│  ├─ stores/    session.ts, role.ts, theme.ts
-│  ├─ components/
-│  │  ├─ ui/     Button, Card, Input, Select, Table, Badge, Dialog …
-│  │  └─ layout/ AppShell, Sidebar, Topbar, ProfileMenu, RoleSwitcher, NotificationBell
-│  └─ features/
-│     ├─ auth/        Login, ChangePassword, TrackingNotice
-│     ├─ tracking/    LiveBoard, MyStats, Reports
-│     ├─ attendance/  AttendanceTable, MyAttendance
-│     ├─ leave/       ApplyLeave, MyLeaves, Approvals, Balances
-│     ├─ rules/       RulesForm, LeaveTypes
-│     ├─ finance/     SalarySetup, PayrollRuns, PayrollDetail
-│     ├─ calendar/    MonthCalendar, HolidayManager, EventForm
-│     ├─ org/         Teams, TeamDetail, Employees, EmployeeDetail, InviteEmployee
-│     └─ profile/     MyProfile, Settings
-├─ server/
-│  ├─ pocketbase.exe        (downloaded, not committed)
-│  ├─ pb_data/              (database + uploaded files, not committed)
-│  ├─ pb_migrations/        (auto-generated schema changes + seed, committed)
-│  └─ pb_hooks/
-│     ├─ invite.pb.js, segments.pb.js, attendance.pb.js, payroll.pb.js,
-│     │  notifications.pb.js, reports.pb.js
-│     └─ lib/  attendance.js, payroll.js, segments.js   (pure CommonJS, tested by Vitest)
-├─ docs/      pocketbase-guide.md, deployment.md
-├─ electron.vite.config.ts
-├─ electron-builder.yml
-├─ roadmap.md
-└─ plan.md
+│  ├─ lib/          db.ts (Supabase client, call(), live(), selectAll()), format.ts, dates.ts, roles.ts, leave.ts …
+│  ├─ stores/       session.ts, role.ts, theme.ts
+│  ├─ components/   ui/, layout/
+│  └─ features/     auth, tracking, attendance, leave, rules, finance, calendar, projects, stars, org, profile, notifications
+│                   (each with its screens and an api.ts of hooks)
+├─ supabase/
+│  ├─ migrations/   schema, security, guards, hourly attendance, register limit, live sessions, realtime, legacy ids, database size
+│  └─ functions/    one folder per Edge Function, _shared/ (core.ts, stores, logic/ bundled from server/pb_hooks/lib)
+├─ server/          the old PocketBase (pb_migrations, pb_hooks, deploy); pb_hooks/lib/*.js is still the tested logic
+├─ scripts/         test-env/ (staging test company), check-rules-supabase.mjs, migrate-to-supabase.mjs,
+│                   backup-supabase.mjs, restore-supabase.mjs, register-supabase-backup-task.ps1, build-edge-shared.mjs
+├─ docs/            deployment.md, switch-over.md, testing/
+└─ plan.md, roadmap.md
 ```
 
 ---
@@ -463,6 +445,13 @@ The detailed module breakdown is in [roadmap.md](roadmap.md).
   - end-to-end 46 of 46 (including the admin reversing, re-approving and cancelling with the employee's balance following each time); `check:rules` 145 of 145; unit tests 271 of 271
   - fix (M6): the Live Board's people list is now live too (realtime on `users` and `teams`): a new hire, a deactivation or a newly assigned team shows within seconds without leaving the screen (it used to need navigating away and back). M6 end-to-end still 17 of 17
 - **All roadmap modules (M0–M12) are built.** Go-live steps are in docs/deployment.md (see M12 above).
+- **Move to Supabase** (2026-10-15/16, branch `supabase-app`; merges into `main` at the switch-over):
+  - steps 2–3: schema, row-level security, guard triggers and all Edge Functions on staging; `npm run check:rules` 240 of 240
+  - step 4: every feature's data layer on supabase-js behind the same hooks (no screen changes); `npm run test:env` seeds staging; every screen checked as admin, manager and employee
+  - step 5: `scripts/migrate-to-supabase.mjs` (accounts keep their passwords, every table and picture, checks both sides), proven on a test PocketBase
+  - step 6 prep: `--delta` for what un-updated PCs send to PocketBase afterwards; time a PC queued before the switch reaches its owner (`profiles.legacy_id`); [docs/switch-over.md](docs/switch-over.md)
+  - step 7: daily backup to E: with restore (drill passed on staging), the database size in an admin's Settings
+  - still to do, by you: the live project and its keys, the real-data dry run, the switch-over evening and release 0.2.0, registering the backup task; open question: rolling up old segments (Reports read raw segments, so deleting them would empty old months)
 
 ## 11. After the MVP
 - **Ping & acknowledge:**

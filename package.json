@@ -14,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "pb": "server\\pocketbase.exe serve --dir server\\pb_data",
-    "check:rules": "node scripts/check-rules.mjs",
+    "check:rules": "node scripts/check-rules-supabase.mjs",
     "test:env": "node scripts/test-env/index.mjs",
     "test:app": "node scripts/test-env/app.mjs",
     "test:e2e": "node scripts/e2e/run.mjs",
