@@ -3,11 +3,14 @@
 // expected allow/deny. Route checks (leave, payroll run, accounts, projects status…) join in
 // step 3, once the Edge Functions exist.
 // Usage: node scripts/check-rules-supabase.mjs   (reads STAGING_* from .env.supabase; never live)
-// It creates its own throwaway accounts and rows and deletes them again at the end.
+// It starts by resetting staging to its default rows (refused while npm run test:env is open),
+// creates its own throwaway accounts and rows, and deletes them again at the end.
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import postgres from 'postgres'
+import { resetStaging } from './test-env/server.mjs'
+import { readState } from './test-env/state.mjs'
 
 const env = Object.fromEntries(
   readFileSync(resolve(import.meta.dirname, '..', '.env.supabase'), 'utf8')
@@ -66,6 +69,12 @@ async function as(user) {
 }
 const at = (minutesAgo) => new Date(Date.now() - minutesAgo * 60000).toISOString()
 const seg = (user, minute) => ({ user, state: 'active', started_at: at(60 - minute), ended_at: at(55 - minute) })
+
+// A run that was stopped half-way leaves its rows behind (same holiday date, same payroll
+// month), and those make the next run fail. Start every run from staging's default rows.
+if (readState()) throw new Error('a test environment (npm run test:env) is using staging: stop it first (Ctrl+C or --stop)')
+await resetStaging()
+console.log('staging reset to its default rows')
 
 try {
   // --- fixtures ---------------------------------------------------------------
