@@ -10,6 +10,7 @@ import { monthOf } from '@/lib/attendance'
 import { addDays, formatTime } from '@/lib/dates'
 import { formatDuration, formatSignedDuration } from '@/lib/format'
 import { monthWeeks, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
+import { loadHome, viewingAs } from '@/lib/roleSwitch'
 import { useSession } from '@/stores/session'
 import { todayKey, useMySegments, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
 import { StatusBadge } from './StatusBadge'
@@ -41,8 +42,11 @@ const share = (part: number, total: number) => (total > 0 ? Math.max(0, part) / 
 
 export function MyStats() {
   const tz = useTimezone()
-  const status = useTrackerStatus()
   const user = useSession((s) => s.user)!
+  const tracker = useTrackerStatus()
+  // While an admin views as someone else, this PC's tracker is still recording the admin:
+  // use only the server's figures for the person on screen, not the tracker's.
+  const status = viewingAs(loadHome(), user.id) ? null : tracker
   const today = todayKey(tz)
   const days = weekOf(today)
   const weeks = monthWeeks(today)

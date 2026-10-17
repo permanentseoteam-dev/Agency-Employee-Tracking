@@ -59,8 +59,10 @@ export function breakdown(item: PayrollItem): Breakdown {
 /** Joined or left part-way through the month: there is no pro-rating, so the admin sets an adjustment. */
 export function midMonth(person: { joined_on?: string; left_on?: string }, month: string): 'joined' | 'left' | null {
   const first = `${month}-01`
-  const last = `${month}-31`
-  if (person.left_on && person.left_on >= first && person.left_on <= last) return 'left'
+  // The month's real last day: leaving on it means a full month was worked.
+  const [y, m] = month.split('-').map(Number)
+  const last = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10)
+  if (person.left_on && person.left_on >= first && person.left_on < last) return 'left'
   if (person.joined_on && person.joined_on > first && person.joined_on <= last) return 'joined'
   return null
 }

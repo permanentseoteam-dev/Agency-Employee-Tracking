@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   BarChart3,
   Briefcase,
@@ -45,7 +45,16 @@ export function Sidebar() {
   const collapsed = useSidebar((s) => s.collapsed)
   const toggle = useSidebar((s) => s.toggle)
   const [query, setQuery] = useState('')
-  const q = query.trim().toLowerCase()
+  // As an icon rail the search box is hidden, so its filter must not hide menu items.
+  const [narrow, setNarrow] = useState(() => window.matchMedia?.('(max-width: 1099px)').matches ?? false)
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 1099px)')
+    if (!mq) return
+    const on = () => setNarrow(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  const q = collapsed || narrow ? '' : query.trim().toLowerCase()
   const items = navFor(role).filter((item) => !q || item.label.toLowerCase().includes(q))
 
   return (

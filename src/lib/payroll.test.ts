@@ -51,7 +51,10 @@ describe('mid-month joiners and leavers', () => {
     [{ joined_on: '2026-10-15' }, 'joined'],
     [{ joined_on: '2026-10-01' }, null],
     [{ joined_on: '2026-01-01', left_on: '2026-10-18' }, 'left'],
-    [{ joined_on: '2026-01-01', left_on: '2026-11-02' }, null]
+    [{ joined_on: '2026-01-01', left_on: '2026-11-02' }, null],
+    // Leaving on the month's last day is a full month.
+    [{ joined_on: '2026-01-01', left_on: '2026-10-31' }, null],
+    [{ joined_on: '2026-01-01', left_on: '2026-10-30' }, 'left']
   ])('%o → %s', (person, expected) => expect(midMonth(person, '2026-10')).toBe(expected))
 })
 

@@ -20,8 +20,10 @@ export function Approvals() {
   const all = pending.data ?? []
   const requests = byKind(all, kind)
 
+  // The balances view covers the current year only; a request for another year shows no balance.
+  const thisYear = String(new Date().getFullYear())
   const balanceFor = (r: LeaveRequest): LeaveBalance | undefined =>
-    (balances.data ?? []).find((b) => b.user === r.user && b.leave_type === r.leave_type)
+    r.start_date.slice(0, 4) === thisYear ? (balances.data ?? []).find((b) => b.user === r.user && b.leave_type === r.leave_type) : undefined
 
   return (
     <div className="space-y-4">

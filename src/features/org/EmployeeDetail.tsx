@@ -88,20 +88,6 @@ function EmployeeView({ employee }: { employee: Employee }) {
       <div className="grid gap-6 @4xl:grid-cols-3">
         <div className="min-w-0 space-y-6 @4xl:col-span-2">
           <DetailsCard employee={employee} isSelf={isSelf} />
-          <div className="grid gap-6 @2xl:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Attendance this month</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-slate-500">Shown here once attendance is built (M7).</CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Leave balance</CardTitle>
-              </CardHeader>
-              <CardContent className="text-sm text-slate-500">Shown here once leave is built (M8).</CardContent>
-            </Card>
-          </div>
         </div>
         <div className="grid min-w-0 content-start items-start gap-6 @2xl:grid-cols-2 @4xl:grid-cols-1">
           <SalaryCard employee={employee} />
@@ -143,7 +129,6 @@ function DetailsCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
       joined_on: form.joined_on
     }
     if (!isSelf) data.role = form.role
-    if (form.email.trim().toLowerCase() !== (employee.email ?? '')) data.email = form.email.trim().toLowerCase()
     try {
       await update.mutateAsync({ id: employee.id, data })
       setStatus({ ok: true, text: 'Saved.' })
@@ -163,8 +148,9 @@ function DetailsCard({ employee, isSelf }: { employee: Employee; isSelf: boolean
             <Field label="Full name" htmlFor="d_full_name">
               <Input id="d_full_name" value={form.full_name} maxLength={100} onChange={(e) => set('full_name', e.target.value)} />
             </Field>
-            <Field label="Email" htmlFor="d_email">
-              <Input id="d_email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} />
+            {/* The sign-in email lives in the account system and can't be changed from here (saving it would do nothing). */}
+            <Field label="Email" htmlFor="d_email" hint="The sign-in email can't be changed here.">
+              <Input id="d_email" type="email" value={form.email} readOnly className="bg-slate-50 text-slate-500 dark:bg-white/5" />
             </Field>
             <Field label="Team" htmlFor="d_team">
               <Select id="d_team" value={form.team} onChange={(e) => set('team', e.target.value)}>

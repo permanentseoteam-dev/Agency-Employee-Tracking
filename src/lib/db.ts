@@ -79,6 +79,7 @@ export function must<T>(result: { data: T | null; error: PostgrestError | null; 
 function friendly(e: PostgrestError): string {
   if (e.code === '23505') return 'That already exists.'
   if (e.code === '42501') return 'You aren’t allowed to do that.'
+  if (e.code === '23503') return 'It’s still in use, so it can’t be deleted.'
   if (e.code === 'PGRST116') return 'Not found.'
   return e.message || 'Something went wrong. Please try again.'
 }

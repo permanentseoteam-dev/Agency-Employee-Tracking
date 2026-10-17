@@ -66,6 +66,9 @@ function shareWithMain(user: UserRecord | null): void {
 async function keepHomeAlive(): Promise<void> {
   if (!viewingAs(loadHome(), useSession.getState().user?.id)) return
   if (await refreshHome()) shareWithMain(useSession.getState().user)
+  // The admin's own session was refused (password reset, switched off): end the borrowed one too,
+  // so this PC never carries on as the viewed person and records the admin's time for them.
+  else if (!loadHome()) useSession.getState().logout()
 }
 
 export const useSession = create<SessionState>((set, get) => {
