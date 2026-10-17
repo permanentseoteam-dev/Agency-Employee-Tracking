@@ -29,7 +29,33 @@ var require_stars = __commonJS({
         given_by_name: names.givenBy || ""
       };
     }
-    module.exports = { recordProblem, givenPayload };
+    function monthStarCharges(attendance, rules, records) {
+      const byId = {};
+      const byStatus = {};
+      for (const r of rules || []) {
+        byId[r.id] = r;
+        if (r.auto) byStatus[r.auto] = r;
+      }
+      const excused = {};
+      for (const r of records || []) if (r.excused) excused[r.user + "|" + r.rule + "|" + r.date] = true;
+      const out = {};
+      const add = (user, rule) => {
+        const stars = Number(rule.stars) || 0;
+        const o = out[user] = out[user] || { stars: 0, pkr: 0 };
+        o.stars += stars;
+        o.pkr += stars * (Number(rule.pkr_per_star) || 0);
+      };
+      for (const a of attendance || []) {
+        const rule = byStatus[a.status];
+        if (rule && !excused[a.user + "|" + rule.id + "|" + a.date]) add(a.user, rule);
+      }
+      for (const r of records || []) {
+        const rule = byId[r.rule];
+        if (rule && !r.excused) add(r.user, rule);
+      }
+      return out;
+    }
+    module.exports = { recordProblem, givenPayload, monthStarCharges };
   }
 });
 export default require_stars();

@@ -13,6 +13,8 @@ export interface StarRule {
   /** The attendance status that gives these stars automatically; '' = given by hand. */
   auto: StarAuto
   description: string
+  /** What each star of this rule costs in pay (whole rupees); 0 = free. */
+  pkr_per_star: number
 }
 
 export interface StarRecord {

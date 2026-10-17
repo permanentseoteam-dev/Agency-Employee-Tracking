@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { starLines, starsByUser, starsText, starTotal, type StarRecord, type StarRule } from './stars'
 
-const late: StarRule = { id: 'r-late', name: 'Late arrival', stars: 1, auto: 'late', description: '' }
-const absent: StarRule = { id: 'r-absent', name: 'Absent without leave', stars: 3, auto: 'absent', description: '' }
-const short: StarRule = { id: 'r-short', name: 'Short hours', stars: 0, auto: 'half_day', description: '' }
-const phone: StarRule = { id: 'r-phone', name: 'Phone in meetings', stars: 2, auto: '', description: '' }
+const late: StarRule = { id: 'r-late', name: 'Late arrival', stars: 1, auto: 'late', description: '', pkr_per_star: 0 }
+const absent: StarRule = { id: 'r-absent', name: 'Absent without leave', stars: 3, auto: 'absent', description: '', pkr_per_star: 0 }
+const short: StarRule = { id: 'r-short', name: 'Short hours', stars: 0, auto: 'half_day', description: '', pkr_per_star: 0 }
+const phone: StarRule = { id: 'r-phone', name: 'Phone in meetings', stars: 2, auto: '', description: '', pkr_per_star: 0 }
 const RULES = [late, absent, short, phone]
 
 const record = (patch: Partial<StarRecord>): StarRecord => ({

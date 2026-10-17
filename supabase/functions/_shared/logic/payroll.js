@@ -70,9 +70,10 @@ var require_payroll = __commonJS({
       const days = Number(input.workingDays) || 0;
       const rate = days > 0 ? base / days : 0;
       const deductedDays = (Number(input.absentDays) || 0) + (Number(input.unpaidLeaveDays) || 0) + 0.5 * (Number(input.halfDays) || 0);
-      const deductions = Math.round(deductedDays * rate);
+      const starsPkr = Math.round(Number(input.starsPkr) || 0);
+      const deductions = Math.round(deductedDays * rate) + starsPkr;
       const adjustment = Math.round(Number(input.adjustment) || 0);
-      return { rate, deductions, net: base - deductions + adjustment };
+      return { rate, deductions, starsPkr, net: base - deductions + adjustment };
     }
     function employedDuring(month, user) {
       const range = monthRange(month);

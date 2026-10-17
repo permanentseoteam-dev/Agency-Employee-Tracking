@@ -6,6 +6,7 @@
 // keeps counted_to, and finalizing needs it to reach the month's last day (a count after it ended).
 import att from '../_shared/logic/attendance.js'
 import lib from '../_shared/logic/payroll.js'
+import starLib from '../_shared/logic/stars.js'
 import { badRequest, body, caller, forbidden, json, loadSettings, serve, sql } from '../_shared/core.ts'
 import { recomputeDays } from '../_shared/attendance_store.ts'
 
@@ -37,7 +38,12 @@ serve(async (req) => {
   const users = await sql`select id, full_name, joined_on, left_on, active from profiles`
   const salaries: Record<string, number> = {}
   for (const s of await sql`select "user", monthly_salary_pkr from salaries`) salaries[s.user] = Number(s.monthly_salary_pkr)
-  const attendance = byUser(await sql`select "user", status from attendance where date >= ${range.from} and date <= ${range.to}` as any)
+  const attendanceRows = await sql`select "user", date, status from attendance where date >= ${range.from} and date <= ${range.to}`
+  const attendance = byUser(attendanceRows as any)
+  // Stars cost each rule's price per star (Rules → Stars); excused ones are free.
+  const starRules = await sql`select id, stars, auto, pkr_per_star from star_rules`
+  const starRecords = await sql`select "user", rule, date, excused from star_records where date >= ${range.from} and date <= ${range.to}`
+  const starCharges: Record<string, { stars: number; pkr: number }> = starLib.monthStarCharges(attendanceRows, starRules, starRecords)
   const leaves = byUser(
     (await sql`select lr."user", lr.start_date, lr.end_date, lr.half_day from leave_requests lr join leave_types lt on lt.id = lr.leave_type
       where lr.status = 'approved' and not lt.paid and lr.start_date <= ${range.to} and lr.end_date >= ${range.from}`).map((l) => ({ ...l, paid: false })) as any
@@ -67,9 +73,18 @@ serve(async (req) => {
       const counts = lib.attendanceCounts(attendance[u.id])
       const unpaid = lib.unpaidLeaveDays(leaves[u.id], month, settings.work_days, holidays)
       const keep = kept[u.id] ?? { adjustment: 0, note: '' }
-      const r = lib.calculate({ base, workingDays, absentDays: counts.absent, unpaidLeaveDays: unpaid, halfDays: counts.half, adjustment: keep.adjustment })
-      await tx`insert into payroll_items (run, "user", base, working_days, absent_days, unpaid_leave_days, half_days, deductions, adjustment_pkr, note, net)
-        values (${run.id}, ${u.id}, ${base}, ${workingDays}, ${counts.absent}, ${unpaid}, ${counts.half}, ${r.deductions}, ${Math.round(keep.adjustment)}, ${keep.note}, ${r.net})`
+      const charge = starCharges[u.id] ?? { stars: 0, pkr: 0 }
+      const r = lib.calculate({
+        base,
+        workingDays,
+        absentDays: counts.absent,
+        unpaidLeaveDays: unpaid,
+        halfDays: counts.half,
+        starsPkr: charge.pkr,
+        adjustment: keep.adjustment
+      })
+      await tx`insert into payroll_items (run, "user", base, working_days, absent_days, unpaid_leave_days, half_days, stars, stars_pkr, deductions, adjustment_pkr, note, net)
+        values (${run.id}, ${u.id}, ${base}, ${workingDays}, ${counts.absent}, ${unpaid}, ${counts.half}, ${charge.stars}, ${r.starsPkr}, ${r.deductions}, ${Math.round(keep.adjustment)}, ${keep.note}, ${r.net})`
       items++
     }
   })

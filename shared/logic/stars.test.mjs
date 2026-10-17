@@ -29,3 +29,33 @@ describe('givenPayload', () => {
     ).toEqual({ record: 'r1', rule_name: 'Phone use', stars: 2, date: '2026-10-14', note: 'Phone in a client call', given_by_name: 'Ayesha' })
   })
 })
+
+describe('monthStarCharges (each rule has its own price)', () => {
+  const rules = [
+    { id: 'late', stars: 1, auto: 'late', pkr_per_star: 200 },
+    { id: 'absent', stars: 3, auto: 'absent', pkr_per_star: 500 },
+    { id: 'phone', stars: 2, auto: '', pkr_per_star: 300 },
+    { id: 'free', stars: 1, auto: '', pkr_per_star: 0 }
+  ]
+  it('adds stars × that rule’s price for counted breaks, per person', () => {
+    const attendance = [
+      { user: 'a', date: '2026-10-01', status: 'late' },
+      { user: 'a', date: '2026-10-02', status: 'late' },
+      { user: 'a', date: '2026-10-03', status: 'absent' },
+      { user: 'b', date: '2026-10-01', status: 'present' }
+    ]
+    const records = [
+      { user: 'a', rule: 'phone', date: '2026-10-05', excused: false },
+      { user: 'b', rule: 'free', date: '2026-10-05', excused: false }
+    ]
+    expect(s.monthStarCharges(attendance, rules, records)).toEqual({
+      a: { stars: 1 + 1 + 3 + 2, pkr: 200 + 200 + 1500 + 600 },
+      b: { stars: 1, pkr: 0 }
+    })
+  })
+  it('excused stars are free', () => {
+    const attendance = [{ user: 'a', date: '2026-10-01', status: 'late' }]
+    const records = [{ user: 'a', rule: 'late', date: '2026-10-01', excused: true }]
+    expect(s.monthStarCharges(attendance, rules, records)).toEqual({})
+  })
+})

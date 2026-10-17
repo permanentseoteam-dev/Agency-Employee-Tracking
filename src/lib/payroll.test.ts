@@ -44,6 +44,12 @@ describe('breakdown', () => {
   it('shows what earlier pay rules deducted on top (an old month with a late fine)', () => {
     expect(breakdown({ ...item, deductions: 18167 }).other).toBe(1500)
   })
+
+  it('shows star charges as their own part, not as "other"', () => {
+    const b = breakdown({ ...item, stars: 5, stars_pkr: 1500, deductions: 18167 })
+    expect(b.stars).toBe(1500)
+    expect(b.other).toBe(0)
+  })
 })
 
 describe('mid-month joiners and leavers', () => {
@@ -67,9 +73,9 @@ describe('totals and CSV', () => {
 
   it('exports a line per employee and a total', () => {
     const lines = payrollCsv([item, other], (id) => (id === 'u1' ? 'Asma Khan' : 'Bilal')).replace('﻿', '').trim().split('\r\n')
-    expect(lines[0]).toBe('Employee,Monthly salary,Working days,Absent,Unpaid leave,Half days,Deductions,Adjustment,Note,Net pay')
-    expect(lines[1]).toBe('Asma Khan,100000,21,2,1,1,16667,-20000,Left on the 18th,63333')
-    expect(lines[2]).toBe('Bilal,50000,21,2,1,1,0,5000,"Bonus, Q3",55000')
-    expect(lines[3]).toBe('Total,150000,,,,,16667,-15000,,118333')
+    expect(lines[0]).toBe('Employee,Monthly salary,Working days,Absent,Unpaid leave,Half days,Stars,Stars (PKR),Deductions,Adjustment,Note,Net pay')
+    expect(lines[1]).toBe('Asma Khan,100000,21,2,1,1,0,0,16667,-20000,Left on the 18th,63333')
+    expect(lines[2]).toBe('Bilal,50000,21,2,1,1,0,0,0,5000,"Bonus, Q3",55000')
+    expect(lines[3]).toBe('Total,150000,,,,,,0,16667,-15000,,118333')
   })
 })

@@ -46,6 +46,7 @@ export function MyPay() {
                 <Th className="text-right">Absent</Th>
                 <Th className="text-right">Unpaid leave</Th>
                 <Th className="text-right">Half days</Th>
+                <Th className="text-right">Stars</Th>
                 <Th className="text-right">Deductions</Th>
                 <Th className="text-right">Adjustment</Th>
                 <Th className="text-right">Net pay</Th>
@@ -65,6 +66,7 @@ export function MyPay() {
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.absent_days || '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.unpaid_leave_days || '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.half_days || '–'}</Td>
+                  <Td className="whitespace-nowrap text-right tabular-nums">{i.stars ? `${i.stars} · ${formatPkr(-(i.stars_pkr ?? 0))}` : '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums">{i.deductions ? formatPkr(-i.deductions) : '–'}</Td>
                   <Td className="whitespace-nowrap text-right tabular-nums" title={i.note || undefined}>
                     {formatAdjustment(i.adjustment_pkr)}
@@ -77,8 +79,8 @@ export function MyPay() {
         )}
       </Card>
       <p className="max-w-4xl text-xs text-slate-500">
-        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate. Late
-        days cost nothing: they give stars instead. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
+        Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate, plus
+        stars: each star costs its rule’s price (see Rules → Stars), and excused stars are free. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
       </p>
 
       {open && <LineDialog line={open} month={open.expand?.run?.month ?? ''} editable={false} onClose={() => setOpen(null)} />}

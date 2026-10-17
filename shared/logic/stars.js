@@ -35,4 +35,38 @@ function givenPayload(rec, names) {
   }
 }
 
-module.exports = { recordProblem, givenPayload }
+/**
+ * What stars cost in a month, per person: each counted rule break costs
+ * (that rule's stars × the rule's pkr_per_star). Same counting as the app (src/lib/stars.ts):
+ * automatic rules from attendance unless excused for that day; by-hand records unless excused.
+ * attendance: [{ user, date, status }], rules: [{ id, stars, auto, pkr_per_star }],
+ * records: [{ user, rule, date, excused }] → { [user]: { stars, pkr } }
+ */
+function monthStarCharges(attendance, rules, records) {
+  const byId = {}
+  const byStatus = {}
+  for (const r of rules || []) {
+    byId[r.id] = r
+    if (r.auto) byStatus[r.auto] = r
+  }
+  const excused = {}
+  for (const r of records || []) if (r.excused) excused[r.user + '|' + r.rule + '|' + r.date] = true
+  const out = {}
+  const add = (user, rule) => {
+    const stars = Number(rule.stars) || 0
+    const o = (out[user] = out[user] || { stars: 0, pkr: 0 })
+    o.stars += stars
+    o.pkr += stars * (Number(rule.pkr_per_star) || 0)
+  }
+  for (const a of attendance || []) {
+    const rule = byStatus[a.status]
+    if (rule && !excused[a.user + '|' + rule.id + '|' + a.date]) add(a.user, rule)
+  }
+  for (const r of records || []) {
+    const rule = byId[r.rule]
+    if (rule && !r.excused) add(r.user, rule)
+  }
+  return out
+}
+
+module.exports = { recordProblem, givenPayload, monthStarCharges }

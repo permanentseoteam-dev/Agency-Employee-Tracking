@@ -2,10 +2,11 @@
 // tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 //
 //   per-day rate = monthly salary ÷ working days in the month (weekends and holidays excluded)
-//   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate
+//   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate + star charges
 //   net          = monthly salary − deductions + adjustment
 // There is no automatic pro-rating: the admin sets an adjustment for mid-month joiners and leavers.
-// Late days cost nothing here: they give stars instead (star_rules), which never touch pay.
+// Late days cost nothing here: they give stars instead (star_rules). Stars cost each rule's
+// pkr_per_star per star (stars.monthStarCharges); excused stars are free.
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const DAY_MS = 86400000
@@ -90,9 +91,10 @@ function calculate(input) {
   const days = Number(input.workingDays) || 0
   const rate = days > 0 ? base / days : 0
   const deductedDays = (Number(input.absentDays) || 0) + (Number(input.unpaidLeaveDays) || 0) + 0.5 * (Number(input.halfDays) || 0)
-  const deductions = Math.round(deductedDays * rate)
+  const starsPkr = Math.round(Number(input.starsPkr) || 0)
+  const deductions = Math.round(deductedDays * rate) + starsPkr
   const adjustment = Math.round(Number(input.adjustment) || 0)
-  return { rate: rate, deductions: deductions, net: base - deductions + adjustment }
+  return { rate: rate, deductions: deductions, starsPkr: starsPkr, net: base - deductions + adjustment }
 }
 
 /** Whether someone was employed for at least one day of the month. */
