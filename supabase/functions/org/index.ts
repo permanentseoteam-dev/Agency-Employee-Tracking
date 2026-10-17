@@ -1,10 +1,9 @@
-// Organization actions, admins only (was invite.pb.js and switch.pb.js). { action, ... }:
+// Organization actions, admins only (was invite.pb.js). { action, ... }:
 //   invite          { email, full_name, password, team, role, designation, phone, joined_on, monthly_salary_pkr } → { id }
 //   reset-password  { userId, password } → { id }   (temporary password; must change it; signed out everywhere)
 //   set-active      { userId, active, left_on? } → { id, active }   (deactivating records the leaving date)
 //   approve         { userId, joined_on? } → { id }   (a "Create an account" sign-up)
 //   reject          { userId } → { id }   (deletes the waiting account)
-//   switch-to       { userId } → { session, record }   (Switch role: sign in as that person, no password)
 import org from '../_shared/logic/org.js'
 import { badRequest, body, caller, forbidden, HttpError, json, notFound, serve, sql } from '../_shared/core.ts'
 import { authAdmin, createAccount, emailTaken, setCanSignIn, signOutEverywhere } from '../_shared/accounts.ts'
@@ -79,25 +78,6 @@ serve(async (req) => {
       const { error } = await authAdmin.deleteUser(p.id) // the profile and salary go with it
       if (error) throw badRequest(error.message)
       return json(200, { id: p.id })
-    }
-
-    case 'switch-to': {
-      const id = typeof b.userId === 'string' ? b.userId.trim() : ''
-      if (!id) throw badRequest('Pick a person.')
-      const p = await profile(id)
-      if (!p) throw notFound('That person no longer exists.')
-      if (!p.active || p.pending_approval) throw badRequest('That account is switched off or waiting for approval.')
-      const { data: user } = await authAdmin.getUserById(id)
-      const email = user?.user?.email
-      if (!email) throw notFound('That person no longer exists.')
-      // A one-time sign-in link for that person, redeemed right here for a session.
-      const { data: link, error } = await authAdmin.generateLink({ type: 'magiclink', email })
-      if (error || !link.properties?.hashed_token) throw new HttpError(500, 'Could not switch: ' + (error?.message ?? 'no link'))
-      const anon = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, { auth: { persistSession: false } })
-      const { data: verified, error: vErr } = await anon.auth.verifyOtp({ type: 'magiclink', token_hash: link.properties.hashed_token })
-      if (vErr || !verified.session) throw new HttpError(500, 'Could not switch: ' + (vErr?.message ?? 'no session'))
-      console.log(`switch role: admin ${me.id} → ${id}`)
-      return json(200, { session: verified.session, record: p })
     }
 
     default:

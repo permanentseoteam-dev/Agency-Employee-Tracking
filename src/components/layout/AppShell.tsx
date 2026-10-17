@@ -3,7 +3,7 @@ import { SettingsSync } from '@/features/rules/api'
 import { useRole } from '@/hooks/useRole'
 import { canOpen, landingFor, NAV, ROLE_LABEL, SECTION_LABEL } from '@/lib/roles'
 import { NotificationBell } from './NotificationBell'
-import { AccountSwitcher } from './AccountSwitcher'
+import { RoleBadge } from './RoleBadge'
 import { Sidebar } from './Sidebar'
 
 const TITLES: Record<string, string> = {
@@ -45,7 +45,7 @@ export function AppShell() {
             <h1 className="truncate text-[28px] leading-tight font-bold tracking-[-.02em] text-ink-900">{title}</h1>
           </div>
           <div className="flex min-w-0 items-center justify-end gap-2.5">
-            <AccountSwitcher />
+            <RoleBadge />
             <NotificationBell />
           </div>
         </header>

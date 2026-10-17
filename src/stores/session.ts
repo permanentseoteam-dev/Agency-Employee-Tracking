@@ -1,13 +1,9 @@
 import { create } from 'zustand'
 import type { Session } from '@supabase/supabase-js'
 import { AppError, supabase, toUser, type UserRecord } from '@/lib/db'
-import { clearHome, loadHome, refreshHome, viewingAs } from '@/lib/roleSwitch'
 
-/** The admin's own saved session is renewed this often while viewing as someone else (tokens last an hour). */
-const KEEP_ALIVE_MS = 30 * 60_000
 /** The last signed-in account, so the app still shows who is signed in when it starts offline. */
 const USER_KEY = 'pseo.user'
-let keepAliveTimer: ReturnType<typeof setInterval> | undefined
 let session: Session | null = null
 
 interface SessionState {
@@ -48,34 +44,35 @@ async function loadUser(s: Session | null): Promise<UserRecord | null> {
   return p.data ? toUser(p.data, e.data?.email ?? s.user.email ?? '') : null
 }
 
-// Tell the main process who is signed in, so the tracker writes as that user. While an admin
-// views the app as someone else (Switch role), the tracker keeps recording the admin.
+// Tell the main process who is signed in, so the tracker writes as that user.
 function shareWithMain(user: UserRecord | null): void {
-  const home = loadHome()
-  const me = viewingAs(home, user?.id)
-    ? { token: home!.session.access_token, record: home!.record }
-    : user && session
-      ? { token: session.access_token, record: user }
-      : null
   window.tracker?.setSession(
-    me ? { token: me.token, userId: me.record.id, role: me.record.role, consented: !!me.record.tracking_consent_at } : null
+    user && session ? { token: session.access_token, userId: user.id, role: user.role, consented: !!user.tracking_consent_at } : null
   )
 }
 
-/** Renews the admin's own session while viewing as someone else, and hands the tracker the new token. */
-async function keepHomeAlive(): Promise<void> {
-  if (!viewingAs(loadHome(), useSession.getState().user?.id)) return
-  if (await refreshHome()) shareWithMain(useSession.getState().user)
-  // The admin's own session was refused (password reset, switched off): end the borrowed one too,
-  // so this PC never carries on as the viewed person and records the admin's time for them.
-  else if (!loadHome()) useSession.getState().logout()
+/**
+ * Switch role was removed (2026-10-17). A PC that was left "viewing as" someone still holds the
+ * admin's saved account under this key: drop it, and end the borrowed session so the tracker
+ * never records the admin as that person. Returns true when the borrowed session must end.
+ */
+const OLD_SWITCH_KEY = 'pseo.homeAccount'
+function endLeftoverSwitch(currentUserId: string | undefined): boolean {
+  try {
+    const raw = localStorage.getItem(OLD_SWITCH_KEY)
+    if (!raw) return false
+    localStorage.removeItem(OLD_SWITCH_KEY)
+    const homeId = (JSON.parse(raw) as { record?: { id?: string } } | null)?.record?.id
+    return !!currentUserId && !!homeId && homeId !== currentUserId
+  } catch {
+    return false
+  }
 }
 
 export const useSession = create<SessionState>((set, get) => {
   const apply = async (s: Session | null) => {
     session = s
     if (!s) {
-      clearHome()
       cache(null)
       set({ user: null })
       shareWithMain(null)
@@ -83,8 +80,6 @@ export const useSession = create<SessionState>((set, get) => {
     }
     try {
       const user = await loadUser(s)
-      // Back on the admin's own account: nothing is being viewed as anyone else.
-      if (!user || loadHome()?.record.id === user.id) clearHome()
       cache(user)
       set({ user })
       shareWithMain(user)
@@ -126,7 +121,6 @@ export const useSession = create<SessionState>((set, get) => {
     },
 
     logout() {
-      clearHome()
       void supabase.auth.signOut({ scope: 'local' })
       window.location.hash = '#/'
     },
@@ -138,6 +132,10 @@ export const useSession = create<SessionState>((set, get) => {
     async init() {
       const { data } = await supabase.auth.getSession()
       session = data.session
+      if (session && endLeftoverSwitch(session.user.id)) {
+        await supabase.auth.signOut({ scope: 'local' })
+        session = null
+      }
       if (session) {
         // Checks the session with the server: a reset password or a switched-off account ends it.
         const { error } = await supabase.auth.getUser()
@@ -148,39 +146,9 @@ export const useSession = create<SessionState>((set, get) => {
       }
       await apply(session)
       set({ ready: true })
-      if (!keepAliveTimer) {
-        void keepHomeAlive()
-        keepAliveTimer = setInterval(() => void keepHomeAlive(), KEEP_ALIVE_MS)
-      }
     }
   }
 })
-
-/**
- * Resolves once the store shows the account `userId` (true), or after `timeoutMs` (false).
- * Switch role waits for this before going to the new role's landing page: the store takes the
- * new session a moment after supabase.auth.setSession (the auth event is handled deferred), and
- * navigating before then lets the shell's route guard check the old role and redirect.
- */
-export function waitForUser(userId: string, timeoutMs = 10_000): Promise<boolean> {
-  if (useSession.getState().user?.id === userId) return Promise.resolve(true)
-  return new Promise((resolve) => {
-    const done = (ok: boolean) => {
-      clearTimeout(timer)
-      unsubscribe()
-      resolve(ok)
-    }
-    const timer = setTimeout(() => done(false), timeoutMs)
-    const unsubscribe = useSession.subscribe((s) => {
-      if (s.user?.id === userId) done(true)
-    })
-  })
-}
-
-/** The signed-in session's tokens (Switch role keeps them as the admin's home account). */
-export function currentTokens() {
-  return session ? { access_token: session.access_token, refresh_token: session.refresh_token } : null
-}
 
 /** Friendly text for any server error (AppError, or a Supabase / network error). */
 export function errorMessage(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
