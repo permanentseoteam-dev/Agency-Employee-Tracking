@@ -57,6 +57,12 @@ export function settings(): TrackerSettings {
   return persisted().get('settings') ?? DEFAULT_SETTINGS
 }
 
+/** The tracking rules for whoever is signed in: admins and managers are tracked any time, employees in shift hours. */
+function rules(): TrackerSettings {
+  const role = identity()?.role
+  return role === 'admin' || role === 'manager' ? { ...settings(), any_time: true } : settings()
+}
+
 // ---- today's totals --------------------------------------------------------
 // Every segment seen today, by id: closed here, or already on the server
 // (recorded on another day's run of the app). Summing by id never double counts.
@@ -198,7 +204,7 @@ function idleSeconds(): number {
 /** Closes the open segment, if any (lock, suspend, sign-in as someone else, quit). */
 function closeOpen(): void {
   const before = machine.state
-  record(machine.stop(Date.now(), idleSeconds(), settings()), trackingUser)
+  record(machine.stop(Date.now(), idleSeconds(), rules()), trackingUser)
   if (before) log.info(`tracking: ${before} → stopped`)
 }
 
@@ -214,7 +220,7 @@ function poll(): void {
 
   if (canTrack()) {
     const before = machine.state
-    record(machine.tick(Date.now(), idleSeconds(), settings()), trackingUser)
+    record(machine.tick(Date.now(), idleSeconds(), rules()), trackingUser)
     if (machine.state !== before) log.info(`tracking: ${before ?? 'stopped'} → ${machine.state ?? 'stopped (outside shift)'}`)
   } else if (machine.state) {
     closeOpen()
@@ -230,7 +236,7 @@ let lastBeat: { status: string; at: number } | null = null
 function presenceStatus(): 'active' | 'idle' | 'offline' {
   // A locked PC counts as idle only during the shift; after hours or on days off it is offline,
   // so the Live Board doesn't show someone as idle all night or all weekend.
-  if (paused === 'locked') return identity()?.consented && inShift(Date.now(), settings()) ? 'idle' : 'offline'
+  if (paused === 'locked') return identity()?.consented && inShift(Date.now(), rules()) ? 'idle' : 'offline'
   if (!canTrack() || !machine.state) return 'offline'
   return machine.state
 }
@@ -261,7 +267,7 @@ export function status(): TrackerStatus {
   if (!id) reason = 'no_user'
   else if (!id.consented) reason = 'no_consent'
   else if (paused) reason = paused
-  else if (!machine.state) reason = inShift(Date.now(), settings()) ? 'starting' : 'outside_shift'
+  else if (!machine.state) reason = inShift(Date.now(), rules()) ? 'starting' : 'outside_shift'
   return {
     state: reason === 'tracking' ? (machine.state ?? 'active') : 'off',
     reason,

@@ -1,7 +1,7 @@
 // The tracking state machine (plan §4.1). Pure: it gets the time, the system
 // idle seconds and the rules on every poll, and returns the segments that just
 // closed. engine.ts feeds it from powerMonitor and stores what it returns.
-import { isoWeekday, toDateKey, zonedTimeToUtc } from '../../src/lib/dates'
+import { addDays, isoWeekday, toDateKey, zonedTimeToUtc } from '../../src/lib/dates'
 import type { TrackerSettings } from '../preload/api'
 
 export type TrackState = 'active' | 'idle'
@@ -26,6 +26,10 @@ const SERVER_FUTURE_MS = 2 * 60_000
 export function shiftFor(now: number, rules: TrackerSettings): { start: number; end: number } | null {
   const tz = rules.timezone
   const day = toDateKey(now, tz)
+  // Any time: the whole local day, every day (segments still split at midnight).
+  if (rules.any_time) {
+    return { start: zonedTimeToUtc(day, '00:00', tz).getTime(), end: zonedTimeToUtc(addDays(day, 1), '00:00', tz).getTime() }
+  }
   if (!rules.work_days.includes(isoWeekday(day))) return null
   return {
     start: zonedTimeToUtc(day, rules.shift_start, tz).getTime(),

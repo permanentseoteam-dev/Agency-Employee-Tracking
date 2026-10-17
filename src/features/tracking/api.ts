@@ -12,6 +12,7 @@ export type TrackerStatus = Awaited<ReturnType<Window['tracker']['getStatus']>>
 export const trackingKeys = {
   people: (userId: string) => ['tracking', 'people', userId] as const,
   presence: ['tracking', 'presence'] as const,
+  firstActivity: (day: string) => ['tracking', 'first-activity', day] as const,
   mine: (userId: string, from: string) => ['tracking', 'mine', userId, from] as const,
   report: (params: ReportParams) => ['tracking', 'report', params] as const
 }
@@ -112,6 +113,33 @@ export function useMyTeams() {
 }
 
 /** Every visible presence record by user, kept live with a realtime subscription. */
+/**
+ * Each person's first recorded activity today (the Live Board), from today's saved segments:
+ * the server rules return the caller's own plus, for staff, the people they may see.
+ * Saved segments close within 5 minutes, so it appears shortly after someone starts.
+ */
+export function useFirstActivity(day: string, tz: string) {
+  return useQuery({
+    queryKey: trackingKeys.firstActivity(day),
+    enabled: !!day,
+    refetchInterval: 60_000,
+    queryFn: async () => {
+      const { start, end } = dayRangeUtc(day, tz)
+      const rows = await selectAll<{ user: string; started_at: string }>(() =>
+        supabase
+          .from('activity_segments')
+          .select('user, started_at')
+          .gte('started_at', start.toISOString())
+          .lt('started_at', end.toISOString())
+          .order('started_at')
+      )
+      const first: Record<string, string> = {}
+      for (const r of rows) first[r.user] ??= r.started_at
+      return first
+    }
+  })
+}
+
 export function usePresence() {
   const qc = useQueryClient()
   const query = useQuery({

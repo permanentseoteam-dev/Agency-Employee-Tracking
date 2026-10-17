@@ -3,7 +3,7 @@ import { SettingsSync } from '@/features/rules/api'
 import { useRole } from '@/hooks/useRole'
 import { canOpen, landingFor, NAV, ROLE_LABEL, SECTION_LABEL } from '@/lib/roles'
 import { NotificationBell } from './NotificationBell'
-import { RoleBadge } from './RoleBadge'
+import { PreviewBanner, RoleBadge } from './RoleBadge'
 import { Sidebar } from './Sidebar'
 
 const TITLES: Record<string, string> = {
@@ -49,6 +49,7 @@ export function AppShell() {
             <NotificationBell />
           </div>
         </header>
+        <PreviewBanner />
         <main className="-mx-2 flex-1 overflow-y-auto px-3.5 pt-2.5 pb-5">
           {/* @container: pages size themselves to this area (it changes with the sidebar), not to the window. */}
           <div key={top} className="page-enter @container/page">

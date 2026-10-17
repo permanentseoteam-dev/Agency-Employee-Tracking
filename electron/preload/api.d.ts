@@ -22,6 +22,8 @@ export interface TrackerSettings {
   work_days: number[]
   idle_threshold_minutes: number
   timezone: string
+  /** Track any time of day, every day (admins and managers); set by the engine, not stored. */
+  any_time?: boolean
 }
 
 export interface TodayTotals {
@@ -49,6 +51,12 @@ export interface NetworkStatus {
   server: boolean
 }
 
+/** What "Save password" keeps on this PC (password '' when it couldn't be saved encrypted). */
+export interface SavedLogin {
+  email: string
+  password: string
+}
+
 export interface TrackerApi {
   logError(message: string): void
   setSession(session: SessionInfo | null): void
@@ -66,6 +74,10 @@ export interface TrackerApi {
   networkStatus(): Promise<NetworkStatus>
   /** Quits the app (managers and admins); resolves false when the main process refuses. */
   quit(): Promise<boolean>
+  /** "Save password" on the sign-in screen. */
+  loadLogin(): Promise<SavedLogin | null>
+  saveLogin(email: string, password: string): Promise<void>
+  clearLogin(): Promise<void>
 }
 
 declare global {

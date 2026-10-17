@@ -4,6 +4,15 @@ import { AppError, supabase, toUser, type UserRecord } from '@/lib/db'
 
 /** The last signed-in account, so the app still shows who is signed in when it starts offline. */
 const USER_KEY = 'pseo.user'
+/** "Remember me" on the sign-in screen: 'false' means sign in again each time the app starts. */
+export const REMEMBER_KEY = 'pseo.rememberMe'
+const remembered = (): boolean => {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
 let session: Session | null = null
 
 interface SessionState {
@@ -132,6 +141,12 @@ export const useSession = create<SessionState>((set, get) => {
     async init() {
       const { data } = await supabase.auth.getSession()
       session = data.session
+      // "Remember me" was off: this is a new start of the app, so ask for the password again.
+      // The tracker keeps queuing the time until the next sign-in.
+      if (session && !remembered()) {
+        await supabase.auth.signOut({ scope: 'local' })
+        session = null
+      }
       if (session && endLeftoverSwitch(session.user.id)) {
         await supabase.auth.signOut({ scope: 'local' })
         session = null

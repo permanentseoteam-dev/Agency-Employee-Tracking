@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
-import { useSession } from '@/stores/session'
+import { REMEMBER_KEY, useSession } from '@/stores/session'
 import { AuthLayout, FormError } from './AuthLayout'
 
 export function Login({ onRegister }: { onRegister?: () => void }) {
@@ -10,6 +10,27 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [remember, setRemember] = useState(() => {
+    try {
+      return localStorage.getItem(REMEMBER_KEY) !== 'false'
+    } catch {
+      return true
+    }
+  })
+  const [savePassword, setSavePassword] = useState(true)
+
+  // Fill in what "Save password" kept on this PC (the password is decrypted by Windows).
+  useEffect(() => {
+    let alive = true
+    void window.tracker?.loadLogin?.().then((saved) => {
+      if (!alive || !saved) return
+      setEmail((v) => v || saved.email)
+      setPassword((v) => v || saved.password)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -17,6 +38,13 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
     setBusy(true)
     try {
       await login(email, password)
+      try {
+        localStorage.setItem(REMEMBER_KEY, remember ? 'true' : 'false')
+      } catch {
+        // storage blocked: stays signed in, as before
+      }
+      if (savePassword) void window.tracker?.saveLogin?.(email.trim().toLowerCase(), password)
+      else void window.tracker?.clearLogin?.()
     } catch (err) {
       const status = (err as { status?: number }).status
       setError(
@@ -57,6 +85,22 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
             onChange={(e) => setPassword(e.target.value)}
           />
         </Field>
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-sm text-ink-700">
+          <label htmlFor="remember_me" className="flex cursor-pointer items-center gap-2">
+            <input id="remember_me" type="checkbox" className="size-4 accent-indigo-600" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+            Remember me
+          </label>
+          <label htmlFor="save_password" className="flex cursor-pointer items-center gap-2">
+            <input
+              id="save_password"
+              type="checkbox"
+              className="size-4 accent-indigo-600"
+              checked={savePassword}
+              onChange={(e) => setSavePassword(e.target.checked)}
+            />
+            Save password
+          </label>
+        </div>
         <FormError message={error} />
         <Button type="submit" className="w-full" loading={busy} disabled={!email || !password}>
           Sign in

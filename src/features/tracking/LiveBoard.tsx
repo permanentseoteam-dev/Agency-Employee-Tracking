@@ -4,11 +4,14 @@ import { Card } from '@/components/ui/Card'
 import { Input, Select } from '@/components/ui/Input'
 import { useLeaveLive, useOnLeave } from '@/features/leave/api'
 import { formatTime, toDateKey } from '@/lib/dates'
-import { formatDuration } from '@/lib/format'
+import { formatDuration, formatSignedDuration } from '@/lib/format'
 import { boardStatus, presenceToday, type BoardStatus } from '@/lib/tracking'
 import { cn } from '@/lib/cn'
-import { useNow, usePeople, usePresence, useTimezone } from './api'
+import { useFirstActivity, useNow, usePeople, usePresence, useTimezone } from './api'
 import { StatusBadge, STATUS_LABEL } from './StatusBadge'
+
+/** Net = active − idle in the whole minutes shown, as on My Stats. */
+const netToday = (active_s: number, idle_s: number) => (Math.floor(active_s / 60) - Math.floor(idle_s / 60)) * 60
 
 const ORDER: Record<BoardStatus, number> = { active: 0, idle: 1, on_leave: 2, offline: 3 }
 const FILTERS: BoardStatus[] = ['active', 'idle', 'on_leave', 'offline']
@@ -19,6 +22,7 @@ export function LiveBoard() {
   const people = usePeople()
   const presence = usePresence()
   const onLeave = useOnLeave(toDateKey(now, tz))
+  const firstActivity = useFirstActivity(toDateKey(now, tz), tz)
   useLeaveLive()
   const [team, setTeam] = useState('')
   const [search, setSearch] = useState('')
@@ -103,7 +107,7 @@ export function LiveBoard() {
                 </div>
                 <StatusBadge status={status} />
               </div>
-              <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
+              <dl className="mt-3 grid grid-cols-3 gap-x-2 gap-y-3 text-sm">
                 <div>
                   <dt className="text-xs text-slate-500">Active</dt>
                   <dd className="font-semibold tabular-nums">{formatDuration(today.active_s)}</dd>
@@ -111,6 +115,18 @@ export function LiveBoard() {
                 <div>
                   <dt className="text-xs text-slate-500">Idle</dt>
                   <dd className="font-semibold tabular-nums">{formatDuration(today.idle_s)}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Net today</dt>
+                  <dd className="font-semibold tabular-nums" data-net={netToday(today.active_s, today.idle_s)}>
+                    {formatSignedDuration(netToday(today.active_s, today.idle_s))}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">First activity</dt>
+                  <dd className="tabular-nums" data-first-activity={firstActivity.data?.[person.id] ?? ''}>
+                    {firstActivity.data?.[person.id] ? formatTime(firstActivity.data[person.id].replace(' ', 'T'), tz) : '—'}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">Last seen</dt>

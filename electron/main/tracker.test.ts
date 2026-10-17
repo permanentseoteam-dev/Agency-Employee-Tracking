@@ -41,6 +41,35 @@ describe('shift window', () => {
   })
 })
 
+describe('any time (admins and managers)', () => {
+  const ANY = { ...RULES, any_time: true }
+
+  it('covers the whole local day, every day', () => {
+    const shift = shiftFor(T0, ANY)!
+    expect(new Date(shift.start).toISOString()).toBe('2026-10-13T19:00:00.000Z') // 00:00 Karachi
+    expect(new Date(shift.end).toISOString()).toBe('2026-10-14T19:00:00.000Z')
+    expect(inShift(Date.parse('2026-10-14T16:30:00.000Z'), ANY)).toBe(true) // 21:30, after office hours
+    expect(inShift(Date.parse('2026-10-17T05:00:00.000Z'), ANY)).toBe(true) // Saturday
+  })
+
+  it('records after office hours, and splits at midnight', () => {
+    const m = new TrackerMachine()
+    const from = Date.parse('2026-10-14T18:50:00.000Z') // 23:50 Karachi
+    const segs = run(m, from, from + 20 * MIN, busy, ANY)
+    expect(total(segs, 'active')).toBeGreaterThan(0)
+    // No segment crosses midnight (19:00 UTC): each belongs to one day.
+    const midnight = Date.parse('2026-10-14T19:00:00.000Z')
+    for (const s of segs) expect(s.startedAt >= midnight || s.endedAt <= midnight).toBe(true)
+  })
+
+  it('still records nothing after hours for an employee', () => {
+    const m = new TrackerMachine()
+    const from = Date.parse('2026-10-14T16:30:00.000Z') // 21:30 Karachi
+    expect(run(m, from, from + 20 * MIN, busy)).toEqual([])
+    expect(m.state).toBeNull()
+  })
+})
+
 describe('TrackerMachine', () => {
   it('opens an active segment on the first poll in shift', () => {
     const m = new TrackerMachine()

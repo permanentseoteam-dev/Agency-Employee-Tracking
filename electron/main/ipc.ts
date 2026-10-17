@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, shell } from 'electron'
 import type { SessionInfo, TrackerSettings } from '../preload/api'
 import { autostartState, ensureAutostart, setAutostart } from './autostart'
+import { clearLogin, loadLogin, saveLogin } from './credentials'
 import { onStatus, status, today } from './engine'
 import { log, logsFolder } from './log'
 import { networkStatus } from './network'
@@ -44,6 +45,13 @@ export function registerIpc(handlers: { quit(): void }): void {
   })
 
   ipcMain.handle('network:status', () => networkStatus())
+
+  // Sign-in screen: "Save password" (the password is encrypted by Windows, see credentials.ts).
+  ipcMain.handle('login:load', () => loadLogin())
+  ipcMain.handle('login:save', (_event, email: unknown, password: unknown) =>
+    typeof email === 'string' && typeof password === 'string' && email.length <= 320 && password.length <= 200 ? saveLogin(email, password) : undefined
+  )
+  ipcMain.handle('login:clear', () => clearLogin())
 
   ipcMain.on('log:renderer-error', (_event, message: unknown) => {
     log.error('[renderer]', String(message))
