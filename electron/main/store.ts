@@ -28,8 +28,6 @@ interface Persisted {
   lastVersion: string | null
   /** Set just before an automatic update: whether the window was open, so the restarted app matches. */
   showWindowAfterUpdate: boolean | null
-  /** "Save password" on the sign-in screen: the password is base64 of Windows-encrypted bytes, or '' (credentials.ts). */
-  savedLogin: { email: string; password: string } | null
 }
 
 let store: Store<Persisted> | null = null
@@ -37,8 +35,11 @@ let store: Store<Persisted> | null = null
 export function persisted(): Store<Persisted> {
   store ??= new Store<Persisted>({
     name: 'tracker',
-    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false, lastVersion: null, showWindowAfterUpdate: null, savedLogin: null }
+    defaults: { identity: null, settings: null, queue: [], today: null, autostartInitialized: false, lastVersion: null, showWindowAfterUpdate: null }
   })
+  // "Save password" was removed (2026-10-17): wipe any email and encrypted password a build
+  // with it saved here, once, the first time the store is opened.
+  if ((store as unknown as Store<Record<string, unknown>>).has('savedLogin')) (store as unknown as Store<Record<string, unknown>>).delete('savedLogin')
   return store
 }
 

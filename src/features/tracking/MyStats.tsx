@@ -9,7 +9,10 @@ import { AttendanceBadge } from '@/features/attendance/status'
 import { monthOf } from '@/lib/attendance'
 import { addDays, formatTime } from '@/lib/dates'
 import { formatDuration, formatSignedDuration } from '@/lib/format'
-import { monthWeeks, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
+import { monthWeeks, overtimeByDay, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
+import { useHolidays } from '@/features/calendar/api'
+import { useOrgSettings } from '@/features/rules/api'
+import { useRole } from '@/hooks/useRole'
 import { useSession } from '@/stores/session'
 import { todayKey, useMySegments, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
 import { StatusBadge } from './StatusBadge'
@@ -64,6 +67,26 @@ export function MyStats() {
     return t
   }, [week.data, status, today, tz])
 
+  // Overtime (admins and managers are tracked any time): active time outside office hours,
+  // from the saved pieces of time, so today's figure can lag the live totals by a few minutes.
+  const { role } = useRole()
+  const showOvertime = role !== 'employee'
+  const org = useOrgSettings().data
+  const holidays = useHolidays().data
+  const overtime = useMemo(
+    () =>
+      org
+        ? overtimeByDay(
+            week.data ?? [],
+            { shift_start: org.shift_start, shift_end: org.shift_end, work_days: org.work_days, timezone: tz },
+            new Set((holidays ?? []).map((h) => h.date))
+          )
+        : {},
+    [week.data, org, holidays, tz]
+  )
+  let weekOvertime = 0
+  for (const d of days) weekOvertime += overtime[d] ?? 0
+
   const weekTotal = sumDays(byDay, days[0], days[6])
   const monthTotal = sumDays(byDay, monthStart, today)
   let daysWorked = 0
@@ -104,6 +127,18 @@ export function MyStats() {
             </span>
           </span>
         </StatCard>
+        {showOvertime && (
+          <StatCard
+            label="Overtime today"
+            value={formatDuration(overtime[today] ?? 0)}
+            valueProps={{ 'data-overtime': String(overtime[today] ?? 0) }}
+            tone="orange"
+          >
+            <span className="text-[12.5px] text-ink-500">
+              This week <span className="tabular-nums">{formatDuration(weekOvertime)}</span> · active time outside office hours
+            </span>
+          </StatCard>
+        )}
       </StatGrid>
 
       {(note || (status && status.pending > 0)) && (

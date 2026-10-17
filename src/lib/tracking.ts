@@ -1,6 +1,6 @@
 // Pure helpers for the tracking screens (My Stats, Live Board, Reports).
 import { toCsv } from './csv'
-import { addDays, isoWeekday, toDateKey, DEFAULT_TZ } from './dates'
+import { addDays, isoWeekday, toDateKey, zonedTimeToUtc, DEFAULT_TZ } from './dates'
 import { formatDuration } from './format'
 
 /** No heartbeat for longer than this means Offline (plan §4.1). */
@@ -76,6 +76,46 @@ export interface SegmentRow {
   state: 'active' | 'idle'
   started_at: string
   ended_at: string
+}
+
+/** The office-hours rules overtime is measured against. */
+export interface ShiftRules {
+  shift_start: string
+  shift_end: string
+  work_days: number[]
+  timezone: string
+}
+
+/**
+ * Overtime per local day: active seconds recorded outside office hours (before the shift
+ * starts, after it ends, or on a day off: a non-working weekday or a holiday). Idle time is
+ * not overtime. Segments are a few minutes long and belong to the day they start on.
+ */
+export function overtimeByDay(segments: SegmentRow[], rules: ShiftRules, holidays: ReadonlySet<string> = new Set()): Record<string, number> {
+  const out: Record<string, number> = {}
+  const shifts = new Map<string, { start: number; end: number } | null>()
+  const shiftOf = (day: string) => {
+    if (!shifts.has(day)) {
+      const workDay = rules.work_days.includes(isoWeekday(day)) && !holidays.has(day)
+      shifts.set(
+        day,
+        workDay ? { start: zonedTimeToUtc(day, rules.shift_start, rules.timezone).getTime(), end: zonedTimeToUtc(day, rules.shift_end, rules.timezone).getTime() } : null
+      )
+    }
+    return shifts.get(day)!
+  }
+  for (const seg of segments) {
+    if (seg.state !== 'active') continue
+    const start = instant(seg.started_at)
+    const end = instant(seg.ended_at)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) continue
+    const day = toDateKey(start, rules.timezone)
+    const shift = shiftOf(day)
+    const inside = shift ? Math.max(0, Math.min(end, shift.end) - Math.max(start, shift.start)) : 0
+    const extra = Math.round((end - start - inside) / 1000)
+    if (extra > 0) out[day] = (out[day] ?? 0) + extra
+  }
+  return out
 }
 
 /** Active and idle seconds per local day. */

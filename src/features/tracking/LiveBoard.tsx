@@ -5,9 +5,11 @@ import { Input, Select } from '@/components/ui/Input'
 import { useLeaveLive, useOnLeave } from '@/features/leave/api'
 import { formatTime, toDateKey } from '@/lib/dates'
 import { formatDuration, formatSignedDuration } from '@/lib/format'
-import { boardStatus, presenceToday, type BoardStatus } from '@/lib/tracking'
+import { boardStatus, overtimeByDay, presenceToday, type BoardStatus, type SegmentRow } from '@/lib/tracking'
+import { useHolidays } from '@/features/calendar/api'
+import { useOrgSettings } from '@/features/rules/api'
 import { cn } from '@/lib/cn'
-import { useFirstActivity, useNow, usePeople, usePresence, useTimezone } from './api'
+import { useNow, usePeople, usePresence, useTimezone, useTodaySegments } from './api'
 import { StatusBadge, STATUS_LABEL } from './StatusBadge'
 
 /** Net = active − idle in the whole minutes shown, as on My Stats. */
@@ -22,7 +24,26 @@ export function LiveBoard() {
   const people = usePeople()
   const presence = usePresence()
   const onLeave = useOnLeave(toDateKey(now, tz))
-  const firstActivity = useFirstActivity(toDateKey(now, tz), tz)
+  const day = toDateKey(now, tz)
+  const todaySegments = useTodaySegments(day, tz)
+  const org = useOrgSettings().data
+  const holidays = useHolidays().data
+  // Per person: first saved activity today, and overtime (active time outside office hours).
+  const firstActivity = useMemo(() => {
+    const out: Record<string, string> = {}
+    for (const s of todaySegments.data ?? []) out[s.user] ??= s.started_at
+    return out
+  }, [todaySegments.data])
+  const overtime = useMemo(() => {
+    const out: Record<string, number> = {}
+    if (!org) return out
+    const byUser: Record<string, SegmentRow[]> = {}
+    for (const s of todaySegments.data ?? []) (byUser[s.user] ??= []).push(s)
+    const rules = { shift_start: org.shift_start, shift_end: org.shift_end, work_days: org.work_days, timezone: tz }
+    const off = new Set((holidays ?? []).map((h) => h.date))
+    for (const [user, segs] of Object.entries(byUser)) out[user] = overtimeByDay(segs, rules, off)[day] ?? 0
+    return out
+  }, [todaySegments.data, org, holidays, tz, day])
   useLeaveLive()
   const [team, setTeam] = useState('')
   const [search, setSearch] = useState('')
@@ -124,8 +145,14 @@ export function LiveBoard() {
                 </div>
                 <div>
                   <dt className="text-xs text-slate-500">First activity</dt>
-                  <dd className="tabular-nums" data-first-activity={firstActivity.data?.[person.id] ?? ''}>
-                    {firstActivity.data?.[person.id] ? formatTime(firstActivity.data[person.id].replace(' ', 'T'), tz) : '—'}
+                  <dd className="tabular-nums" data-first-activity={firstActivity[person.id] ?? ''}>
+                    {firstActivity[person.id] ? formatTime(firstActivity[person.id].replace(' ', 'T'), tz) : '—'}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Overtime</dt>
+                  <dd className="tabular-nums" data-overtime={overtime[person.id] ?? 0}>
+                    {overtime[person.id] ? formatDuration(overtime[person.id]) : '—'}
                   </dd>
                 </div>
                 <div>

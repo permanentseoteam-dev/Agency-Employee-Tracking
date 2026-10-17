@@ -6,11 +6,34 @@ import { AppError, supabase, toUser, type UserRecord } from '@/lib/db'
 const USER_KEY = 'pseo.user'
 /** "Remember me" on the sign-in screen: 'false' means sign in again each time the app starts. */
 export const REMEMBER_KEY = 'pseo.rememberMe'
-const remembered = (): boolean => {
+/** Set for the life of this app window (survives a page reload, not a restart of the app). */
+const THIS_RUN_KEY = 'pseo.signedInThisRun'
+
+/**
+ * Whether a saved session must be dropped when the app starts: "Remember me" was off and
+ * this is a new start of the app (not a reload of the same window). Pure, so it is tested.
+ */
+export function forgetAtStart(rememberMe: string | null, signedInThisRun: string | null): boolean {
+  return rememberMe === 'false' && signedInThisRun !== '1'
+}
+
+/** A line in the app's log for every sign-in change (event names and reasons, never tokens). */
+const note = (message: string) => window.tracker?.logInfo?.(`auth: ${message}`)
+
+function readFlags(): { rememberMe: string | null; thisRun: string | null } {
   try {
-    return localStorage.getItem(REMEMBER_KEY) !== 'false'
+    return { rememberMe: localStorage.getItem(REMEMBER_KEY), thisRun: sessionStorage.getItem(THIS_RUN_KEY) }
   } catch {
-    return true
+    return { rememberMe: null, thisRun: null }
+  }
+}
+
+/** After a sign-in: mark this app run, so a reload doesn't count as a new start. */
+export function markSignedInThisRun(): void {
+  try {
+    sessionStorage.setItem(THIS_RUN_KEY, '1')
+  } catch {
+    // storage blocked
   }
 }
 let session: Session | null = null
@@ -99,6 +122,7 @@ export const useSession = create<SessionState>((set, get) => {
 
   supabase.auth.onAuthStateChange((event, s) => {
     // Supabase asks not to await other calls inside this callback.
+    if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') note(`event ${event}`)
     if (event === 'TOKEN_REFRESHED') {
       session = s
       setTimeout(() => shareWithMain(get().user), 0)
@@ -109,7 +133,10 @@ export const useSession = create<SessionState>((set, get) => {
   })
   // The tracker found the token dead (password reset, deactivated): show Login.
   // Its segments stay queued and sync after the next sign-in.
-  window.tracker?.onSessionExpired(() => void supabase.auth.signOut({ scope: 'local' }))
+  window.tracker?.onSessionExpired(() => {
+    note('signed out: the tracker found the session refused by the server')
+    void supabase.auth.signOut({ scope: 'local' })
+  })
 
   return {
     user: cached(),
@@ -123,6 +150,7 @@ export const useSession = create<SessionState>((set, get) => {
         throw new AppError(status, error.message, code)
       }
       await apply(data.session)
+      markSignedInThisRun()
       if (!get().user) {
         await supabase.auth.signOut({ scope: 'local' })
         throw new AppError(403, 'Your account is waiting for your admin’s approval, or it has been switched off.')
@@ -130,6 +158,7 @@ export const useSession = create<SessionState>((set, get) => {
     },
 
     logout() {
+      note('signed out: Log out was clicked')
       void supabase.auth.signOut({ scope: 'local' })
       window.location.hash = '#/'
     },
@@ -143,11 +172,14 @@ export const useSession = create<SessionState>((set, get) => {
       session = data.session
       // "Remember me" was off: this is a new start of the app, so ask for the password again.
       // The tracker keeps queuing the time until the next sign-in.
-      if (session && !remembered()) {
+      const flags = readFlags()
+      if (session && forgetAtStart(flags.rememberMe, flags.thisRun)) {
+        note('signed out at start: Remember me was off')
         await supabase.auth.signOut({ scope: 'local' })
         session = null
       }
       if (session && endLeftoverSwitch(session.user.id)) {
+        note('signed out at start: an old Switch role session was left')
         await supabase.auth.signOut({ scope: 'local' })
         session = null
       }
@@ -155,10 +187,13 @@ export const useSession = create<SessionState>((set, get) => {
         // Checks the session with the server: a reset password or a switched-off account ends it.
         const { error } = await supabase.auth.getUser()
         if (error && error.status && error.status >= 400 && error.status < 500) {
+          note(`signed out at start: the server refused the saved session (${error.status} ${error.message})`)
           await supabase.auth.signOut({ scope: 'local' })
           session = null
         }
       }
+      if (session) markSignedInThisRun()
+      note(session ? 'restored the saved session at start' : 'no saved session at start')
       await apply(session)
       set({ ready: true })
     }

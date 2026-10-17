@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   boardStatus,
+  overtimeByDay,
   liveStatus,
   monthWeeks,
   presenceToday,
@@ -119,3 +120,40 @@ describe('reportCsv', () => {
     expect(reportTotals(rows)).toEqual({ active_s: 22980, idle_s: 1800 })
   })
 })
+
+describe('overtimeByDay', () => {
+  // Karachi (UTC+5), 09:00–18:00, Monday–Friday.
+  const RULES = { shift_start: '09:00', shift_end: '18:00', work_days: [1, 2, 3, 4, 5], timezone: 'Asia/Karachi' }
+  const seg = (state: 'active' | 'idle', from: string, to: string) => ({ state, started_at: from, ended_at: to })
+
+  it('counts active time after office hours, not inside them', () => {
+    const out = overtimeByDay(
+      [
+        seg('active', '2026-10-14T10:00:00Z', '2026-10-14T10:05:00Z'), // 15:00 Karachi: in office hours
+        seg('active', '2026-10-14T14:00:00Z', '2026-10-14T14:05:00Z') // 19:00 Karachi: after hours
+      ],
+      RULES
+    )
+    expect(out).toEqual({ '2026-10-14': 300 })
+  })
+
+  it('splits a piece that crosses the end of the shift', () => {
+    // 17:58–18:03 Karachi: 3 of the 5 minutes are after hours.
+    expect(overtimeByDay([seg('active', '2026-10-14T12:58:00Z', '2026-10-14T13:03:00Z')], RULES)).toEqual({ '2026-10-14': 180 })
+  })
+
+  it('counts early starts, weekends and holidays; never idle time', () => {
+    const out = overtimeByDay(
+      [
+        seg('active', '2026-10-14T03:00:00Z', '2026-10-14T03:05:00Z'), // 08:00 Karachi, before the shift
+        seg('active', '2026-10-17T06:00:00Z', '2026-10-17T06:05:00Z'), // Saturday
+        seg('active', '2026-10-15T06:00:00Z', '2026-10-15T06:05:00Z'), // a holiday
+        seg('idle', '2026-10-14T15:00:00Z', '2026-10-14T15:05:00Z') // idle after hours: not overtime
+      ],
+      RULES,
+      new Set(['2026-10-15'])
+    )
+    expect(out).toEqual({ '2026-10-14': 300, '2026-10-17': 300, '2026-10-15': 300 })
+  })
+})
+
