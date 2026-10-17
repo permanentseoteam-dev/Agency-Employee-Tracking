@@ -12,7 +12,7 @@ import { FormError } from '@/features/auth/AuthLayout'
 import { call, must, supabase, toUser, type UserRecord } from '@/lib/db'
 import { loadHome, refreshHome, saveHome, switchTargets, viewingAs, type SessionTokens } from '@/lib/roleSwitch'
 import { landingFor, roleOf, ROLE_LABEL } from '@/lib/roles'
-import { currentTokens, errorMessage, useSession } from '@/stores/session'
+import { currentTokens, errorMessage, useSession, waitForUser } from '@/stores/session'
 
 /**
  * The signed-in role. An admin can switch role: view the app as any active person, with
@@ -36,6 +36,9 @@ export function AccountSwitcher() {
     queryClient.clear()
     const { error: e } = await supabase.auth.setSession(tokens)
     if (e) throw e
+    // Go to the landing page only once the store holds the new account: before that the shell's
+    // route guard still sees the old role and would send the page back to the old role's landing page.
+    await waitForUser(record.id)
     setOpen(false)
     navigate(landingFor(roleOf(record.role)))
   }

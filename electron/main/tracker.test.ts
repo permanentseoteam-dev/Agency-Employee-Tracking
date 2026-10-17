@@ -124,6 +124,49 @@ describe('TrackerMachine', () => {
     expect(m.state).toBe('active')
   })
 
+  it('never starts a segment before one already recorded when the clock moves back', () => {
+    const m = new TrackerMachine()
+    // Tracked 4 min, then the PC clock jumps back 2 min and polling carries on from there.
+    const first = run(m, T0, T0 + 4 * MIN, busy)
+    const back = T0 + 4 * MIN - 2 * MIN
+    const segs = [...first, ...run(m, back, back + 15 * MIN, busy), ...m.stop(back + 15 * MIN, 0, RULES)]
+    expect(segs[0]).toEqual({ state: 'active', startedAt: T0, endedAt: T0 + 4 * MIN })
+    // No piece overlaps an earlier one (the server would reject it and the time would be lost).
+    for (let i = 1; i < segs.length; i++) expect(segs[i].startedAt).toBeGreaterThanOrEqual(segs[i - 1].endedAt)
+    // Recording resumes where it left off: the next piece starts exactly at the end of the last one.
+    expect(segs[1].startedAt).toBe(T0 + 4 * MIN)
+    expect(segs.at(-1)!.endedAt).toBe(back + 15 * MIN)
+    // While the clock catches up, the open segment holds nothing.
+    const m2 = new TrackerMachine()
+    run(m2, T0, T0 + 4 * MIN, busy)
+    m2.tick(back, 0, RULES)
+    expect(m2.openSeconds(back)).toEqual({ state: 'active', seconds: 0 })
+  })
+
+  it('also starts after the last recorded segment when the clock moved back while locked', () => {
+    const m = new TrackerMachine()
+    run(m, T0, T0 + 4 * MIN, busy)
+    expect(m.stop(T0 + 4 * MIN, 0, RULES)).toEqual([{ state: 'active', startedAt: T0, endedAt: T0 + 4 * MIN }])
+    const back = T0 + 2 * MIN
+    run(m, back, back + 6 * MIN, busy)
+    const segs = m.stop(back + 6 * MIN, 0, RULES)
+    expect(segs).toEqual([{ state: 'active', startedAt: T0 + 4 * MIN, endedAt: back + 6 * MIN }])
+  })
+
+  it('does not wait for time recorded far ahead when a clock that was hours fast is corrected', () => {
+    // The server refused everything that ended more than 2 min after its own clock, so nothing
+    // recorded further ahead can overlap: recording resumes at most 2 min after the corrected time.
+    const m = new TrackerMachine()
+    const fast = T0 + 3 * 60 * MIN
+    run(m, fast, fast + 4 * MIN, busy)
+    m.stop(fast + 4 * MIN, 0, RULES)
+    const segs = [...run(m, T0, T0 + 20 * MIN, busy), ...m.stop(T0 + 20 * MIN, 0, RULES)]
+    expect(segs[0].startedAt).toBe(T0 + 2 * MIN)
+    expectContiguous(segs)
+    expect(segs.at(-1)!.endedAt).toBe(T0 + 20 * MIN)
+    expect(total(segs, 'active')).toBe(18 * MIN)
+  })
+
   it('does not track outside shift hours or on non-working days', () => {
     const m = new TrackerMachine()
     const before = Date.parse('2026-10-14T03:30:00.000Z') // 08:30 PKT

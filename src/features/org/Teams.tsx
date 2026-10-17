@@ -70,6 +70,17 @@ export function TeamDialog({ team, onClose }: { team: Team | null; onClose: () =
   const [error, setError] = useState<string | null>(null)
 
   const candidates = (employees.data ?? []).filter((e) => e.active && (e.role === 'manager' || e.role === 'admin'))
+  // The saved manager may since have been demoted or switched off. Keep them in the list,
+  // marked, so the admin sees who it is and can pick someone else (their team's leave
+  // requests now go to the admins).
+  const savedManager = team?.manager ?? ''
+  const staleManager =
+    employees.data && savedManager && !candidates.some((c) => c.id === savedManager)
+      ? {
+          id: savedManager,
+          name: employees.data.find((e) => e.id === savedManager)?.full_name || team?.expand?.manager?.full_name || 'Unknown person'
+        }
+      : null
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -92,6 +103,9 @@ export function TeamDialog({ team, onClose }: { team: Team | null; onClose: () =
         <Field label="Manager" htmlFor="t_manager" hint="Only people with the Manager or Admin role are listed.">
           <Select id="t_manager" value={manager} onChange={(e) => setManager(e.target.value)}>
             <option value="">No manager</option>
+            {staleManager && (
+              <option value={staleManager.id}>{staleManager.name} (no longer a manager)</option>
+            )}
             {candidates.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.full_name} ({c.role})

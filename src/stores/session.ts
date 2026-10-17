@@ -156,6 +156,27 @@ export const useSession = create<SessionState>((set, get) => {
   }
 })
 
+/**
+ * Resolves once the store shows the account `userId` (true), or after `timeoutMs` (false).
+ * Switch role waits for this before going to the new role's landing page: the store takes the
+ * new session a moment after supabase.auth.setSession (the auth event is handled deferred), and
+ * navigating before then lets the shell's route guard check the old role and redirect.
+ */
+export function waitForUser(userId: string, timeoutMs = 10_000): Promise<boolean> {
+  if (useSession.getState().user?.id === userId) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const done = (ok: boolean) => {
+      clearTimeout(timer)
+      unsubscribe()
+      resolve(ok)
+    }
+    const timer = setTimeout(() => done(false), timeoutMs)
+    const unsubscribe = useSession.subscribe((s) => {
+      if (s.user?.id === userId) done(true)
+    })
+  })
+}
+
 /** The signed-in session's tokens (Switch role keeps them as the admin's home account). */
 export function currentTokens() {
   return session ? { access_token: session.access_token, refresh_token: session.refresh_token } : null

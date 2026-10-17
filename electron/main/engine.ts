@@ -11,9 +11,19 @@ import { SyncQueue } from './syncQueue'
 import { inShift, POLL_MS, TrackerMachine, type Segment } from './tracker'
 
 const HEARTBEAT_MS = 60_000
+/**
+ * Today's server segments are read again this often (and shortly after the queue sends
+ * something), so time recorded on another PC after this app signed in shows up in today's
+ * totals. remember() de-duplicates by id, so reading the same rows again never double counts.
+ */
+const SERVER_TOTALS_MS = 10 * 60_000
+/** Wait this long after a segment reaches the server, so one flush of many segments reads once. */
+const AFTER_SYNC_MS = 5_000
 
 const machine = new TrackerMachine()
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let serverTotalsTimer: ReturnType<typeof setInterval> | null = null
+let afterSyncTimer: ReturnType<typeof setTimeout> | null = null
 /** The user whose segment is open in the machine. */
 let trackingUser: string | null = null
 let paused: 'locked' | 'suspended' | null = null
@@ -34,6 +44,7 @@ export const queue = new SyncQueue({
         const { error, status } = await db.from('activity_segments').insert(item)
         // The shape classify() reads: status, plus Postgres's code and the guard's hint.
         if (error) throw { status, code: error.code, hint: error.hint ?? '', message: error.message }
+        refreshTodaySoon()
       }
     }
   },
@@ -79,6 +90,8 @@ async function loadTodayFromServer(userId: string): Promise<void> {
       .eq('user', userId)
       .gte('started_at', new Date(start).toISOString())
     if (error) throw new Error(error.message)
+    // Signed out or someone else signed in while waiting: these rows are not theirs.
+    if (identity()?.userId !== userId) return
     const rows = data ?? []
     remember(
       userId,
@@ -91,6 +104,22 @@ async function loadTodayFromServer(userId: string): Promise<void> {
   } catch (err) {
     log.warn('could not load today’s totals from the server:', (err as Error).message)
   }
+}
+
+/** Re-reads today's server segments for whoever is signed in now. */
+function refreshTodayFromServer(): void {
+  const id = identity()
+  if (id && isSignedIn()) void loadTodayFromServer(id.userId)
+}
+
+/** After the queue sends segments: read today's server totals once it has settled. */
+function refreshTodaySoon(): void {
+  if (afterSyncTimer) clearTimeout(afterSyncTimer)
+  afterSyncTimer = setTimeout(() => {
+    afterSyncTimer = null
+    refreshTodayFromServer()
+  }, AFTER_SYNC_MS)
+  afterSyncTimer.unref?.()
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -297,6 +326,7 @@ export function startEngine(): void {
   queue.onChange(pushStatus)
 
   pollTimer = setInterval(poll, POLL_MS)
+  serverTotalsTimer = setInterval(refreshTodayFromServer, SERVER_TOTALS_MS)
   poll()
   log.info(`tracker started (${queue.pending().length} segment(s) waiting to sync)`)
 }
@@ -305,6 +335,10 @@ export function startEngine(): void {
 export function stopNow(): void {
   if (pollTimer) clearInterval(pollTimer)
   pollTimer = null
+  if (serverTotalsTimer) clearInterval(serverTotalsTimer)
+  serverTotalsTimer = null
+  if (afterSyncTimer) clearTimeout(afterSyncTimer)
+  afterSyncTimer = null
   closeOpen()
 }
 

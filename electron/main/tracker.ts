@@ -19,6 +19,8 @@ export const ROLL_MS = 5 * 60_000
 export const GAP_MS = 60_000
 /** Shorter pieces are dropped; the server needs the end to be after the start. */
 const MIN_SEGMENT_MS = 1000
+/** The server's segment guard refuses a segment that ends more than this after its own clock. */
+const SERVER_FUTURE_MS = 2 * 60_000
 
 /** Today's shift as UTC instants, or null on a non-working day. */
 export function shiftFor(now: number, rules: TrackerSettings): { start: number; end: number } | null {
@@ -46,6 +48,12 @@ export class TrackerMachine {
   private lastTick: number | null = null
   /** Latest moment input is known to have happened while active. Active time is only confirmed up to here. */
   private lastInput = 0
+  /**
+   * End of the last segment handed out. A new segment never starts before it: after the clock
+   * moves back, a segment starting at the (earlier) new time would overlap one already recorded,
+   * and the server's overlap guard would reject it and the time would be lost.
+   */
+  private lastEmittedEnd = 0
 
   /** The state of the open segment, or null when nothing is being tracked. */
   get state(): TrackState | null {
@@ -78,8 +86,14 @@ export class TrackerMachine {
       if (!tracking) this.close(t, out)
     } else if (tracking) {
       const idle = idleSeconds * 1000 >= thresholdMs(rules)
-      this.open = { state: idle ? 'idle' : 'active', startedAt: now }
-      this.lastInput = now
+      // Never before what was already recorded (the clock moved back): until the clock catches
+      // up, the open segment simply holds nothing. But the server refuses segments that end more
+      // than SERVER_FUTURE_MS ahead of its clock, so after a big correction (the PC clock was hours
+      // ahead) what was recorded further ahead never got in: don't wait for it.
+      this.lastEmittedEnd = Math.min(this.lastEmittedEnd, now + SERVER_FUTURE_MS)
+      const start = Math.max(now, this.lastEmittedEnd)
+      this.open = { state: idle ? 'idle' : 'active', startedAt: start }
+      this.lastInput = start
     }
     return out
   }
@@ -140,12 +154,14 @@ export class TrackerMachine {
 
   /** Adds a closed segment, split so no piece is longer than ROLL_MS (the server allows 6 min). */
   private emit(state: TrackState, start: number, end: number, out: Segment[]): void {
-    let s = start
+    let s = Math.max(start, this.lastEmittedEnd)
     while (end - s > ROLL_MS) {
       out.push({ state, startedAt: s, endedAt: s + ROLL_MS })
       s += ROLL_MS
     }
     if (end - s >= MIN_SEGMENT_MS) out.push({ state, startedAt: s, endedAt: end })
+    const last = out[out.length - 1]
+    if (last) this.lastEmittedEnd = Math.max(this.lastEmittedEnd, last.endedAt)
   }
 }
 
