@@ -21,12 +21,13 @@ export function ProfileMenu() {
       {/* The sidebar's bottom card: who is signed in; it opens the account menu. */}
       <DropdownMenu.Trigger
         aria-label="Profile menu"
-        className="mt-3 w-full rounded-[var(--radius-inner)] bg-[image:var(--brand-gradient-deep)] p-3 text-left text-white shadow-[0_14px_30px_-16px_rgba(27,42,107,.8)] outline-none transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-indigo-300 rail:p-2"
+        className="mt-3 w-full rounded-2xl border border-[var(--sidebar-line)] bg-[var(--sidebar-field)] px-3 py-2.5 text-left text-white outline-none transition-colors duration-200 hover:bg-white/[.12] focus-visible:ring-2 focus-visible:ring-indigo-300 rail:p-2"
       >
-        <span className="flex items-center gap-2 rail:justify-center">
-          <Avatar user={user} size={28} className="shrink-0 bg-white/20 text-white ring-0 dark:bg-white/20 dark:text-white" />
-          <span className="min-w-0 truncate text-[13px] rail:hidden">
-            {user.full_name || user.email} · {ROLE_LABEL[user.role]}
+        <span className="flex items-center gap-2.5 rail:justify-center">
+          <Avatar user={user} size={30} className="shrink-0 bg-[var(--sidebar-active)] text-white ring-0 dark:bg-[var(--sidebar-active)] dark:text-white" />
+          <span className="min-w-0 rail:hidden">
+            <span className="block truncate text-[13px] font-semibold">{user.full_name || user.email}</span>
+            <span className="block truncate text-[11.5px] text-[var(--sidebar-muted)]">{ROLE_LABEL[user.role]}</span>
           </span>
         </span>
       </DropdownMenu.Trigger>

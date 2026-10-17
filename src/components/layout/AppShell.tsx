@@ -28,7 +28,7 @@ export function AppShell() {
   return (
     <div className="relative flex h-full gap-5 overflow-hidden p-4">
       {/* Decorative light behind the glass. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 -z-0 overflow-hidden dark:opacity-40">
+      <div aria-hidden className="hidden dark:block pointer-events-none absolute inset-0 -z-0 overflow-hidden dark:opacity-40">
         <div className="absolute -top-[120px] -left-[120px] size-[480px] rounded-full bg-[#5C84FF] opacity-35 blur-[110px]" />
         <div className="absolute -right-[100px] -bottom-[140px] size-[520px] rounded-full bg-[#2F5BFF] opacity-[.22] blur-[120px]" />
       </div>
