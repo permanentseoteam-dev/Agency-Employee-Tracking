@@ -36,10 +36,10 @@ function givenPayload(rec, names) {
 }
 
 /**
- * What stars cost in a month, per person: each counted rule break costs
- * (that rule's stars × the rule's pkr_per_star). Same counting as the app (src/lib/stars.ts):
+ * What stars cost in a month, per person: each counted rule break costs the rule's price_pkr
+ * once, whatever its stars. Same counting as the app (src/lib/stars.ts):
  * automatic rules from attendance unless excused for that day; by-hand records unless excused.
- * attendance: [{ user, date, status }], rules: [{ id, stars, auto, pkr_per_star }],
+ * attendance: [{ user, date, status }], rules: [{ id, stars, auto, price_pkr }],
  * records: [{ user, rule, date, excused }] → { [user]: { stars, pkr } }
  */
 function monthStarCharges(attendance, rules, records) {
@@ -53,10 +53,9 @@ function monthStarCharges(attendance, rules, records) {
   for (const r of records || []) if (r.excused) excused[r.user + '|' + r.rule + '|' + r.date] = true
   const out = {}
   const add = (user, rule) => {
-    const stars = Number(rule.stars) || 0
     const o = (out[user] = out[user] || { stars: 0, pkr: 0 })
-    o.stars += stars
-    o.pkr += stars * (Number(rule.pkr_per_star) || 0)
+    o.stars += Number(rule.stars) || 0
+    o.pkr += Number(rule.price_pkr) || 0
   }
   for (const a of attendance || []) {
     const rule = byStatus[a.status]

@@ -14,7 +14,7 @@ export interface StarRule {
   auto: StarAuto
   description: string
   /** What each star of this rule costs in pay (whole rupees); 0 = free. */
-  pkr_per_star: number
+  price_pkr: number
 }
 
 export interface StarRecord {

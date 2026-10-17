@@ -268,7 +268,7 @@ export function LineDialog({ line, month, editable, onClose }: { line: PayrollLi
         {line.unpaid_leave_days > 0 && <Row label="Unpaid leave" detail={days(line.unpaid_leave_days)} amount={formatPkr(-b.unpaidLeave, 2)} />}
         {line.half_days > 0 && <Row label="Half days" detail={`${line.half_days} × ½ day`} amount={formatPkr(-b.halfDays, 2)} />}
         {(line.stars ?? 0) > 0 && (
-          <Row label="Stars" detail={`${line.stars} star${line.stars === 1 ? '' : 's'} at each rule’s price`} amount={formatPkr(-b.stars)} />
+          <Row label="Stars" detail={`${line.stars} star${line.stars === 1 ? '' : 's'}, each break at its rule’s price`} amount={formatPkr(-b.stars)} />
         )}
         {b.other > 0 && <Row label="Other" detail="under earlier pay rules" amount={formatPkr(-b.other)} />}
         <Row label="Deductions" amount={formatPkr(-line.deductions)} strong />

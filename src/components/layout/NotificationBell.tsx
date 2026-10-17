@@ -1,11 +1,13 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Bell, CheckCheck } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarkAllRead, useMarkRead, useNotifications } from '@/features/notifications/api'
 import { useNow, useTimezone } from '@/features/tracking/api'
 import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 import { notificationComment, notificationLink, notificationText, timeAgo } from '@/lib/notifications'
+import { MenuBackdrop } from './MenuBackdrop'
 
 /** Top-bar bell (plan §4.9): unread count, the latest notifications, mark read. */
 export function NotificationBell() {
@@ -18,9 +20,11 @@ export function NotificationBell() {
   const markAll = useMarkAllRead()
   const items = notifications.data?.items ?? []
   const unread = notifications.data?.unread ?? 0
+  const [open, setOpen] = useState(false)
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      {open && <MenuBackdrop onClose={() => setOpen(false)} />}
       <DropdownMenu.Trigger
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
         className="glass relative grid size-11 shrink-0 place-items-center rounded-[var(--radius-control)] text-ink-900 outline-none transition-transform duration-200 hover:-translate-y-px focus-visible:ring-2 focus-visible:ring-indigo-400"

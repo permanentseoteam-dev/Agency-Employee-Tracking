@@ -1,11 +1,13 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { Check, ChevronDown } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRole } from '@/hooks/useRole'
 import { cn } from '@/lib/cn'
 import type { Role } from '@/lib/db'
 import { landingFor, ROLE_LABEL } from '@/lib/roles'
 import { useRolePreview } from '@/stores/rolePreview'
+import { MenuBackdrop } from './MenuBackdrop'
 
 const CHIP = 'shrink-0 rounded-full bg-[var(--info-bg)] px-3 py-1.5 text-xs font-semibold text-[var(--info-text)]'
 const VIEWS: Role[] = ['admin', 'manager', 'employee']
@@ -18,6 +20,7 @@ export function RoleBadge() {
   const { role, actualRole, previewing } = useRole()
   const setPreview = useRolePreview((s) => s.setPreview)
   const navigate = useNavigate()
+  const [open, setOpen] = useState(false)
 
   if (actualRole !== 'admin') {
     return (
@@ -33,7 +36,8 @@ export function RoleBadge() {
   }
 
   return (
-    <DropdownMenu.Root>
+    <DropdownMenu.Root open={open} onOpenChange={setOpen}>
+      {open && <MenuBackdrop onClose={() => setOpen(false)} />}
       <DropdownMenu.Trigger
         aria-label="View the app as another role"
         data-role={role}

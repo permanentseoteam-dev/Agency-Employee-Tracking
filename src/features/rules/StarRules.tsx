@@ -37,7 +37,7 @@ export function StarRules() {
       {readOnly && <ReadOnlyNote />}
       <div className="flex flex-wrap items-center justify-between gap-4 @3xl:flex-nowrap">
         <p className="min-w-0 text-sm text-slate-500">
-          Each rule break gives these stars, and every star costs its rule’s price in that month’s payroll (stars × price). Excused stars
+          Each rule break gives these stars and costs its rule’s price once in that month’s payroll, whatever the stars. Excused breaks
           are free. Automatic rules come from attendance; an admin gives the others by hand from Attendance.
         </p>
         {!readOnly && (
@@ -60,8 +60,7 @@ export function StarRules() {
               <tr>
                 <Th>Rule break</Th>
                 <Th className="text-right">Stars</Th>
-                <Th className="text-right">Price per star</Th>
-                <Th className="text-right">Cost per break</Th>
+                <Th className="text-right">Price per break</Th>
                 <Th>Given</Th>
                 {!readOnly && <Th className="w-40" />}
               </tr>
@@ -74,11 +73,8 @@ export function StarRules() {
                     {r.description && <span className="block text-xs text-slate-500">{r.description}</span>}
                   </Td>
                   <Td className="text-right font-semibold tabular-nums">{r.stars}</Td>
-                  <Td className="text-right tabular-nums" data-price={r.pkr_per_star ?? 0}>
-                    {r.pkr_per_star ? formatPkr(Number(r.pkr_per_star)) : <span className="text-slate-400">Free</span>}
-                  </Td>
-                  <Td className="text-right tabular-nums">
-                    {r.stars && r.pkr_per_star ? formatPkr(r.stars * Number(r.pkr_per_star)) : <span className="text-slate-400">-</span>}
+                  <Td className="text-right tabular-nums" data-price={r.price_pkr ?? 0}>
+                    {r.price_pkr ? formatPkr(Number(r.price_pkr)) : <span className="text-slate-400">Free</span>}
                   </Td>
                   <Td>{r.auto ? <Badge tone="amber">Automatic</Badge> : <Badge tone="blue">By hand</Badge>}</Td>
                   {!readOnly && (
@@ -108,7 +104,7 @@ function StarRuleDialog({ rule, onClose }: { rule: StarRule | null; onClose: () 
   const save = useSaveStarRule()
   const [name, setName] = useState(rule?.name ?? '')
   const [stars, setStars] = useState(rule ? String(rule.stars) : '')
-  const [price, setPrice] = useState(rule?.pkr_per_star ? String(rule.pkr_per_star) : '0')
+  const [price, setPrice] = useState(rule?.price_pkr ? String(rule.price_pkr) : '0')
   const [description, setDescription] = useState(rule?.description ?? '')
   const [error, setError] = useState<string | null>(null)
 
@@ -119,9 +115,9 @@ function StarRuleDialog({ rule, onClose }: { rule: StarRule | null; onClose: () 
     if (!name.trim()) return setError('Enter a name.')
     if (stars.trim() === '' || !Number.isInteger(n) || n < 0 || n > 100) return setError('Stars must be a whole number from 0 to 100.')
     const p = Number(price.replace(/,/g, '').trim() || '0')
-    if (!Number.isInteger(p) || p < 0 || p > 1_000_000) return setError('Price per star must be whole rupees from 0 to 1,000,000.')
+    if (!Number.isInteger(p) || p < 0 || p > 1_000_000) return setError('Price per break must be whole rupees from 0 to 1,000,000.')
     try {
-      await save.mutateAsync({ id: rule?.id, data: { name: name.trim(), stars: n, pkr_per_star: p, description: description.trim() } })
+      await save.mutateAsync({ id: rule?.id, data: { name: name.trim(), stars: n, price_pkr: p, description: description.trim() } })
       onClose()
     } catch (err) {
       setError(errorMessage(err, 'Could not save. The name may already be in use.'))
@@ -138,9 +134,9 @@ function StarRuleDialog({ rule, onClose }: { rule: StarRule | null; onClose: () 
           <Input id="sr_stars" inputMode="numeric" value={stars} onChange={(e) => setStars(e.target.value)} />
         </Field>
         <Field
-          label="Price per star (PKR)"
+          label="Price per break (PKR)"
           htmlFor="sr_price"
-          hint={`0 = free. Each break of this rule then costs ${formatPkr((Number(stars) || 0) * (Number(price.replace(/,/g, '')) || 0))} in payroll.`}
+          hint={`0 = free. Each break of this rule costs ${formatPkr(Number(price.replace(/,/g, '')) || 0)} in payroll, whatever its stars.`}
         >
           <Input id="sr_price" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} />
         </Field>

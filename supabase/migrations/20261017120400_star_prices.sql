@@ -1,12 +1,12 @@
--- Stars cost money (2026-10-17): every star rule has its own price in rupees per star, set and
--- changed by admins in Rules → Stars. Payroll deducts, per person and month, the sum of
--- (stars × that rule's price) over the counted (not excused) rule breaks. Safe to run again.
+-- Stars cost money (2026-10-17): every star rule has its own price in rupees per break, set and
+-- changed by admins in Rules → Stars. One counted (not excused) break of a rule costs that price,
+-- whatever the rule's stars. Payroll deducts, per person and month, the sum. Safe to run again.
 
 alter table public.star_rules
-  add column if not exists pkr_per_star numeric not null default 0;
-alter table public.star_rules drop constraint if exists star_rules_pkr_per_star_check;
+  add column if not exists price_pkr numeric not null default 0;
+alter table public.star_rules drop constraint if exists star_rules_price_pkr_check;
 alter table public.star_rules
-  add constraint star_rules_pkr_per_star_check check (pkr_per_star >= 0 and pkr_per_star <= 1000000 and pkr_per_star = round(pkr_per_star));
+  add constraint star_rules_price_pkr_check check (price_pkr >= 0 and price_pkr <= 1000000 and price_pkr = round(price_pkr));
 
 -- What the payroll function counted: the stars and what they cost (already inside deductions).
 alter table public.payroll_items
@@ -36,3 +36,6 @@ begin
   end if;
   return coalesce(new, old);
 end $$;
+
+-- The app's API reads columns from a cached copy of the schema: refresh it now.
+notify pgrst, 'reload schema';

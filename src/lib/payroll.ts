@@ -19,7 +19,7 @@ export interface PayrollItem {
   absent_days: number
   unpaid_leave_days: number
   half_days: number
-  /** Counted stars in the month and what they cost (each rule's price per star); 0 on older runs. */
+  /** Counted stars in the month and what they cost (each break costs its rule's price); 0 on older runs. */
   stars?: number
   stars_pkr?: number
   deductions: number

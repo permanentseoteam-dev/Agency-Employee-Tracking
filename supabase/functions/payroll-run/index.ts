@@ -40,8 +40,8 @@ serve(async (req) => {
   for (const s of await sql`select "user", monthly_salary_pkr from salaries`) salaries[s.user] = Number(s.monthly_salary_pkr)
   const attendanceRows = await sql`select "user", date, status from attendance where date >= ${range.from} and date <= ${range.to}`
   const attendance = byUser(attendanceRows as any)
-  // Stars cost each rule's price per star (Rules → Stars); excused ones are free.
-  const starRules = await sql`select id, stars, auto, pkr_per_star from star_rules`
+  // Each counted break costs its rule's price (Rules → Stars); excused ones are free.
+  const starRules = await sql`select id, stars, auto, price_pkr from star_rules`
   const starRecords = await sql`select "user", rule, date, excused from star_records where date >= ${range.from} and date <= ${range.to}`
   const starCharges: Record<string, { stars: number; pkr: number }> = starLib.monthStarCharges(attendanceRows, starRules, starRecords)
   const leaves = byUser(

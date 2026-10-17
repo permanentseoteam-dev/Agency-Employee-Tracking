@@ -32,12 +32,12 @@ describe('givenPayload', () => {
 
 describe('monthStarCharges (each rule has its own price)', () => {
   const rules = [
-    { id: 'late', stars: 1, auto: 'late', pkr_per_star: 200 },
-    { id: 'absent', stars: 3, auto: 'absent', pkr_per_star: 500 },
-    { id: 'phone', stars: 2, auto: '', pkr_per_star: 300 },
-    { id: 'free', stars: 1, auto: '', pkr_per_star: 0 }
+    { id: 'late', stars: 1, auto: 'late', price_pkr: 200 },
+    { id: 'absent', stars: 3, auto: 'absent', price_pkr: 500 },
+    { id: 'phone', stars: 2, auto: '', price_pkr: 300 },
+    { id: 'free', stars: 1, auto: '', price_pkr: 0 }
   ]
-  it('adds stars × that rule’s price for counted breaks, per person', () => {
+  it('adds each counted break’s price once, whatever its stars, per person', () => {
     const attendance = [
       { user: 'a', date: '2026-10-01', status: 'late' },
       { user: 'a', date: '2026-10-02', status: 'late' },
@@ -49,9 +49,13 @@ describe('monthStarCharges (each rule has its own price)', () => {
       { user: 'b', rule: 'free', date: '2026-10-05', excused: false }
     ]
     expect(s.monthStarCharges(attendance, rules, records)).toEqual({
-      a: { stars: 1 + 1 + 3 + 2, pkr: 200 + 200 + 1500 + 600 },
+      a: { stars: 1 + 1 + 3 + 2, pkr: 200 + 200 + 500 + 300 },
       b: { stars: 1, pkr: 0 }
     })
+  })
+  it('does not multiply the price by the stars: 3 stars priced 20 cost 20', () => {
+    const absent = [{ id: 'absent', stars: 3, auto: 'absent', price_pkr: 20 }]
+    expect(s.monthStarCharges([{ user: 'a', date: '2026-10-03', status: 'absent' }], absent, [])).toEqual({ a: { stars: 3, pkr: 20 } })
   })
   it('excused stars are free', () => {
     const attendance = [{ user: 'a', date: '2026-10-01', status: 'late' }]

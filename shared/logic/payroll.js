@@ -5,8 +5,8 @@
 //   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate + star charges
 //   net          = monthly salary − deductions + adjustment
 // There is no automatic pro-rating: the admin sets an adjustment for mid-month joiners and leavers.
-// Late days cost nothing here: they give stars instead (star_rules). Stars cost each rule's
-// pkr_per_star per star (stars.monthStarCharges); excused stars are free.
+// Late days cost nothing here: they give stars instead (star_rules). Each counted break costs
+// its rule's price_pkr once (stars.monthStarCharges); excused ones are free.
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const DAY_MS = 86400000

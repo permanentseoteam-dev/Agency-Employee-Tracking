@@ -40,10 +40,9 @@ var require_stars = __commonJS({
       for (const r of records || []) if (r.excused) excused[r.user + "|" + r.rule + "|" + r.date] = true;
       const out = {};
       const add = (user, rule) => {
-        const stars = Number(rule.stars) || 0;
         const o = out[user] = out[user] || { stars: 0, pkr: 0 };
-        o.stars += stars;
-        o.pkr += stars * (Number(rule.pkr_per_star) || 0);
+        o.stars += Number(rule.stars) || 0;
+        o.pkr += Number(rule.price_pkr) || 0;
       };
       for (const a of attendance || []) {
         const rule = byStatus[a.status];
