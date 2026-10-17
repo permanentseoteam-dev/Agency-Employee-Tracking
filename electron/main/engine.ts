@@ -199,7 +199,9 @@ function poll(): void {
 let lastBeat: { status: string; at: number } | null = null
 
 function presenceStatus(): 'active' | 'idle' | 'offline' {
-  if (paused === 'locked') return 'idle'
+  // A locked PC counts as idle only during the shift; after hours or on days off it is offline,
+  // so the Live Board doesn't show someone as idle all night or all weekend.
+  if (paused === 'locked') return identity()?.consented && inShift(Date.now(), settings()) ? 'idle' : 'offline'
   if (!canTrack() || !machine.state) return 'offline'
   return machine.state
 }
