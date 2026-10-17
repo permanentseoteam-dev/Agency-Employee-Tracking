@@ -2,7 +2,8 @@
 // lib/payroll_store.js). Admins only. { month: "YYYY-MM" } (this month or earlier)
 // → { run, month, items, skipped: [names without a salary], counted_to }.
 // The month's attendance is recounted first; adjustments and notes on a draft are kept;
-// a finalized month is refused. Finalizing, and the locks after it, are database triggers.
+// a finalized month is refused. Finalizing, and the locks after it, are database triggers; the run
+// keeps counted_to, and finalizing needs it to reach the month's last day (a count after it ended).
 import att from '../_shared/logic/attendance.js'
 import lib from '../_shared/logic/payroll.js'
 import { badRequest, body, caller, forbidden, json, loadSettings, serve, sql } from '../_shared/core.ts'
@@ -48,10 +49,13 @@ serve(async (req) => {
     }
   }
 
+  // The last day counted is kept on the run: finalizing needs a count made after the month ended.
+  const counted = range.from <= countedTo ? countedTo : null
   const skipped: string[] = []
   let items = 0
   await sql.begin(async (tx) => {
-    if (!run) [run] = await tx`insert into payroll_runs (month, status) values (${month}, 'draft') returning id, status`
+    if (!run) [run] = await tx`insert into payroll_runs (month, status, counted_to) values (${month}, 'draft', ${counted}) returning id, status`
+    else await tx`update payroll_runs set counted_to = ${counted} where id = ${run.id}`
     await tx`delete from payroll_items where run = ${run.id}`
     for (const u of users) {
       if (!lib.employedDuring(month, { active: !!u.active, joined_on: u.joined_on, left_on: u.left_on })) continue
@@ -69,5 +73,5 @@ serve(async (req) => {
       items++
     }
   })
-  return json(200, { run: run.id, month, items, skipped, counted_to: range.from <= countedTo ? countedTo : '' })
+  return json(200, { run: run.id, month, items, skipped, counted_to: counted ?? '' })
 })

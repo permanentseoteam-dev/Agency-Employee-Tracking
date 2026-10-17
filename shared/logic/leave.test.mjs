@@ -35,6 +35,20 @@ describe('checkDates', () => {
 })
 
 describe('countDays', () => {
+  // The holidays trigger (supabase/migrations/20261017120200_leave_fixes.sql, public.leave_days)
+  // recounts stored days with this same rule; these are the cases it was checked against.
+  it.each([
+    ['2026-10-19', '2026-10-23', false, [], 5],
+    ['2026-10-19', '2026-10-23', false, ['2026-10-21'], 4],
+    ['2026-10-20', '2026-10-21', false, ['2026-10-20', '2026-10-21'], 0],
+    ['2026-10-21', '2026-10-21', true, ['2026-10-21'], 0],
+    ['2026-10-21', '2026-10-21', true, ['2026-10-19'], 0.5],
+    ['2026-10-17', '2026-10-19', false, ['2026-10-19'], 0],
+    ['2026-12-28', '2027-01-02', false, [], 5]
+  ])('%s – %s (half %s, holidays %j) counts %s, as the holidays trigger does', (start, end, half, holidays, expected) => {
+    expect(l.countDays(start, end, half, MON_FRI, holidays)).toBe(expected)
+  })
+
   it('counts working days only (Mon–Fri)', () => {
     // Fri 16 Oct – Tue 20 Oct 2026: Fri, Mon, Tue
     expect(l.countDays('2026-10-16', '2026-10-20', false, MON_FRI, [])).toBe(3)

@@ -21,7 +21,7 @@ export async function recomputeDays(settings: Settings, days: string[], onlyUser
     const bounds = att.dayBounds(day, offset)
     const segRows = await sql`select "user", state, started_at, ended_at from activity_segments
       where started_at >= ${bounds.start} and started_at < ${bounds.end}`
-    const leaveRows = await sql`select "user", start_date, end_date from leave_requests
+    const leaveRows = await sql`select "user", start_date, end_date, half_day from leave_requests
       where status = 'approved' and start_date <= ${day} and end_date >= ${day}`
     const holidays = (await sql`select date from holidays where date = ${day}`).map((h) => h.date as string)
 
@@ -30,7 +30,8 @@ export async function recomputeDays(settings: Settings, days: string[], onlyUser
       ;(segments[s.user] ??= []).push({ state: s.state, started_at: pbDate(s.started_at), ended_at: pbDate(s.ended_at) })
     }
     const leaves: Record<string, unknown[]> = {}
-    for (const l of leaveRows) (leaves[l.user] ??= []).push({ start_date: l.start_date, end_date: l.end_date })
+    // half_day matters: a half-day leave leaves the other half to be judged on activity.
+    for (const l of leaveRows) (leaves[l.user] ??= []).push({ start_date: l.start_date, end_date: l.end_date, half_day: !!l.half_day })
 
     await sql.begin(async (tx) => {
       for (const u of users) {

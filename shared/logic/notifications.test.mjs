@@ -23,6 +23,30 @@ describe('requestRecipients', () => {
   })
 })
 
+describe('isEligibleTeamManager', () => {
+  it('accepts an active manager or admin', () => {
+    expect(n.isEligibleTeamManager({ id: 'm1', active: true, role: 'manager' })).toBe(true)
+    expect(n.isEligibleTeamManager({ id: 'a1', active: true, role: 'admin', pending_approval: false })).toBe(true)
+  })
+
+  it('refuses a manager who was demoted to employee', () => {
+    expect(n.isEligibleTeamManager({ id: 'm1', active: true, role: 'employee' })).toBe(false)
+  })
+
+  it('refuses an inactive or unapproved account, or none at all', () => {
+    expect(n.isEligibleTeamManager({ id: 'm1', active: false, role: 'manager' })).toBe(false)
+    expect(n.isEligibleTeamManager({ id: 'm1', active: true, role: 'manager', pending_approval: true })).toBe(false)
+    expect(n.isEligibleTeamManager(null)).toBe(false)
+    expect(n.isEligibleTeamManager(undefined)).toBe(false)
+  })
+
+  it('sends the request to the admins when the team manager was demoted', () => {
+    const demoted = { id: 'm1', active: true, role: 'employee' }
+    const managerId = n.isEligibleTeamManager(demoted) ? demoted.id : ''
+    expect(n.requestRecipients({ id: 'e1', role: 'employee' }, managerId, ADMINS)).toEqual(ADMINS)
+  })
+})
+
 describe('when to notify', () => {
   it('notifies for new pending requests only', () => {
     expect(n.isNewRequest('pending')).toBe(true)

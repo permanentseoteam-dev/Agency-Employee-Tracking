@@ -39,6 +39,8 @@ export function ChangePassword() {
       if (check.error) throw new AppError(check.error.status ? 400 : 0, 'The temporary password is not correct.')
       const changed = await supabase.auth.updateUser({ password: next })
       if (changed.error) throw new AppError(changed.error.status ? 400 : 0, changed.error.message)
+      // The server clears the flag itself when the password changes (and refuses to clear it any
+      // other way), so this write changes nothing there; it is kept for a server without that.
       must(await supabase.from('profiles').update({ must_change_password: false }).eq('id', user.id).select())
       await reload()
     } catch (err) {

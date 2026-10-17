@@ -95,25 +95,45 @@ function summarize(segments) {
 }
 
 /**
+ * How approved leave covers a day: 'full' (a full-day leave, or two half days), 'half'
+ * (one half-day leave only) or '' (no leave). leaves: { start_date, end_date, half_day?, status? }.
+ */
+function leaveCover(day, leaves) {
+  let halves = 0
+  for (const l of leaves || []) {
+    if (l.status && l.status !== 'approved') continue
+    if (!(l.start_date <= day && l.end_date >= day)) continue
+    if (!l.half_day) return 'full'
+    halves++
+  }
+  if (halves >= 2) return 'full'
+  return halves === 1 ? 'half' : ''
+}
+
+/**
  * The attendance record for one person and day. Status order (plan §4.2, first match wins):
  * holiday or weekend → on leave → absent → half day → late → present.
+ * A half-day leave is not a whole day off: the other half is judged against the half-day
+ * hours. Enough activity → present (never late: the leave doesn't say which half was
+ * taken, so a morning off would always look late); too little or none → half day (payroll
+ * takes 0.5 off), never absent.
  * settings: org_settings values. segments: the day's activity segments. leaves: the person's
- * approved leave requests. holidays: day keys (or { date } objects).
+ * approved leave requests (with half_day). holidays: day keys (or { date } objects).
  */
 function statusFor(day, settings, segments, leaves, holidays) {
   const s = settings || {}
   const sum = summarize(segments)
   const isHoliday = (holidays || []).some((h) => (typeof h === 'string' ? h : h && h.date) === day)
-  const onLeave = (leaves || []).some(
-    (l) => (!l.status || l.status === 'approved') && l.start_date <= day && l.end_date >= day
-  )
+  const cover = leaveCover(day, leaves)
+  const halfDaySeconds = (Number(s.half_day_min_hours) || 0) * 3600
 
   let status
   if (isHoliday) status = 'holiday'
   else if ((s.work_days || []).indexOf(isoWeekday(day)) === -1) status = 'weekend'
-  else if (onLeave) status = 'on_leave'
+  else if (cover === 'full') status = 'on_leave'
+  else if (cover === 'half') status = sum.active_s > 0 && sum.active_s >= halfDaySeconds ? 'present' : 'half_day'
   else if (sum.active_s === 0) status = 'absent'
-  else if (sum.active_s < (Number(s.half_day_min_hours) || 0) * 3600) status = 'half_day'
+  else if (sum.active_s < halfDaySeconds) status = 'half_day'
   else {
     const hm = String(s.shift_start || '00:00').split(':').map(Number)
     const shiftStart = Date.parse(day + 'T00:00:00.000Z') + (hm[0] * 60 + hm[1] - offsetFor(s.timezone)) * 60000
@@ -168,6 +188,7 @@ module.exports = {
   daysBetween,
   employedOn,
   summarize,
+  leaveCover,
   statusFor,
   parseRange,
   nightlyDays,

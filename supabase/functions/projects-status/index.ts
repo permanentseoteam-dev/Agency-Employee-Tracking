@@ -33,14 +33,24 @@ serve(async (req) => {
     const bounds = att.dayBounds(today, offset)
     const segRows = await sql`select "user", state, started_at, ended_at from activity_segments
       where started_at >= ${bounds.start} and started_at < ${bounds.end} and "user" = any(${members})`
-    const leaveRows = await sql`select "user", start_date, end_date from leave_requests
+    const leaveRows = await sql`select "user", start_date, end_date, half_day from leave_requests
       where status = 'approved' and start_date <= ${today} and end_date >= ${today} and "user" = any(${members})`
     const holidays = (await sql`select date from holidays where date = ${today}`).map((h) => h.date as string)
     const times = { now, ...lib.shiftTimes(today, settings, offset) }
     for (const p of people) {
       const segs = segRows.filter((s) => s.user === p.id).map((s) => ({ state: s.state, started_at: pbDate(s.started_at), ended_at: pbDate(s.ended_at) }))
-      const leaves = leaveRows.filter((l) => l.user === p.id)
-      statusOf[p.id] = lib.liveStatus(att.statusFor(today, settings, segs, leaves, holidays), times)
+      const leaves = leaveRows
+        .filter((l) => l.user === p.id)
+        .map((l) => ({ start_date: l.start_date, end_date: l.end_date, half_day: !!l.half_day }))
+      const record = att.statusFor(today, settings, segs, leaves, holidays)
+      let live = lib.liveStatus(record, times)
+      if (att.leaveCover(today, leaves) === 'half' && (record.status === 'present' || record.status === 'half_day')) {
+        // A half-day leave: before any activity they're on their half off (half day once the
+        // shift is over, as the nightly record will say), and a late start is the half off.
+        if (!record.active_s) live = now >= times.shiftEnd ? 'half_day' : 'on_leave'
+        else if (live === 'late') live = 'present'
+      }
+      statusOf[p.id] = live
     }
   } else {
     for (const r of await sql`select "user", status from attendance where date = ${date} and "user" = any(${members})`) statusOf[r.user] = r.status

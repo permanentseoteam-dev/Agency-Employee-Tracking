@@ -74,19 +74,30 @@ var require_attendance = __commonJS({
       }
       return { active_s: Math.round(activeMs / 1e3), idle_s: Math.round(idleMs / 1e3), first, last };
     }
+    function leaveCover(day, leaves) {
+      let halves = 0;
+      for (const l of leaves || []) {
+        if (l.status && l.status !== "approved") continue;
+        if (!(l.start_date <= day && l.end_date >= day)) continue;
+        if (!l.half_day) return "full";
+        halves++;
+      }
+      if (halves >= 2) return "full";
+      return halves === 1 ? "half" : "";
+    }
     function statusFor(day, settings, segments, leaves, holidays) {
       const s = settings || {};
       const sum = summarize(segments);
       const isHoliday = (holidays || []).some((h) => (typeof h === "string" ? h : h && h.date) === day);
-      const onLeave = (leaves || []).some(
-        (l) => (!l.status || l.status === "approved") && l.start_date <= day && l.end_date >= day
-      );
+      const cover = leaveCover(day, leaves);
+      const halfDaySeconds = (Number(s.half_day_min_hours) || 0) * 3600;
       let status;
       if (isHoliday) status = "holiday";
       else if ((s.work_days || []).indexOf(isoWeekday(day)) === -1) status = "weekend";
-      else if (onLeave) status = "on_leave";
+      else if (cover === "full") status = "on_leave";
+      else if (cover === "half") status = sum.active_s > 0 && sum.active_s >= halfDaySeconds ? "present" : "half_day";
       else if (sum.active_s === 0) status = "absent";
-      else if (sum.active_s < (Number(s.half_day_min_hours) || 0) * 3600) status = "half_day";
+      else if (sum.active_s < halfDaySeconds) status = "half_day";
       else {
         const hm = String(s.shift_start || "00:00").split(":").map(Number);
         const shiftStart = Date.parse(day + "T00:00:00.000Z") + (hm[0] * 60 + hm[1] - offsetFor(s.timezone)) * 6e4;
@@ -132,6 +143,7 @@ var require_attendance = __commonJS({
       daysBetween,
       employedOn,
       summarize,
+      leaveCover,
       statusFor,
       parseRange,
       nightlyDays,

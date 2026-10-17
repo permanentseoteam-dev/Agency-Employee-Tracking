@@ -74,17 +74,22 @@ const nameOf = async (table: 'profiles' | 'leave_types', id: string | null, fiel
   return (r?.[field] as string) ?? ''
 }
 
-/** A new request → its team manager (or the admins for a manager's own request). */
+/**
+ * A new request → its team manager (or the admins for a manager's own request). A team
+ * manager who is no longer an active manager or admin (demoted, switched off) doesn't get it;
+ * the admins do, so the request is never left with someone who can't decide it.
+ */
 export async function notifyNewRequest(req: Record<string, any>) {
   try {
     if (!notes.isNewRequest(req.status)) return
     const [requester] = await sql`select p.id, p.role, p.full_name, t.manager from profiles p left join teams t on t.id = p.team where p.id = ${req.user}`
     let managerId = ''
     if (requester?.manager) {
-      const [m] = await sql`select id from profiles where id = ${requester.manager} and active`
-      if (m) managerId = m.id
+      const [m] = await sql`select id, active, role, pending_approval from profiles
+        where id = ${requester.manager} and active and not pending_approval and role in ('manager', 'admin')`
+      if (notes.isEligibleTeamManager(m)) managerId = m.id
     }
-    const admins = (await sql`select id from profiles where role = 'admin' and active`).map((a) => a.id as string)
+    const admins = (await sql`select id from profiles where role = 'admin' and active and not pending_approval`).map((a) => a.id as string)
     const payload = notes.requestPayload(
       { id: req.id, user: req.user, start_date: req.start_date, end_date: req.end_date, half_day: req.half_day, days: Number(req.days) },
       { requester: requester?.full_name ?? '', leaveType: await nameOf('leave_types', req.leave_type, 'name') }

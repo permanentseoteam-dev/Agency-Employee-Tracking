@@ -2,6 +2,7 @@
 // tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 
 const DECISIONS = ['approved', 'rejected']
+const MANAGER_ROLES = ['manager', 'admin']
 
 function unique(ids) {
   const out = []
@@ -10,9 +11,20 @@ function unique(ids) {
 }
 
 /**
+ * Whether a team's manager (a profile row { active, role, pending_approval }, or null) still
+ * gets the team's leave requests: only an active, approved account that is still a manager or
+ * admin. A manager who was demoted or switched off no longer does (they can't decide the
+ * requests either), and the request goes to the admins instead.
+ */
+function isEligibleTeamManager(profile) {
+  return !!profile && profile.active === true && profile.pending_approval !== true && MANAGER_ROLES.indexOf(profile.role) !== -1
+}
+
+/**
  * Who hears about a new leave request (plan §4.3): the requester's team manager.
  * A manager's or admin's own request, or one with no active team manager, goes to
- * the admins instead. Nobody is notified about their own request.
+ * the admins instead (the caller passes '' for a team manager who isn't eligible, see
+ * isEligibleTeamManager). Nobody is notified about their own request.
  */
 function requestRecipients(requester, teamManagerId, adminIds) {
   const toAdmins =
@@ -52,4 +64,4 @@ function decisionPayload(req, names) {
   return p
 }
 
-module.exports = { requestRecipients, isNewRequest, isDecision, requestPayload, decisionPayload }
+module.exports = { isEligibleTeamManager, requestRecipients, isNewRequest, isDecision, requestPayload, decisionPayload }

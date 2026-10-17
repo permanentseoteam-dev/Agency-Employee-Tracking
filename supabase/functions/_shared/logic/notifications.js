@@ -8,10 +8,14 @@ var __commonJS = (cb, mod) => function __require() {
 var require_notifications = __commonJS({
   "shared/logic/notifications.js"(exports, module) {
     var DECISIONS = ["approved", "rejected"];
+    var MANAGER_ROLES = ["manager", "admin"];
     function unique(ids) {
       const out = [];
       for (const id of ids) if (id && out.indexOf(id) === -1) out.push(id);
       return out;
+    }
+    function isEligibleTeamManager(profile) {
+      return !!profile && profile.active === true && profile.pending_approval !== true && MANAGER_ROLES.indexOf(profile.role) !== -1;
     }
     function requestRecipients(requester, teamManagerId, adminIds) {
       const toAdmins = requester.role === "manager" || requester.role === "admin" || !teamManagerId || teamManagerId === requester.id;
@@ -42,7 +46,7 @@ var require_notifications = __commonJS({
       p.comment = req.comment || "";
       return p;
     }
-    module.exports = { requestRecipients, isNewRequest, isDecision, requestPayload, decisionPayload };
+    module.exports = { isEligibleTeamManager, requestRecipients, isNewRequest, isDecision, requestPayload, decisionPayload };
   }
 });
 export default require_notifications();
