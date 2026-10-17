@@ -114,10 +114,20 @@ export function useOnLeave(day: string) {
   return useQuery({
     queryKey: leaveKeys.onDay(day),
     enabled: !!day,
-    queryFn: async () =>
-      (must(await supabase.from('leave_requests').select('user').eq('status', 'approved').lte('start_date', day).gte('end_date', day)) as { user: string }[]).map(
-        (r) => r.user
-      )
+    // Away for the whole day: a full-day leave, or two half days. One half day isn't "On leave" (they work the other half).
+    queryFn: async () => {
+      const rows = must(
+        await supabase.from('leave_requests').select('user, half_day').eq('status', 'approved').lte('start_date', day).gte('end_date', day)
+      ) as { user: string; half_day: boolean }[]
+      const halves = new Map<string, number>()
+      const away = new Set<string>()
+      for (const r of rows) {
+        if (!r.half_day) away.add(r.user)
+        else if ((halves.get(r.user) ?? 0) + 1 >= 2) away.add(r.user)
+        else halves.set(r.user, 1)
+      }
+      return [...away]
+    }
   })
 }
 

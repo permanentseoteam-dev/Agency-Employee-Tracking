@@ -61,6 +61,8 @@ export function dateRange(start: string, end: string): string {
 }
 
 export function daysText(days: number, halfDay: boolean): string {
+  // A request a later holiday recounted to nothing reads "0 days", even a half day.
+  if (days === 0) return '0 days'
   if (halfDay || days === 0.5) return 'Half day'
   return `${days} day${days === 1 ? '' : 's'}`
 }

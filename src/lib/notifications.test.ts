@@ -70,6 +70,8 @@ describe('notificationText', () => {
   it('counts days', () => {
     expect(daysText(1, false)).toBe('1 day')
     expect(daysText(2.5, false)).toBe('2.5 days')
+    expect(daysText(0.5, true)).toBe('Half day')
+    expect(daysText(0, true)).toBe('0 days')
   })
 
   it('shows a comment only for leave decisions that have one', () => {
