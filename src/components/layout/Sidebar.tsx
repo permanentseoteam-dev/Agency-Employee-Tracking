@@ -79,7 +79,11 @@ export function Sidebar() {
           className="h-10 w-full rounded-[var(--radius-control)] border border-[var(--sidebar-line)] bg-[var(--sidebar-field)] pr-3 pl-9 text-sm text-white placeholder:text-[var(--sidebar-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
         />
       </label>
-      <nav className="-mx-1 flex flex-1 flex-col gap-0.5 overflow-y-auto px-1" aria-label="Main">
+      {/* No visible scrollbar; on a short window the menu still scrolls with the wheel or touchpad. */}
+      <nav
+        className="-mx-1 flex flex-1 flex-col gap-0.5 overflow-y-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-label="Main"
+      >
         {SECTIONS.map((section) => {
           const group = items.filter((item) => item.section === section)
           if (group.length === 0) return null
