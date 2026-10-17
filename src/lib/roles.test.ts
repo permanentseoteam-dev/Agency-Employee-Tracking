@@ -17,7 +17,7 @@ describe('roles', () => {
     const employee = navFor('employee').map((n) => n.path)
     const manager = navFor('manager').map((n) => n.path)
     const admin = navFor('admin').map((n) => n.path)
-    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/projects', '/rules', '/finance'])
+    expect(employee).toEqual(['/my-stats', '/my-attendance', '/my-leaves', '/calendar', '/projects', '/rules', '/finance'])
     expect(manager).toContain('/live')
     // Own attendance is a tab in Attendance, approvals are tabs in My Leaves.
     expect(manager).toContain('/attendance')
@@ -44,7 +44,7 @@ describe('roles', () => {
     expect(canOpen('manager', '/finance/my-pay')).toBe(false)
     expect(canOpen('employee', '/my-leaves')).toBe(true)
     expect(canOpen('employee', '/profile')).toBe(true)
-    expect(canOpen('employee', '/calendar/month')).toBe(false)
+    expect(canOpen('employee', '/calendar/month')).toBe(true)
     expect(canOpen('manager', '/calendar/month')).toBe(true)
     expect(canOpen('manager', '/my-leaves/pending')).toBe(true)
     expect(canOpen('manager', '/attendance/mine')).toBe(true)

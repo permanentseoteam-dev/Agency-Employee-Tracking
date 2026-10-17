@@ -49,7 +49,7 @@ export const NAV: NavItem[] = [
   { path: '/my-attendance', label: 'My Attendance', icon: 'attendance', minRole: 'employee', section: 'personal', hiddenFor: ['manager', 'admin'], module: 'M7' },
   // Managers and admins approve leave from tabs inside My Leaves.
   { path: '/my-leaves', label: 'My Leaves', icon: 'leave', minRole: 'employee', section: 'personal', module: 'M8' },
-  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', section: 'personal', hiddenFor: ['employee'], module: 'M10' },
+  { path: '/calendar', label: 'Calendar', icon: 'calendar', minRole: 'employee', section: 'personal', module: 'M10' },
   // Everyone sees the clients they're on; only an admin sets up clients and their people.
   { path: '/projects', label: 'Project', icon: 'project', minRole: 'employee', section: 'team', module: 'Projects' },
   { path: '/live', label: 'Live Board', icon: 'live', minRole: 'manager', section: 'team', module: 'M6' },

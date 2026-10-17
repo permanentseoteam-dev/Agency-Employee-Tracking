@@ -87,7 +87,7 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| E-70 | No company calendar | Look at the sidebar; open the Calendar address | No Calendar item; the address sends you back to My Stats (project calendars still work, E-85) |  | ✓ |
+| E-70 | Company calendar | Open Calendar → Month and Holidays | Holidays, events for everyone and for your team, and approved leave show; no add, edit or delete buttons (read-only) | ★ |  |
 | E-74 | Notification bell | After a decision on your leave, open the bell | Unread count, the decision with who decided and the comment; clicking opens My Leaves and marks it read | ★ |  |
 | E-75 | Mark all as read | Bell → Mark all as read | The badge clears; the items stay in the list |  |  |
 | E-76 | Edit profile | My Profile: change name, phone and designation, upload a photo | Saved; the photo shows in the top bar |  |  |
@@ -106,8 +106,8 @@ Run these during shift hours (09:00–18:00, Mon–Fri) unless a test says other
 
 | ID | Check | How | Expected | ★ | Auto |
 | --- | --- | --- | --- | --- | --- |
-| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Project, Rules, Finance; My Leaves has no Pending/Decided tabs | ★ |  |
-| E-91 | Manager pages blocked | (automated) Open the Live Board, Attendance, Calendar or Organization address | Sent back to My Stats; the My Leaves → Pending address shows My Leaves |  |  |
+| E-90 | Employee menu only | Look at the sidebar | Only My Stats, My Attendance, My Leaves, Calendar, Project, Rules, Finance; My Leaves has no Pending/Decided tabs | ★ |  |
+| E-91 | Manager pages blocked | (automated) Open the Live Board, Attendance or Organization address | Sent back to My Stats; the My Leaves → Pending address shows My Leaves |  |  |
 | E-92 | Other people's data is private | (server check) Read another person's attendance, leave, time, live status or salary | Refused or empty |  | ✓ |
 | E-93 | Can't decide own leave | (server check) Approve your own request | Refused |  | ✓ |
 | E-94 | Can't promote yourself | (server check) Change your own role or team | Refused |  | ✓ |
