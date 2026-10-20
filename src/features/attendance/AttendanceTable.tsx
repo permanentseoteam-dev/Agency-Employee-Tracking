@@ -16,6 +16,7 @@ import {
   countStatuses,
   employedOn,
   monthDays,
+  monthLabel,
   monthOf,
   recomputeRange,
   type AttendanceRecord
@@ -144,6 +145,11 @@ export function AttendanceTable() {
           </Button>
         )}
       </div>
+      {recompute.isPending && (
+        <p role="status" className="text-sm text-slate-500">
+          Counting each finished day of {monthLabel(month)} again. A whole month takes up to half a minute.
+        </p>
+      )}
       {notice && (
         <p role="status" className={cn('text-sm', notice.ok ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600')}>
           {notice.text}
