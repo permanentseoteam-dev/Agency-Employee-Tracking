@@ -3,7 +3,7 @@ import { chipStatuses, countStatuses, sortByStatus, TEAM_STATUS_LABEL, type Team
 
 describe('projects', () => {
   it('offers "Not in yet" only for today', () => {
-    expect(chipStatuses(true)).toEqual(['present', 'late', 'half_day', 'absent', 'on_leave', 'not_in_yet'])
+    expect(chipStatuses(true)).toEqual(['present', 'late', 'absent', 'on_leave', 'not_in_yet'])
     expect(chipStatuses(false)).not.toContain('not_in_yet')
   })
 

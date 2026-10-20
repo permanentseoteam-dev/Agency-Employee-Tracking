@@ -100,6 +100,15 @@ export function recordsByDay(rules: StarRule[], records: Pick<StarRecord, 'rule'
   return out
 }
 
+/**
+ * Late stars so far today, the same rule as the server's attendance.statusFor: 1 per started star block
+ * after shift start + grace. firstActiveMs: today's first active moment, or null before any.
+ */
+export function lateToday(firstActiveMs: number | null, shiftStartMs: number, graceMinutes: number, blockMinutes: number): { minutes: number; stars: number } {
+  const lateMs = firstActiveMs === null ? 0 : Math.max(0, firstActiveMs - (shiftStartMs + graceMinutes * 60000))
+  return { minutes: Math.ceil(lateMs / 60000), stars: lateMs > 0 ? Math.ceil(lateMs / (blockMinutes * 60000)) : 0 }
+}
+
 /** "1 star", "3 stars". */
 export function starsText(n: number): string {
   return `${n} star${n === 1 ? '' : 's'}`

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { recordsByDay, starLines, starsByUser, starsText, starTotal, type StarRecord, type StarRule } from './stars'
+import { lateToday, recordsByDay, starLines, starsByUser, starsText, starTotal, type StarRecord, type StarRule } from './stars'
 
 const late: StarRule = { id: 'r-late', name: 'Late arrival', stars: 0, auto: 'late', description: '' }
 const short: StarRule = { id: 'r-short', name: 'Short of the daily target', stars: 0, auto: 'short', description: '' }
@@ -58,6 +58,18 @@ describe('stars', () => {
   it('says 1 star and 2 stars', () => {
     expect(starsText(1)).toBe('1 star')
     expect(starsText(0)).toBe('0 stars')
+  })
+})
+
+describe('lateToday', () => {
+  const nine = Date.parse('2026-10-12T04:00:00Z') // 09:00 in Karachi
+  const at = (min: number) => nine + min * 60000
+  it('1–30 min after grace = 1 star, 31–60 = 2', () => {
+    expect(lateToday(at(15), nine, 15, 30)).toEqual({ minutes: 0, stars: 0 })
+    expect(lateToday(at(16), nine, 15, 30)).toEqual({ minutes: 1, stars: 1 })
+    expect(lateToday(at(45), nine, 15, 30)).toEqual({ minutes: 30, stars: 1 })
+    expect(lateToday(at(46), nine, 15, 30)).toEqual({ minutes: 31, stars: 2 })
+    expect(lateToday(null, nine, 15, 30)).toEqual({ minutes: 0, stars: 0 })
   })
 })
 

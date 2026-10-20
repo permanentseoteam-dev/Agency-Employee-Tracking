@@ -66,10 +66,10 @@ describe('liveStatus: today while it is still running', () => {
 })
 
 describe('monthCounts', () => {
-  it('counts the five statuses and ignores holidays and weekends', () => {
+  it('counts the four statuses and ignores holidays, weekends and old half days', () => {
     const records = ['present', 'present', 'late', 'half_day', 'absent', 'on_leave', 'holiday', 'weekend'].map((status) => ({ status }))
-    expect(lib.monthCounts(records)).toEqual({ present: 2, late: 1, half_day: 1, absent: 1, on_leave: 1 })
-    expect(lib.monthCounts([])).toEqual({ present: 0, late: 0, half_day: 0, absent: 0, on_leave: 0 })
+    expect(lib.monthCounts(records)).toEqual({ present: 2, late: 1, absent: 1, on_leave: 1 })
+    expect(lib.monthCounts([])).toEqual({ present: 0, late: 0, absent: 0, on_leave: 0 })
   })
 })
 

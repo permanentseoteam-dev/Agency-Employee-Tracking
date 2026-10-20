@@ -10,7 +10,7 @@ var require_projects = __commonJS({
     var DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
     var DAY_MS = 864e5;
     var MAX_RANGE_DAYS = 62;
-    var COUNTED = ["present", "late", "half_day", "absent", "on_leave"];
+    var COUNTED = ["present", "late", "absent", "on_leave"];
     function isDateKey(value) {
       return typeof value === "string" && DATE_KEY.test(value) && !Number.isNaN(Date.parse(value + "T00:00:00.000Z"));
     }

@@ -18,7 +18,6 @@ import { useClient } from './ClientPage'
 const MONTH_COLUMNS: { key: CountedStatus; short: string }[] = [
   { key: 'present', short: 'P' },
   { key: 'late', short: 'L' },
-  { key: 'half_day', short: '½' },
   { key: 'absent', short: 'A' },
   { key: 'on_leave', short: 'LV' }
 ]
@@ -192,7 +191,7 @@ export function ClientTeam() {
               ))}
               {shown.length === 0 && (
                 <tr>
-                  <Td colSpan={isAdmin ? 9 : 8} className="text-center text-slate-500">
+                  <Td colSpan={isAdmin ? 8 : 7} className="text-center text-slate-500">
                     Nobody with this status.
                   </Td>
                 </tr>
@@ -202,9 +201,9 @@ export function ClientTeam() {
         )}
       </Card>
       <p className="text-xs text-slate-500">
-        P, L, ½, A and LV count this month’s finished working days (Present, Late, Half day, Absent, On leave).{' '}
+        P, L, A and LV count this month’s finished working days (Present, Late, Absent, On leave).{' '}
         {isToday
-          ? 'Today updates every minute: “Not in yet” turns into Absent once the shift ends, and Half day is decided when the shift is over.'
+          ? 'Today updates every minute: “Not in yet” turns into Absent once the shift ends.'
           : 'A past day shows its counted attendance.'}{' '}
         {!isAdmin && 'You see the clients you work on; only the admin changes clients and their people.'}
       </p>

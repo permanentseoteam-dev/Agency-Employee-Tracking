@@ -7,8 +7,9 @@ import { TrendChart } from '@/components/ui/TrendChart'
 import { useMonthAttendance } from '@/features/attendance/api'
 import { AttendanceBadge } from '@/features/attendance/status'
 import { monthOf } from '@/lib/attendance'
-import { addDays, formatTime, isoWeekday } from '@/lib/dates'
+import { addDays, formatTime, isoWeekday, toDateKey, zonedTimeToUtc } from '@/lib/dates'
 import { formatDuration, formatSignedDuration } from '@/lib/format'
+import { lateToday, starsText } from '@/lib/stars'
 import { monthWeeks, overtimeByDay, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
 import { useHolidays } from '@/features/calendar/api'
 import { useOrgSettings } from '@/features/rules/api'
@@ -100,6 +101,14 @@ export function MyStats() {
   // The daily target only applies on a working day that isn't a holiday.
   const target = (org?.required_daily_minutes ?? 360) * 60
   const workingToday = !!org && org.work_days.includes(isoWeekday(today)) && !(holidays ?? []).some((h) => h.date === today)
+  // Late stars so far today, from the first active piece of time (the day's record is counted after it ends).
+  let firstActive: number | null = null
+  for (const s of week.data ?? []) {
+    const start = Date.parse(s.started_at.replace(' ', 'T'))
+    if (s.state === 'active' && toDateKey(start, tz) === today && (firstActive === null || start < firstActive)) firstActive = start
+  }
+  const late =
+    org && workingToday ? lateToday(firstActive, zonedTimeToUtc(today, org.shift_start, tz).getTime(), org.grace_minutes, org.star_block_minutes ?? 30) : null
   // Net = active − idle, in the whole minutes shown above, so it always matches the two figures.
   const todayNet = (Math.floor(todayActive / 60) - Math.floor(todayIdle / 60)) * 60
   const time = (value: string | undefined) => (value ? formatTime(value.replace(' ', 'T'), tz) : '-')
@@ -119,6 +128,11 @@ export function MyStats() {
               {todayActive >= target
                 ? `Daily target of ${target / 3600} h reached`
                 : `${formatDuration(target - todayActive)} to go for the ${target / 3600} h target`}
+            </span>
+          )}
+          {late && late.stars > 0 && (
+            <span className="block text-[12.5px] text-[var(--warning-text)]" data-late-stars={late.stars}>
+              {late.minutes} min late today: {starsText(late.stars)}
             </span>
           )}
         </StatCard>

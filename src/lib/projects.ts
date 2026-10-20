@@ -5,7 +5,7 @@ import type { AttendanceStatus } from './attendance'
 /** A stored attendance status, "not_in_yet" (today, before anyone starts), or '' (not employed / not counted yet). */
 export type TeamStatus = AttendanceStatus | 'not_in_yet' | ''
 
-export type CountedStatus = 'present' | 'late' | 'half_day' | 'absent' | 'on_leave'
+export type CountedStatus = 'present' | 'late' | 'absent' | 'on_leave'
 
 export interface MemberStatus {
   user: string
@@ -36,7 +36,7 @@ const ORDER: TeamStatus[] = ['present', 'late', 'half_day', 'not_in_yet', 'absen
 
 /** The status chips above the table; "Not in yet" only exists for today. */
 export function chipStatuses(today: boolean): TeamStatus[] {
-  const base: TeamStatus[] = ['present', 'late', 'half_day', 'absent', 'on_leave']
+  const base: TeamStatus[] = ['present', 'late', 'absent', 'on_leave']
   return today ? [...base, 'not_in_yet'] : base
 }
 
