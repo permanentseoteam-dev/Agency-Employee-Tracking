@@ -18,6 +18,7 @@ function recordProblem(input, ctx) {
   if (c.today && date > c.today) return 'Stars can’t be given for a day that hasn’t happened yet.'
   if (c.joined_on && date < c.joined_on) return 'That day is before they joined (' + c.joined_on + ').'
   if (c.left_on && date > c.left_on) return 'That day is after they left (' + c.left_on + ').'
+  if (c.locked) return 'That month’s payroll is approved, so its stars can’t change.'
   if (input.excused && !input.auto) return 'Only automatic stars can be excused. Remove a star given by hand instead.'
   if (!input.excused && input.auto) return 'This rule’s stars come from attendance automatically. You can excuse them for a day instead.'
   return null
@@ -66,4 +67,27 @@ function monthStars(attendance, rules, records) {
   return out
 }
 
-module.exports = { recordProblem, givenPayload, monthStars }
+/**
+ * One person's star records by day, for payroll.calculateDay: the stars given by hand that count,
+ * and which automatic parts (late, short) an admin excused. Hand stars use the rule's current stars.
+ * rules: [{ id, stars, auto }], records: [{ rule, date, excused }] → { [date]: { hand, late, short } }
+ */
+function recordsByDay(rules, records) {
+  const byId = {}
+  for (const r of rules || []) byId[r.id] = r
+  const out = {}
+  for (const rec of records || []) {
+    const rule = byId[rec.rule]
+    if (!rule) continue
+    const d = (out[rec.date] = out[rec.date] || { hand: 0, late: false, short: false })
+    if (rec.excused) {
+      if (rule.auto === 'late') d.late = true
+      else if (rule.auto === 'short') d.short = true
+    } else if (!rule.auto) {
+      d.hand += Number(rule.stars) || 0
+    }
+  }
+  return out
+}
+
+module.exports = { recordProblem, givenPayload, monthStars, recordsByDay }

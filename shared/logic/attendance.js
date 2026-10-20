@@ -73,10 +73,29 @@ function employedOn(day, user) {
   return true
 }
 
-/** Active and idle seconds, and first and last activity, from one day's segments. */
+/** Total length of [start, end] intervals in ms, counting any overlap once. */
+function mergedMs(intervals) {
+  const sorted = (intervals || []).slice().sort((a, b) => a[0] - b[0])
+  let total = 0
+  let start = null
+  let end = null
+  for (const iv of sorted) {
+    if (end === null || iv[0] > end) {
+      if (end !== null) total += end - start
+      start = iv[0]
+      end = iv[1]
+    } else if (iv[1] > end) {
+      end = iv[1]
+    }
+  }
+  if (end !== null) total += end - start
+  return total
+}
+
+/** Active and idle seconds (overlaps counted once), and first and last activity, from one day's segments. */
 function summarize(segments) {
-  let activeMs = 0
-  let idleMs = 0
+  const active = []
+  const idle = []
   let first = null
   let last = null
   for (const s of segments || []) {
@@ -84,14 +103,46 @@ function summarize(segments) {
     const end = parseInstant(s.ended_at)
     if (isNaN(start) || isNaN(end) || end <= start) continue
     if (s.state === 'active') {
-      activeMs += end - start
+      active.push([start, end])
       if (first === null || start < first) first = start
       if (last === null || end > last) last = end
     } else {
-      idleMs += end - start
+      idle.push([start, end])
     }
   }
-  return { active_s: Math.round(activeMs / 1000), idle_s: Math.round(idleMs / 1000), first: first, last: last }
+  return { active_s: Math.round(mergedMs(active) / 1000), idle_s: Math.round(mergedMs(idle) / 1000), first: first, last: last }
+}
+
+/** The daily target and the star block, in minutes, from org_settings (6 hours; 1 star per 30 minutes). */
+function starSettings(settings) {
+  const s = settings || {}
+  const target = Number(s.required_daily_minutes)
+  const block = Number(s.star_block_minutes)
+  return { targetMinutes: target > 0 ? target : 360, blockMinutes: block > 0 ? block : 30 }
+}
+
+/** Whole star blocks in a stretch of time: any part of a block is a star (1 second late = 1 star). */
+function starBlocks(ms, blockMinutes) {
+  return ms > 0 ? Math.ceil(ms / (blockMinutes * 60000)) : 0
+}
+
+/**
+ * The part of a day that approved leave pays for: 1, 0.5 (a paid half day) or 0. A leave is paid
+ * unless paid === false; a full-day leave wins over half days, and two half days make a day.
+ */
+function paidLeavePart(day, leaves) {
+  let halves = 0
+  let paid = 0
+  for (const l of leaves || []) {
+    if (l.status && l.status !== 'approved') continue
+    if (!(l.start_date <= day && l.end_date >= day)) continue
+    if (!l.half_day) return l.paid === false ? 0 : 1
+    if (halves < 2) {
+      halves++
+      if (l.paid !== false) paid += 0.5
+    }
+  }
+  return paid
 }
 
 /**
@@ -111,34 +162,52 @@ function leaveCover(day, leaves) {
 }
 
 /**
- * The attendance record for one person and day. Status order (plan §4.2, first match wins):
- * holiday or weekend → on leave → absent → half day → late → present.
- * A half-day leave is not a whole day off: the other half is judged against the half-day
- * hours. Enough activity → present (never late: the leave doesn't say which half was
- * taken, so a morning off would always look late); too little or none → half day (payroll
- * takes 0.5 off), never absent.
+ * The attendance record for one person and day. Status order (first match wins):
+ * holiday or weekend → on leave → absent → late → present. Stars, separately:
+ * - late: 1 per started star block (30 min) after shift start + grace;
+ * - short: 1 per started block of active time under the daily target (6 h).
+ * A half-day leave halves the target and is never late (the leave doesn't say which half was
+ * taken); with no activity at all it reads On leave, and the missed half shows as short stars.
+ * An absent day has no stars: it pays nothing instead.
+ * pay_basis is the share of the daily rate the day pays before stars: 'full', 'half' (an unpaid
+ * half day), 'none' (absent or unpaid leave) or 'off' (weekend or holiday, not a working day).
  * settings: org_settings values. segments: the day's activity segments. leaves: the person's
- * approved leave requests (with half_day). holidays: day keys (or { date } objects).
+ * approved leave requests (with half_day and paid). holidays: day keys (or { date } objects).
  */
 function statusFor(day, settings, segments, leaves, holidays) {
   const s = settings || {}
   const sum = summarize(segments)
+  const stars = starSettings(s)
   const isHoliday = (holidays || []).some((h) => (typeof h === 'string' ? h : h && h.date) === day)
   const cover = leaveCover(day, leaves)
-  const halfDaySeconds = (Number(s.half_day_min_hours) || 0) * 3600
 
   let status
-  if (isHoliday) status = 'holiday'
-  else if ((s.work_days || []).indexOf(isoWeekday(day)) === -1) status = 'weekend'
-  else if (cover === 'full') status = 'on_leave'
-  else if (cover === 'half') status = sum.active_s > 0 && sum.active_s >= halfDaySeconds ? 'present' : 'half_day'
-  else if (sum.active_s === 0) status = 'absent'
-  else if (sum.active_s < halfDaySeconds) status = 'half_day'
-  else {
+  let paid = 1
+  let lateMs = 0
+  let shortMs = 0
+  if (isHoliday) {
+    status = 'holiday'
+    paid = -1
+  } else if ((s.work_days || []).indexOf(isoWeekday(day)) === -1) {
+    status = 'weekend'
+    paid = -1
+  } else if (cover === 'full') {
+    status = 'on_leave'
+    paid = paidLeavePart(day, leaves)
+  } else if (cover === 'half') {
+    status = sum.active_s > 0 ? 'present' : 'on_leave'
+    paid = 0.5 + paidLeavePart(day, leaves)
+    shortMs = Math.max(0, ((stars.targetMinutes * 60) / 2 - sum.active_s) * 1000)
+  } else if (sum.active_s === 0) {
+    status = 'absent'
+    paid = 0
+  } else {
     const hm = String(s.shift_start || '00:00').split(':').map(Number)
     const shiftStart = Date.parse(day + 'T00:00:00.000Z') + (hm[0] * 60 + hm[1] - offsetFor(s.timezone)) * 60000
     const graceEnd = shiftStart + (Number(s.grace_minutes) || 0) * 60000
-    status = sum.first > graceEnd ? 'late' : 'present'
+    lateMs = Math.max(0, sum.first - graceEnd)
+    shortMs = Math.max(0, (stars.targetMinutes * 60 - sum.active_s) * 1000)
+    status = lateMs > 0 ? 'late' : 'present'
   }
 
   return {
@@ -147,7 +216,12 @@ function statusFor(day, settings, segments, leaves, holidays) {
     active_s: sum.active_s,
     idle_s: sum.idle_s,
     first_activity_at: sum.first === null ? '' : pbDate(sum.first),
-    last_activity_at: sum.last === null ? '' : pbDate(sum.last)
+    last_activity_at: sum.last === null ? '' : pbDate(sum.last),
+    late_minutes: Math.ceil(lateMs / 60000),
+    late_stars: starBlocks(lateMs, stars.blockMinutes),
+    shortfall_minutes: Math.ceil(shortMs / 60000),
+    shortfall_stars: starBlocks(shortMs, stars.blockMinutes),
+    pay_basis: paid < 0 ? 'off' : paid >= 1 ? 'full' : paid >= 0.5 ? 'half' : 'none'
   }
 }
 
@@ -187,8 +261,11 @@ module.exports = {
   dayBounds,
   daysBetween,
   employedOn,
+  mergedMs,
   summarize,
+  starSettings,
   leaveCover,
+  paidLeavePart,
   statusFor,
   parseRange,
   nightlyDays,

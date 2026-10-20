@@ -5,7 +5,7 @@
 // - a finished day: the stored attendance status (attendance.js decides it each night)
 // - today: a live status from today's activity so far. Present and Late show as soon as
 //   someone starts; with no activity it reads "Not in yet" until the shift ends, then
-//   Absent; Half day is only decided once the shift is over.
+//   Absent. Too little active time gives stars, not a status.
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 const DAY_MS = 86400000
@@ -49,9 +49,6 @@ function liveStatus(base, times) {
   const status = base && base.status
   if (status === 'holiday' || status === 'weekend' || status === 'on_leave') return status
   if (!base.active_s) return times.now >= times.shiftEnd ? 'absent' : 'not_in_yet'
-  if (status === 'half_day' && times.now < times.shiftEnd) {
-    return parseInstant(base.first_activity_at) > times.graceEnd ? 'late' : 'present'
-  }
   return status
 }
 

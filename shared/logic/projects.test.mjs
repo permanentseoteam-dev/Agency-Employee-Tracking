@@ -41,10 +41,14 @@ describe('liveStatus: today while it is still running', () => {
     expect(liveAt('10:00', [seg(MONDAY, '09:20', 30)])).toBe('late')
   })
 
-  it('decides Half day only once the shift has ended', () => {
+  it('a short day stays Present after the shift (short hours give stars, not a status)', () => {
     const short = [seg(MONDAY, '09:00', 120)]
     expect(liveAt('17:00', short)).toBe('present')
-    expect(liveAt('18:30', short)).toBe('half_day')
+    expect(liveAt('18:30', short)).toBe('present')
+  })
+
+  it('a half-day leave with no activity reads On leave', () => {
+    expect(liveAt('10:00', [], [{ status: 'approved', start_date: MONDAY, end_date: MONDAY, half_day: true }])).toBe('on_leave')
   })
 
   it('keeps leave, holidays and weekends as they are', () => {

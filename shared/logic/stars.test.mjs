@@ -16,6 +16,10 @@ describe('recordProblem', () => {
     expect(s.recordProblem({ date: '2026-10-14', excused: false, auto: '' }, { ...CTX, left_on: '2026-10-10' })).toMatch(/after they left/)
   })
 
+  it('refuses any change once the month’s payroll is approved', () => {
+    expect(s.recordProblem({ date: '2026-10-14', excused: false, auto: '' }, { ...CTX, locked: true })).toMatch(/approved/)
+  })
+
   it('keeps automatic and by-hand rules apart', () => {
     expect(s.recordProblem({ date: '2026-10-14', excused: false, auto: 'late' }, CTX)).toMatch(/automatically/)
     expect(s.recordProblem({ date: '2026-10-14', excused: true, auto: '' }, CTX)).toMatch(/Only automatic stars/)
@@ -54,5 +58,26 @@ describe('monthStars (a count; stars don’t cost pay)', () => {
     const attendance = [{ user: 'a', date: '2026-10-01', status: 'late' }]
     const records = [{ user: 'a', rule: 'late', date: '2026-10-01', excused: true }]
     expect(s.monthStars(attendance, rules, records)).toEqual({})
+  })
+})
+
+describe('recordsByDay (stars for payroll.calculateDay)', () => {
+  const rules = [
+    { id: 'late', stars: 0, auto: 'late' },
+    { id: 'short', stars: 0, auto: 'short' },
+    { id: 'phone', stars: 2, auto: '' }
+  ]
+  it('adds hand stars per day and marks excused late or short stars', () => {
+    const records = [
+      { rule: 'phone', date: '2026-10-05', excused: false },
+      { rule: 'phone', date: '2026-10-05', excused: false },
+      { rule: 'late', date: '2026-10-06', excused: true },
+      { rule: 'short', date: '2026-10-06', excused: true },
+      { rule: 'gone', date: '2026-10-07', excused: false }
+    ]
+    expect(s.recordsByDay(rules, records)).toEqual({
+      '2026-10-05': { hand: 4, late: false, short: false },
+      '2026-10-06': { hand: 0, late: true, short: true }
+    })
   })
 })

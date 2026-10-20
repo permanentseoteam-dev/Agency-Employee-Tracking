@@ -74,6 +74,100 @@ var require_payroll = __commonJS({
       const adjustment = Math.round(Number(input.adjustment) || 0);
       return { rate, deductions, net: base - deductions + adjustment };
     }
+    var BASIS_SHARE = { full: 1, half: 0.5, none: 0 };
+    function round2(x) {
+      return Math.round(x * 100) / 100;
+    }
+    function payRates(salary, workingDayCount, settings) {
+      const s = settings || {};
+      const target = Number(s.required_daily_minutes) > 0 ? Number(s.required_daily_minutes) : 360;
+      const block = Number(s.star_block_minutes) > 0 ? Number(s.star_block_minutes) : 30;
+      const daily = workingDayCount > 0 ? (Number(salary) || 0) / workingDayCount : 0;
+      const hourly = daily / (target / 60);
+      const star = s.star_value_mode === "fixed_pkr" ? Math.max(0, Number(s.star_value_pkr) || 0) : hourly * block / 60;
+      return { daily_rate: daily, hourly_rate: hourly, star_value: star };
+    }
+    function basisShare(record) {
+      if (Object.prototype.hasOwnProperty.call(BASIS_SHARE, record.pay_basis)) return BASIS_SHARE[record.pay_basis];
+      if (record.status === "absent") return 0;
+      if (record.status === "half_day") return 0.5;
+      return 1;
+    }
+    function calculateDay(record, extra, rates) {
+      const e = extra || {};
+      const late = e.late ? 0 : Number(record.late_stars) || 0;
+      const short = e.short ? 0 : Number(record.shortfall_stars) || 0;
+      const hand = Number(e.hand) || 0;
+      const stars = late + short + hand;
+      const base = basisShare(record) * rates.daily_rate;
+      const deduction = Math.min(base, stars * rates.star_value);
+      return { late_stars: late, shortfall_stars: short, hand_stars: hand, stars, base, deduction, day_pay: base - deduction };
+    }
+    function employedOnDay(day, user) {
+      if (!user.active && !user.left_on) return false;
+      if (user.joined_on && day < user.joined_on) return false;
+      if (user.left_on && day > user.left_on) return false;
+      return true;
+    }
+    function calculateMonth(input) {
+      const i = input || {};
+      const s = i.settings || {};
+      const salary = Number(i.salary) || 0;
+      const person = i.person || {};
+      const holidays = holidaySet(i.holidays);
+      const working = monthDays(i.month).filter((d) => isWorkingDay(d, s.work_days, holidays));
+      const rates = payRates(salary, working.length, s);
+      const byDate = {};
+      for (const r of i.records || []) byDate[r.date] = r;
+      const extras = i.stars || {};
+      const t = { late: 0, short: 0, hand: 0, starDeduction: 0, absent: 0, unpaid: 0, gross: 0 };
+      const days = [];
+      for (const d of working) {
+        if (!employedOnDay(d, person)) {
+          days.push({ date: d, employed: false, counted: false, status: "", late_stars: 0, shortfall_stars: 0, hand_stars: 0, stars: 0, base: 0, deduction: 0, day_pay: 0 });
+          continue;
+        }
+        const rec = byDate[d];
+        const line = calculateDay(rec || { pay_basis: "full" }, extras[d], rates);
+        t.late += line.late_stars;
+        t.short += line.shortfall_stars;
+        t.hand += line.hand_stars;
+        t.starDeduction += line.deduction;
+        t.gross += line.day_pay;
+        if (rec && rec.status === "absent") t.absent++;
+        else if (rec) t.unpaid += 1 - basisShare(rec);
+        days.push(Object.assign({ date: d, employed: true, counted: !!rec, status: rec ? rec.status : "" }, line));
+      }
+      let offStars = 0;
+      for (const d of Object.keys(extras)) {
+        if (d.slice(0, 7) === i.month && working.indexOf(d) === -1) offStars += Number(extras[d].hand) || 0;
+      }
+      if (offStars) {
+        const off = Math.min(t.gross, offStars * rates.star_value);
+        t.hand += offStars;
+        t.starDeduction += off;
+        t.gross -= off;
+      }
+      if (!working.length && employedDuring(i.month, person)) t.gross = salary;
+      const gross = round2(t.gross);
+      return {
+        working_days: working.length,
+        daily_rate: rates.daily_rate,
+        hourly_rate: rates.hourly_rate,
+        star_value: rates.star_value,
+        late_stars: t.late,
+        shortfall_stars: t.short,
+        hand_stars: t.hand,
+        stars: t.late + t.short + t.hand,
+        star_deduction: round2(t.starDeduction),
+        absent_days: t.absent,
+        unpaid_days: t.unpaid,
+        gross,
+        deductions: round2(salary - gross),
+        net: round2(gross + Math.round(Number(i.adjustment) || 0)),
+        days
+      };
+    }
     function employedDuring(month, user) {
       const range = monthRange(month);
       if (!user.active && !user.left_on) return false;
@@ -99,6 +193,9 @@ var require_payroll = __commonJS({
       unpaidLeaveDays,
       attendanceCounts,
       calculate,
+      payRates,
+      calculateDay,
+      calculateMonth,
       employedDuring,
       parseMonth,
       monthLabel

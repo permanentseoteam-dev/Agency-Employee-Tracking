@@ -45,8 +45,8 @@ describe('statusFor: one case per status, in the order of plan §4.2', () => {
     expect(r).toMatchObject({ status: 'absent', active_s: 0, idle_s: 7200, first_activity_at: '', last_activity_at: '' })
   })
 
-  it('half day (active time under the half-day minimum)', () => {
-    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 239)], [], []).status).toBe('half_day')
+  it('a short day is no longer a status of its own (it gives stars)', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 60)], [], []).status).toBe('present')
   })
 
   it('late (first activity after shift start + grace)', () => {
@@ -61,8 +61,120 @@ describe('statusFor: one case per status, in the order of plan §4.2', () => {
       active_s: 330 * 60,
       idle_s: 30 * 60,
       first_activity_at: '2026-10-12 04:10:00.000Z',
-      last_activity_at: '2026-10-12 10:15:00.000Z'
+      last_activity_at: '2026-10-12 10:15:00.000Z',
+      late_minutes: 0,
+      late_stars: 0,
+      shortfall_minutes: 30,
+      shortfall_stars: 1,
+      pay_basis: 'full'
     })
+  })
+})
+
+describe('stars: late arrival (grace ends 09:15)', () => {
+  // A full 6-hour day, so only the late stars show.
+  const day = (first) => att.statusFor(MONDAY, SETTINGS, [seg('active', first, 360)], [], [])
+
+  it.each([
+    ['09:15', 0, 0],
+    ['09:15:01', 1, 1],
+    ['09:16', 1, 1],
+    ['09:45', 30, 1],
+    ['09:46', 31, 2],
+    ['10:15', 60, 2],
+    ['10:16', 61, 3],
+    ['10:45', 90, 3],
+    ['10:46', 91, 4]
+  ])('first activity %s → %i min late, %i stars', (first, minutes, stars) => {
+    const r = day(first)
+    expect(r.late_minutes).toBe(minutes)
+    expect(r.late_stars).toBe(stars)
+    expect(r.shortfall_stars).toBe(0)
+    expect(r.status).toBe(stars ? 'late' : 'present')
+  })
+
+  it('follows the shift start, grace and star block from the settings', () => {
+    const s = { ...SETTINGS, shift_start: '10:00', grace_minutes: 15, star_block_minutes: 15 }
+    const r = att.statusFor(MONDAY, s, [seg('active', '10:46', 360)], [], [])
+    expect(r.late_minutes).toBe(31)
+    expect(r.late_stars).toBe(3)
+  })
+})
+
+describe('stars: active time under the 6-hour target', () => {
+  const day = (minutes) => att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', minutes)], [], [])
+
+  it.each([
+    [360, 0, 0],
+    [390, 0, 0],
+    [359, 1, 1],
+    [330, 30, 1],
+    [329, 31, 2],
+    [300, 60, 2],
+    [240, 120, 4],
+    [1, 359, 12]
+  ])('%i min active → %i min short, %i stars', (active, short, stars) => {
+    expect(day(active)).toMatchObject({ shortfall_minutes: short, shortfall_stars: stars, late_stars: 0 })
+  })
+
+  it('counts several logins, and overlapping time only once', () => {
+    const segments = [seg('active', '09:00', 120), seg('active', '10:00', 120), seg('active', '13:00', 180)]
+    const r = att.statusFor(MONDAY, SETTINGS, segments, [], [])
+    expect(r.active_s).toBe(360 * 60)
+    expect(r.shortfall_stars).toBe(0)
+  })
+
+  it('late and short stars both apply', () => {
+    const r = att.statusFor(MONDAY, SETTINGS, [seg('active', '10:00', 300)], [], [])
+    expect(r).toMatchObject({ status: 'late', late_stars: 2, shortfall_stars: 2 })
+  })
+
+  it('follows the daily target from the settings', () => {
+    expect(att.statusFor(MONDAY, { ...SETTINGS, required_daily_minutes: 480 }, [seg('active', '09:00', 360)], [], []).shortfall_stars).toBe(4)
+  })
+
+  it('an absent day has no stars and pays nothing', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [], [], [])).toMatchObject({ status: 'absent', late_stars: 0, shortfall_stars: 0, pay_basis: 'none' })
+  })
+
+  it('weekends, holidays and leave give no stars', () => {
+    for (const r of [
+      att.statusFor(SATURDAY, SETTINGS, [seg('active', '11:00', 30, SATURDAY)], [], []),
+      att.statusFor(MONDAY, SETTINGS, [seg('active', '11:00', 30)], [], [MONDAY]),
+      att.statusFor(MONDAY, SETTINGS, [seg('active', '11:00', 30)], [{ start_date: MONDAY, end_date: MONDAY }], [])
+    ]) {
+      expect(r.late_stars + r.shortfall_stars).toBe(0)
+    }
+  })
+
+  it('places the day in Karachi time: 00:30 there is still the same day', () => {
+    // 19:30 UTC on Sunday is 00:30 on Monday in Karachi.
+    const early = { state: 'active', started_at: '2026-10-11 19:30:00.000Z', ended_at: '2026-10-11 19:40:00.000Z' }
+    expect(att.dayKeyOf(Date.parse('2026-10-11T19:30:00.000Z'), 300)).toBe(MONDAY)
+    expect(att.statusFor(MONDAY, SETTINGS, [early], [], []).first_activity_at).toBe('2026-10-11 19:30:00.000Z')
+  })
+})
+
+describe('pay_basis: what share of the day rate the day pays before stars', () => {
+  const leave = (extra) => ({ start_date: MONDAY, end_date: MONDAY, status: 'approved', ...extra })
+
+  it('worked → full; absent → none; weekend or holiday → off', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, workedDay('09:00'), [], []).pay_basis).toBe('full')
+    expect(att.statusFor(MONDAY, SETTINGS, [], [], []).pay_basis).toBe('none')
+    expect(att.statusFor(SATURDAY, SETTINGS, [], [], []).pay_basis).toBe('off')
+    expect(att.statusFor(MONDAY, SETTINGS, [], [], [MONDAY]).pay_basis).toBe('off')
+  })
+
+  it('paid leave → full; unpaid leave → none', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [], [leave({ paid: true })], []).pay_basis).toBe('full')
+    expect(att.statusFor(MONDAY, SETTINGS, [], [leave({ paid: false })], []).pay_basis).toBe('none')
+  })
+
+  it('half-day leave: paid → full, unpaid → half; two halves add up', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [], [leave({ half_day: true })], []).pay_basis).toBe('full')
+    expect(att.statusFor(MONDAY, SETTINGS, [], [leave({ half_day: true, paid: false })], []).pay_basis).toBe('half')
+    const halves = [leave({ half_day: true }), leave({ half_day: true, paid: false })]
+    expect(att.statusFor(MONDAY, SETTINGS, [], halves, []).pay_basis).toBe('half')
   })
 })
 
@@ -76,8 +188,8 @@ describe('statusFor: boundaries', () => {
     expect(att.statusFor(MONDAY, { ...SETTINGS, grace_minutes: 0 }, workedDay('09:01'), [], []).status).toBe('late')
   })
 
-  it('exactly the half-day minimum is not a half day', () => {
-    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 240)], [], []).status).toBe('present')
+  it('exactly the daily target gives no short stars', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 360)], [], []).shortfall_stars).toBe(0)
   })
 
   it('a holiday on a weekend shows as the holiday', () => {
@@ -105,28 +217,23 @@ describe('statusFor: boundaries', () => {
 describe('statusFor: half-day leave', () => {
   const half = { start_date: MONDAY, end_date: MONDAY, half_day: true, status: 'approved' }
 
-  it('worked the other half (at least the half-day hours) → present', () => {
-    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 240)], [half], []).status).toBe('present')
+  it('worked the other half (half the target, 3 hours) → present, no stars', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '09:00', 180)], [half], [])).toMatchObject({ status: 'present', shortfall_stars: 0 })
   })
 
   it('a late start is the half taken off, never late', () => {
-    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '14:00', 240)], [half], []).status).toBe('present')
+    expect(att.statusFor(MONDAY, SETTINGS, [seg('active', '14:00', 240)], [half], [])).toMatchObject({ status: 'present', late_stars: 0 })
   })
 
-  it('too little activity for the other half → half day', () => {
-    const r = att.statusFor(MONDAY, SETTINGS, [seg('active', '14:00', 239)], [half], [])
-    expect(r.status).toBe('half_day')
-    expect(r.active_s).toBe(239 * 60)
+  it('too little activity for the other half → short stars against 3 hours', () => {
+    const r = att.statusFor(MONDAY, SETTINGS, [seg('active', '14:00', 120)], [half], [])
+    expect(r).toMatchObject({ status: 'present', shortfall_minutes: 60, shortfall_stars: 2 })
+    expect(r.active_s).toBe(120 * 60)
   })
 
-  it('no activity at all → half day, never absent or a whole day on leave', () => {
-    expect(att.statusFor(MONDAY, SETTINGS, [], [half], []).status).toBe('half_day')
-    expect(att.statusFor(MONDAY, SETTINGS, [seg('idle', '09:00', 120)], [half], []).status).toBe('half_day')
-  })
-
-  it('no activity is still a half day when the half-day hours are 0', () => {
-    expect(att.statusFor(MONDAY, { ...SETTINGS, half_day_min_hours: 0 }, [], [half], []).status).toBe('half_day')
-    expect(att.statusFor(MONDAY, { ...SETTINGS, half_day_min_hours: 0 }, [seg('active', '14:00', 1)], [half], []).status).toBe('present')
+  it('no activity at all → on leave, with the missed half as short stars, never absent', () => {
+    expect(att.statusFor(MONDAY, SETTINGS, [], [half], [])).toMatchObject({ status: 'on_leave', shortfall_stars: 6, late_stars: 0 })
+    expect(att.statusFor(MONDAY, SETTINGS, [seg('idle', '09:00', 120)], [half], []).status).toBe('on_leave')
   })
 
   it('a full-day leave on the same day wins → on leave', () => {
@@ -160,24 +267,22 @@ describe('statusFor: half-day leave', () => {
   })
 })
 
-describe('half-day leave through to payroll', () => {
-  // The day's record → attendanceCounts → calculate, with unpaid half leave adding its own 0.5.
-  const deducted = (segments, paid) => {
+describe('half-day leave through to day pay', () => {
+  // The day's record → payroll.calculateDay, at half-hour star pay (6 stars = half a day).
+  const rates = payroll.payRates(120000, 24, SETTINGS) // 5,000 a day
+  const dayPay = (segments, paid) => {
     const leave = { start_date: MONDAY, end_date: MONDAY, half_day: true, status: 'approved', paid }
-    const rec = att.statusFor(MONDAY, SETTINGS, segments, [leave], [])
-    const counts = payroll.attendanceCounts([rec])
-    const unpaid = payroll.unpaidLeaveDays([leave], '2026-10', SETTINGS.work_days, [])
-    return counts.absent + unpaid + 0.5 * counts.half
+    return payroll.calculateDay(att.statusFor(MONDAY, SETTINGS, segments, [leave], []), null, rates).day_pay
   }
 
-  it('paid half day: 0.5 off with no work, nothing off when the other half was worked', () => {
-    expect(deducted([], true)).toBe(0.5)
-    expect(deducted([seg('active', '14:00', 240)], true)).toBe(0)
+  it('paid half day: half the day with no work, the whole day when the other half was worked', () => {
+    expect(dayPay([], true)).toBeCloseTo(2500, 6)
+    expect(dayPay([seg('active', '14:00', 180)], true)).toBeCloseTo(5000, 6)
   })
 
-  it('unpaid half day: a whole day off with no work, 0.5 when the other half was worked', () => {
-    expect(deducted([], false)).toBe(1)
-    expect(deducted([seg('active', '14:00', 240)], false)).toBe(0.5)
+  it('unpaid half day: nothing with no work, half the day when the other half was worked', () => {
+    expect(dayPay([], false)).toBeCloseTo(0, 6)
+    expect(dayPay([seg('active', '14:00', 180)], false)).toBeCloseTo(2500, 6)
   })
 })
 

@@ -35,9 +35,6 @@ var require_projects = __commonJS({
       const status = base && base.status;
       if (status === "holiday" || status === "weekend" || status === "on_leave") return status;
       if (!base.active_s) return times.now >= times.shiftEnd ? "absent" : "not_in_yet";
-      if (status === "half_day" && times.now < times.shiftEnd) {
-        return parseInstant(base.first_activity_at) > times.graceEnd ? "late" : "present";
-      }
       return status;
     }
     function monthCounts(records) {
