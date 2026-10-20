@@ -5,6 +5,8 @@ import { Field, Input } from '@/components/ui/Input'
 import { FormError } from '@/features/auth/AuthLayout'
 import { cn } from '@/lib/cn'
 import type { OrgSettings } from '@/lib/db'
+import { payRates } from '@/lib/pay'
+import { formatPay } from '@/lib/payroll'
 import { shiftHours, validateRules, WEEKDAYS, type RulesErrors, type RulesInput } from '@/lib/rules'
 import { errorMessage, useSession } from '@/stores/session'
 import { useOrgSettings, useSaveSettings } from './api'
@@ -15,8 +17,11 @@ interface FormState {
   shift_end: string
   work_days: number[]
   grace_minutes: string
-  full_day_min_hours: string
-  half_day_min_hours: string
+  /** The daily target in hours (stored as minutes). */
+  required_hours: string
+  star_block_minutes: string
+  star_value_mode: OrgSettings['star_value_mode']
+  star_value_pkr: string
   idle_threshold_minutes: string
   monthly_full_leaves: string
   monthly_half_leaves: string
@@ -28,28 +33,45 @@ function toForm(s: OrgSettings): FormState {
     shift_end: s.shift_end,
     work_days: [...s.work_days].sort(),
     grace_minutes: String(s.grace_minutes),
-    full_day_min_hours: String(s.full_day_min_hours),
-    half_day_min_hours: String(s.half_day_min_hours),
+    required_hours: String((s.required_daily_minutes ?? 360) / 60),
+    star_block_minutes: String(s.star_block_minutes ?? 30),
+    star_value_mode: s.star_value_mode ?? 'half_hour_pay',
+    star_value_pkr: String(s.star_value_pkr ?? 0),
     idle_threshold_minutes: String(s.idle_threshold_minutes),
     monthly_full_leaves: String(s.monthly_full_leaves ?? 0),
     monthly_half_leaves: String(s.monthly_half_leaves ?? 0)
   }
 }
 
-function toInput(f: FormState, timezone: string): RulesInput {
+function toInput(f: FormState, s: OrgSettings): RulesInput {
   const num = (v: string) => (v.trim() === '' ? Number.NaN : Number(v.replace(/,/g, '')))
+  const fixed = f.star_value_mode === 'fixed_pkr'
   return {
     shift_start: f.shift_start,
     shift_end: f.shift_end,
     work_days: [...f.work_days].sort(),
     grace_minutes: num(f.grace_minutes),
-    full_day_min_hours: num(f.full_day_min_hours),
-    half_day_min_hours: num(f.half_day_min_hours),
+    // No longer edited: passed through unchanged.
+    full_day_min_hours: s.full_day_min_hours,
+    half_day_min_hours: s.half_day_min_hours,
+    required_daily_minutes: Math.round(num(f.required_hours) * 60),
+    star_block_minutes: num(f.star_block_minutes),
+    star_value_mode: f.star_value_mode,
+    star_value_pkr: fixed ? num(f.star_value_pkr) : (s.star_value_pkr ?? 0),
     idle_threshold_minutes: num(f.idle_threshold_minutes),
     monthly_full_leaves: num(f.monthly_full_leaves),
     monthly_half_leaves: num(f.monthly_half_leaves),
-    timezone
+    timezone: s.timezone
   }
+}
+
+/** What one star costs on an example salary, from the form as typed: "PKR 378.79", or '' while invalid. */
+function exampleStar(f: FormState): string {
+  const hours = Number(f.required_hours)
+  const block = Number(f.star_block_minutes)
+  if (f.star_value_mode === 'fixed_pkr') return ''
+  if (!(hours > 0) || !(block > 0)) return ''
+  return formatPay(payRates(100000, 22, { required_daily_minutes: hours * 60, star_block_minutes: block }).star_value)
 }
 
 export function RulesForm() {
@@ -77,7 +99,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setStatus(null)
-    const input = toInput(form, settings.timezone)
+    const input = toInput(form, settings)
     const problems = validateRules(input)
     setErrors(problems)
     if (Object.keys(problems).length) {
@@ -135,17 +157,46 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
           </div>
         </Section>
 
-        <Section title="Attendance" description="How each working day is marked.">
+        <Section
+          title="Attendance and stars"
+          description="Each started star block late, or short of the daily target, is a star. Every star takes its value off that day's pay."
+        >
           <div className="grid grid-cols-1 gap-4 @xl:grid-cols-2 @3xl:grid-cols-3">
             <Field label="Grace period (minutes)" htmlFor="grace_minutes" error={errors.grace_minutes} hint="First activity after shift start + grace = Late.">
               <Input id="grace_minutes" inputMode="numeric" value={form.grace_minutes} onChange={(e) => set('grace_minutes', e.target.value)} />
             </Field>
-            <Field label="Full day (hours active)" htmlFor="full_day_min_hours" error={errors.full_day_min_hours}>
-              <Input id="full_day_min_hours" inputMode="decimal" value={form.full_day_min_hours} onChange={(e) => set('full_day_min_hours', e.target.value)} />
+            <Field
+              label="Daily target (hours active)"
+              htmlFor="required_hours"
+              error={errors.required_daily_minutes}
+              hint="Everyone must be active this long on a working day."
+            >
+              <Input id="required_hours" inputMode="decimal" value={form.required_hours} onChange={(e) => set('required_hours', e.target.value)} />
             </Field>
-            <Field label="Half day (hours active)" htmlFor="half_day_min_hours" error={errors.half_day_min_hours} hint="Less than this counts as Half day.">
-              <Input id="half_day_min_hours" inputMode="decimal" value={form.half_day_min_hours} onChange={(e) => set('half_day_min_hours', e.target.value)} />
+            <Field label="One star per (minutes)" htmlFor="star_block_minutes" error={errors.star_block_minutes} hint="1–30 minutes late or short = 1 star at 30.">
+              <Input id="star_block_minutes" inputMode="numeric" value={form.star_block_minutes} onChange={(e) => set('star_block_minutes', e.target.value)} />
             </Field>
+            <Field
+              label="A star costs"
+              htmlFor="star_value_mode"
+              error={errors.star_value_mode}
+              hint={exampleStar(form) && `About ${exampleStar(form)} on a 100,000 salary with 22 working days.`}
+            >
+              <select
+                id="star_value_mode"
+                value={form.star_value_mode}
+                onChange={(e) => set('star_value_mode', e.target.value as FormState['star_value_mode'])}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm dark:border-slate-700 dark:bg-slate-900"
+              >
+                <option value="half_hour_pay">The pay for one star block of time</option>
+                <option value="fixed_pkr">A fixed amount</option>
+              </select>
+            </Field>
+            {form.star_value_mode === 'fixed_pkr' && (
+              <Field label="Amount per star (PKR)" htmlFor="star_value_pkr" error={errors.star_value_pkr} hint="The same for everyone, whatever the salary.">
+                <Input id="star_value_pkr" inputMode="decimal" value={form.star_value_pkr} onChange={(e) => set('star_value_pkr', e.target.value)} />
+              </Field>
+            )}
           </div>
         </Section>
 

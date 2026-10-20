@@ -1,16 +1,18 @@
-// Stars count against a person: each rule break gives that rule's stars (star_rules).
-// Automatic rules come straight from attendance (a Late, Absent or Half day day);
-// an admin gives the others by hand, or excuses an automatic one for a day
-// (star_records). Amounts always use the rule's current stars. Pure, so it is tested.
+// Stars count against a person, and every star costs pay (src/lib/pay.ts). Two rules are automatic and
+// come straight from attendance: Late (1 star per started star block after shift start + grace) and
+// Short (1 per started block under the daily target). An admin gives the others by hand, or excuses an
+// automatic one for a day (star_records). By-hand amounts always use the rule's current stars. Pure, so it is tested.
 import type { AttendanceStatus } from './attendance'
+import type { DayStars } from './pay'
 
-export type StarAuto = '' | 'late' | 'absent' | 'half_day'
+export type StarAuto = '' | 'late' | 'short'
 
 export interface StarRule {
   id: string
   name: string
+  /** Stars per break for a rule given by hand; automatic rules work theirs out from attendance. */
   stars: number
-  /** The attendance status that gives these stars automatically; '' = given by hand. */
+  /** The automatic part of attendance that gives these stars; '' = given by hand. */
   auto: StarAuto
   description: string
 }
@@ -38,25 +40,28 @@ export interface StarLine {
   record?: StarRecord
 }
 
+type StarDay = { user: string; date: string; status: AttendanceStatus; late_stars?: number; shortfall_stars?: number }
+
 /** Every rule break in the given attendance and records, newest first. */
-export function starLines(
-  attendance: { user: string; date: string; status: AttendanceStatus }[],
-  rules: StarRule[],
-  records: StarRecord[]
-): StarLine[] {
+export function starLines(attendance: StarDay[], rules: StarRule[], records: StarRecord[]): StarLine[] {
   const byId = new Map(rules.map((r) => [r.id, r]))
-  const byStatus = new Map(rules.filter((r) => r.auto).map((r) => [r.auto as string, r]))
+  const late = rules.find((r) => r.auto === 'late')
+  const short = rules.find((r) => r.auto === 'short')
   const excuses = new Map(records.filter((r) => r.excused).map((r) => [`${r.user}|${r.rule}|${r.date}`, r]))
   const lines: StarLine[] = []
   for (const a of attendance) {
-    const rule = byStatus.get(a.status)
-    if (!rule) continue
-    const excuse = excuses.get(`${a.user}|${rule.id}|${a.date}`)
-    lines.push({ user: a.user, date: a.date, rule, stars: rule.stars, automatic: true, excused: !!excuse, record: excuse })
+    for (const [rule, stars] of [
+      [late, a.late_stars ?? 0],
+      [short, a.shortfall_stars ?? 0]
+    ] as const) {
+      if (!rule || !stars) continue
+      const excuse = excuses.get(`${a.user}|${rule.id}|${a.date}`)
+      lines.push({ user: a.user, date: a.date, rule, stars, automatic: true, excused: !!excuse, record: excuse })
+    }
   }
   for (const r of records) {
     const rule = byId.get(r.rule)
-    if (r.excused || !rule) continue
+    if (r.excused || !rule || rule.auto) continue
     lines.push({ user: r.user, date: r.date, rule, stars: rule.stars, automatic: false, excused: false, record: r })
   }
   return lines.sort((a, b) => (a.date === b.date ? a.rule.name.localeCompare(b.rule.name) : a.date < b.date ? 1 : -1))
@@ -71,6 +76,27 @@ export function starTotal(lines: StarLine[]): number {
 export function starsByUser(lines: StarLine[]): Record<string, number> {
   const out: Record<string, number> = {}
   for (const l of lines) if (!l.excused) out[l.user] = (out[l.user] ?? 0) + l.stars
+  return out
+}
+
+/**
+ * One person's star records by day, for pay.calculateMonth (the same as the server's stars.recordsByDay):
+ * the stars given by hand that count, and which automatic parts were excused.
+ */
+export function recordsByDay(rules: StarRule[], records: Pick<StarRecord, 'rule' | 'date' | 'excused'>[]): Record<string, DayStars> {
+  const byId = new Map(rules.map((r) => [r.id, r]))
+  const out: Record<string, DayStars> = {}
+  for (const rec of records) {
+    const rule = byId.get(rec.rule)
+    if (!rule) continue
+    const d = (out[rec.date] ??= { hand: 0, late: false, short: false })
+    if (rec.excused) {
+      if (rule.auto === 'late') d.late = true
+      else if (rule.auto === 'short') d.short = true
+    } else if (!rule.auto) {
+      d.hand += Number(rule.stars) || 0
+    }
+  }
   return out
 }
 

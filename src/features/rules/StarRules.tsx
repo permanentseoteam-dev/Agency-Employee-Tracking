@@ -11,11 +11,20 @@ import { useDeleteStarRule, useSaveStarRule, useStarRules } from '@/features/sta
 import type { StarRule } from '@/lib/stars'
 import { useRole } from '@/hooks/useRole'
 import { errorMessage } from '@/stores/session'
+import { useOrgSettings } from './api'
 import { ReadOnlyNote } from './RulesForm'
 
 /** Rules → Stars: what each rule break costs in stars. Everyone sees it; only an admin changes it. */
+/** "1 per 30 min late", "1 per 30 min short of 6 h". */
+function autoStars(auto: StarRule['auto'], block: number, targetMinutes: number): string {
+  return auto === 'late' ? `1 per ${block} min late` : `1 per ${block} min short of ${targetMinutes / 60} h`
+}
+
 export function StarRules() {
   const rules = useStarRules()
+  const settings = useOrgSettings()
+  const block = settings.data?.star_block_minutes ?? 30
+  const target = settings.data?.required_daily_minutes ?? 360
   const readOnly = useRole().role !== 'admin'
   const remove = useDeleteStarRule()
   const [editing, setEditing] = useState<StarRule | 'new' | null>(null)
@@ -36,8 +45,8 @@ export function StarRules() {
       {readOnly && <ReadOnlyNote />}
       <div className="flex flex-wrap items-center justify-between gap-4 @3xl:flex-nowrap">
         <p className="min-w-0 text-sm text-slate-500">
-          Each rule break gives these stars. Stars are a count and don’t change pay; excused breaks aren’t counted. Automatic rules come
-          from attendance; an admin gives the others by hand from Attendance.
+          Every star takes its value off that day’s pay (Rules → General); excused stars cost nothing. The two automatic rules come from
+          attendance; an admin gives the others by hand from Attendance.
         </p>
         {!readOnly && (
           <Button className="shrink-0" onClick={() => setEditing('new')}>
@@ -70,7 +79,7 @@ export function StarRules() {
                     <span className="font-medium">{r.name}</span>
                     {r.description && <span className="block text-xs text-slate-500">{r.description}</span>}
                   </Td>
-                  <Td className="text-right font-semibold tabular-nums">{r.stars}</Td>
+                  <Td className="text-right font-semibold tabular-nums">{r.auto ? <span className="font-normal text-slate-500">{autoStars(r.auto, block, target)}</span> : r.stars}</Td>
                   <Td>{r.auto ? <Badge tone="amber">Automatic</Badge> : <Badge tone="blue">By hand</Badge>}</Td>
                   {!readOnly && (
                     <Td className="text-right whitespace-nowrap">
@@ -122,13 +131,15 @@ function StarRuleDialog({ rule, onClose }: { rule: StarRule | null; onClose: () 
         <Field label="Rule break" htmlFor="sr_name">
           <Input id="sr_name" value={name} maxLength={100} autoFocus onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Stars" htmlFor="sr_stars" hint="0 = noted, but no stars.">
-          <Input id="sr_stars" inputMode="numeric" value={stars} onChange={(e) => setStars(e.target.value)} />
-        </Field>
+        {!rule?.auto && (
+          <Field label="Stars" htmlFor="sr_stars" hint="0 = noted, but no stars.">
+            <Input id="sr_stars" inputMode="numeric" value={stars} onChange={(e) => setStars(e.target.value)} />
+          </Field>
+        )}
         <Field label="Description (optional)" htmlFor="sr_description">
           <Input id="sr_description" value={description} maxLength={500} onChange={(e) => setDescription(e.target.value)} />
         </Field>
-        {rule?.auto && <p className="text-sm text-slate-500">Automatic: given for each matching day in attendance.</p>}
+        {rule?.auto && <p className="text-sm text-slate-500">Automatic: the stars are worked out from attendance each day (Rules → General).</p>}
         <FormError message={error} />
         <div className="flex gap-2">
           <Button type="submit" loading={save.isPending}>

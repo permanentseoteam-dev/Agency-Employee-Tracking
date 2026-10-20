@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { starLines, starsByUser, starsText, starTotal, type StarRecord, type StarRule } from './stars'
+import { recordsByDay, starLines, starsByUser, starsText, starTotal, type StarRecord, type StarRule } from './stars'
 
-const late: StarRule = { id: 'r-late', name: 'Late arrival', stars: 1, auto: 'late', description: '' }
-const absent: StarRule = { id: 'r-absent', name: 'Absent without leave', stars: 3, auto: 'absent', description: '' }
-const short: StarRule = { id: 'r-short', name: 'Short hours', stars: 0, auto: 'half_day', description: '' }
+const late: StarRule = { id: 'r-late', name: 'Late arrival', stars: 0, auto: 'late', description: '' }
+const short: StarRule = { id: 'r-short', name: 'Short of the daily target', stars: 0, auto: 'short', description: '' }
 const phone: StarRule = { id: 'r-phone', name: 'Phone in meetings', stars: 2, auto: '', description: '' }
-const RULES = [late, absent, short, phone]
+const RULES = [late, short, phone]
 
 const record = (patch: Partial<StarRecord>): StarRecord => ({
   id: 'x',
@@ -19,23 +18,24 @@ const record = (patch: Partial<StarRecord>): StarRecord => ({
 })
 
 const attendance = [
-  { user: 'u1', date: '2026-10-01', status: 'late' as const },
-  { user: 'u1', date: '2026-10-02', status: 'present' as const },
-  { user: 'u1', date: '2026-10-06', status: 'absent' as const },
-  { user: 'u1', date: '2026-10-07', status: 'half_day' as const },
-  { user: 'u2', date: '2026-10-01', status: 'late' as const },
+  { user: 'u1', date: '2026-10-01', status: 'late' as const, late_stars: 1, shortfall_stars: 0 },
+  { user: 'u1', date: '2026-10-02', status: 'present' as const, late_stars: 0, shortfall_stars: 2 },
+  { user: 'u1', date: '2026-10-06', status: 'absent' as const, late_stars: 0, shortfall_stars: 0 },
+  { user: 'u1', date: '2026-10-07', status: 'late' as const, late_stars: 3, shortfall_stars: 1 },
+  { user: 'u2', date: '2026-10-01', status: 'late' as const, late_stars: 2, shortfall_stars: 0 },
   { user: 'u2', date: '2026-10-02', status: 'on_leave' as const }
 ]
 
 describe('stars', () => {
-  it('gives automatic stars for Late, Absent and Half day days, with the rule’s current amount', () => {
+  it('gives the late and short stars each day counted, as their own lines', () => {
     const lines = starLines(attendance, RULES, [])
     expect(lines.filter((l) => l.user === 'u1').map((l) => [l.date, l.rule.name, l.stars])).toEqual([
-      ['2026-10-07', 'Short hours', 0],
-      ['2026-10-06', 'Absent without leave', 3],
+      ['2026-10-07', 'Late arrival', 3],
+      ['2026-10-07', 'Short of the daily target', 1],
+      ['2026-10-02', 'Short of the daily target', 2],
       ['2026-10-01', 'Late arrival', 1]
     ])
-    expect(starsByUser(lines)).toEqual({ u1: 4, u2: 1 })
+    expect(starsByUser(lines)).toEqual({ u1: 7, u2: 2 })
   })
 
   it('adds stars given by hand and leaves out excused days', () => {
@@ -46,16 +46,33 @@ describe('stars', () => {
     const mine = lines.filter((l) => l.user === 'u1')
     expect(mine.find((l) => l.record?.id === 'hand')).toMatchObject({ automatic: false, stars: 2 })
     expect(mine.find((l) => l.date === '2026-10-01')).toMatchObject({ automatic: true, excused: true })
-    expect(starTotal(mine)).toBe(2 + 3 + 0)
-    expect(starsByUser(lines).u2).toBe(1) // u1's excuse doesn't touch u2's late day
+    expect(starTotal(mine)).toBe(2 + 2 + 3 + 1)
+    expect(starsByUser(lines).u2).toBe(2) // u1's excuse doesn't touch u2's late day
   })
 
-  it('ignores records for a rule that was deleted', () => {
+  it('ignores records for a rule that was deleted, and days counted before stars were stored', () => {
     expect(starLines([], RULES, [record({ rule: 'gone' })])).toEqual([])
+    expect(starLines([{ user: 'u1', date: '2026-09-01', status: 'late' }], RULES, [])).toEqual([])
   })
 
   it('says 1 star and 2 stars', () => {
     expect(starsText(1)).toBe('1 star')
     expect(starsText(0)).toBe('0 stars')
+  })
+})
+
+describe('recordsByDay (stars for pay.calculateMonth)', () => {
+  it('adds hand stars per day and marks excused late or short stars', () => {
+    const out = recordsByDay(RULES, [
+      record({ rule: 'r-phone', date: '2026-10-05' }),
+      record({ rule: 'r-phone', date: '2026-10-05' }),
+      record({ rule: 'r-late', date: '2026-10-06', excused: true }),
+      record({ rule: 'r-short', date: '2026-10-06', excused: true }),
+      record({ rule: 'gone', date: '2026-10-07' })
+    ])
+    expect(out).toEqual({
+      '2026-10-05': { hand: 4, late: false, short: false },
+      '2026-10-06': { hand: 0, late: true, short: true }
+    })
   })
 })

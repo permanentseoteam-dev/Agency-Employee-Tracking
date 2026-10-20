@@ -23,7 +23,7 @@ import {
 import { cn } from '@/lib/cn'
 import { formatDayKey, formatTime, isoWeekday, toDateKey, DEFAULT_TZ } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
-import { starLines, starsByUser } from '@/lib/stars'
+import { starLines, starsByUser, starsText } from '@/lib/stars'
 import { errorMessage } from '@/stores/session'
 import { useAttendancePeople, useMonthAttendance, useRecompute } from './api'
 import { MonthPicker } from './MonthPicker'
@@ -36,6 +36,8 @@ function cellTitle(day: string, r: AttendanceRecord, tz: string): string {
   if (r.first_activity_at) parts.push(`first activity ${formatTime(r.first_activity_at.replace(' ', 'T'), tz)}`)
   if (r.active_s > 0) parts.push(`${formatDuration(r.active_s)} active`)
   if (r.idle_s > 0) parts.push(`${formatDuration(r.idle_s)} idle`)
+  if (r.late_stars) parts.push(`${r.late_minutes} min late (${starsText(r.late_stars)})`)
+  if (r.shortfall_stars) parts.push(`${r.shortfall_minutes} min short (${starsText(r.shortfall_stars)})`)
   return parts.join(' · ')
 }
 
@@ -295,7 +297,7 @@ export function AttendanceTable() {
           </span>
           active / idle hours
         </span>
-        {(['present', 'late', 'half_day', 'absent', 'on_leave', 'holiday'] as const).map((s) => (
+        {(['present', 'late', 'absent', 'on_leave', 'holiday'] as const).map((s) => (
           <span key={s} className="flex items-center gap-1.5">
             <span className={cn('flex size-5 items-center justify-center rounded font-semibold', STATUS_CLASS[s])}>{STATUS_CODE[s]}</span>
             {STATUS_LABEL[s]}
@@ -317,8 +319,8 @@ export function AttendanceTable() {
         />
       )}
       <p className="text-xs text-slate-500">
-        Attendance is counted every night at 01:00 for the days just finished. Late means the first activity came after the shift start plus the grace
-        minutes.
+        Attendance is counted every hour for the days just finished. Late means the first activity came after the shift start plus the grace
+        minutes. Each started star block late, or short of the daily target, is a star; hover a day to see them.
       </p>
     </div>
   )

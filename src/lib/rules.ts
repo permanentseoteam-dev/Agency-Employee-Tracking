@@ -40,15 +40,18 @@ export function validateRules(r: RulesInput): RulesErrors {
   if (!Number.isInteger(r.grace_minutes) || r.grace_minutes < 0 || r.grace_minutes > 240) {
     errors.grace_minutes = 'Enter whole minutes between 0 and 240.'
   }
-  if (!(r.half_day_min_hours > 0)) errors.half_day_min_hours = 'Must be more than 0 hours.'
-  if (!(r.full_day_min_hours > 0)) errors.full_day_min_hours = 'Must be more than 0 hours.'
-  if (!errors.half_day_min_hours && !errors.full_day_min_hours && r.half_day_min_hours >= r.full_day_min_hours) {
-    errors.half_day_min_hours = 'Half day must need fewer hours than a full day.'
+  if (!Number.isInteger(r.required_daily_minutes) || r.required_daily_minutes < 1) {
+    errors.required_daily_minutes = 'Enter the hours, e.g. 6.'
+  } else if (!errors.shift_start && !errors.shift_end && r.required_daily_minutes > minutesOf(r.shift_end) - minutesOf(r.shift_start)) {
+    errors.required_daily_minutes = 'The daily target can’t be longer than the shift.'
   }
-  if (!errors.full_day_min_hours && !errors.shift_end && !errors.shift_start) {
-    if (r.full_day_min_hours > shiftHours(r.shift_start, r.shift_end)) {
-      errors.full_day_min_hours = 'A full day cannot need more hours than the shift is long.'
-    }
+  if (!Number.isInteger(r.star_block_minutes) || r.star_block_minutes < 1 || r.star_block_minutes > 240) {
+    errors.star_block_minutes = 'Enter whole minutes between 1 and 240.'
+  }
+  if (r.star_value_mode !== 'half_hour_pay' && r.star_value_mode !== 'fixed_pkr') {
+    errors.star_value_mode = 'Pick what a star costs.'
+  } else if (r.star_value_mode === 'fixed_pkr' && !(r.star_value_pkr >= 0 && r.star_value_pkr <= 1_000_000)) {
+    errors.star_value_pkr = 'Enter an amount between 0 and 1,000,000.'
   }
   if (!Number.isInteger(r.idle_threshold_minutes) || r.idle_threshold_minutes < 1 || r.idle_threshold_minutes > 60) {
     errors.idle_threshold_minutes = 'Enter whole minutes between 1 and 60.'

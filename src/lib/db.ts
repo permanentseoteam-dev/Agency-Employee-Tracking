@@ -36,8 +36,16 @@ export interface OrgSettings {
   shift_end: string
   work_days: number[]
   grace_minutes: number
+  /** No longer used (the daily target replaced them); kept because the 0.2.5 app still saves them. */
   full_day_min_hours: number
   half_day_min_hours: number
+  /** Active minutes everyone must reach on a working day; less gives short stars. */
+  required_daily_minutes: number
+  /** One star per started block of this many minutes late or short. */
+  star_block_minutes: number
+  /** What a star costs: pay for one star block (half an hour at 30 minutes), or star_value_pkr. */
+  star_value_mode: 'half_hour_pay' | 'fixed_pkr'
+  star_value_pkr: number
   idle_threshold_minutes: number
   /** Leave per month, any leave type; 0 = no limit. */
   monthly_full_leaves: number

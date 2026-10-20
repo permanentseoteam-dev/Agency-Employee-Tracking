@@ -11,6 +11,7 @@ import { MyAttendance } from '@/features/attendance/MyAttendance'
 import { CalendarLayout } from '@/features/calendar/CalendarLayout'
 import { HolidayManager } from '@/features/calendar/HolidayManager'
 import { MonthCalendar } from '@/features/calendar/MonthCalendar'
+import { DailyBreakdown } from '@/features/finance/DailyBreakdown'
 import { FinanceLayout } from '@/features/finance/FinanceLayout'
 import { MyPay } from '@/features/finance/MyPay'
 import { PayrollDetail } from '@/features/finance/PayrollDetail'
@@ -143,6 +144,7 @@ const router = createHashRouter([
           { index: true, element: <Navigate to="/finance/payroll" replace /> },
           { path: 'payroll', element: <PayrollRuns /> },
           { path: 'payroll/:id', element: <PayrollDetail /> },
+          { path: 'daily', element: <DailyBreakdown /> },
           { path: 'salaries', element: <SalarySetup /> },
           { path: 'my-pay', element: <MyPay /> }
         ]

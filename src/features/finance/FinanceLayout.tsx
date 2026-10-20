@@ -4,6 +4,7 @@ import { TabNav } from '@/components/ui/TabNav'
 
 const TABS = [
   { to: '/finance/payroll', label: 'Payroll' },
+  { to: '/finance/daily', label: 'Daily pay' },
   { to: '/finance/salaries', label: 'Salaries' }
 ]
 

@@ -17,7 +17,7 @@ import { errorMessage } from '@/stores/session'
 import { usePayrollRuns, useRunPayroll } from './api'
 
 export function RunStatusBadge({ status }: { status: 'draft' | 'finalized' }) {
-  return status === 'finalized' ? <Badge tone="green">Finalized</Badge> : <Badge tone="amber">Draft</Badge>
+  return status === 'finalized' ? <Badge tone="green">Approved</Badge> : <Badge tone="amber">Draft</Badge>
 }
 
 export function PayrollRuns() {
@@ -57,13 +57,13 @@ export function PayrollRuns() {
             </div>
             <Button className="max-w-full" onClick={() => void onRun()} loading={runPayroll.isPending} disabled={finalized || month > current}>
               <Calculator className="size-4" aria-hidden />
-              {finalized ? `${monthLabel(month)} is finalized` : existing ? `Recount the ${monthLabel(month)} draft` : `Run payroll for ${monthLabel(month)}`}
+              {finalized ? `${monthLabel(month)} is approved` : existing ? `Recount the ${monthLabel(month)} draft` : `Run payroll for ${monthLabel(month)}`}
             </Button>
           </div>
           <FormError message={error} />
           <InfoBanner className="max-w-4xl">
-            Builds a draft from salaries, attendance and unpaid leave, after counting the month’s attendance again. Review it, set adjustments for anyone who
-            joined or left mid-month, then finalize. {month === current && 'This month hasn’t ended yet, so only the days so far are counted.'}
+            Builds a draft from salaries and each working day’s pay (stars and unpaid days taken off), after counting the month’s attendance again.
+            Review it, set any adjustments, then approve. {month === current && 'This month hasn’t ended yet, so only the days so far are counted.'}
           </InfoBanner>
         </CardContent>
       </Card>

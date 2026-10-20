@@ -13,6 +13,16 @@ export interface AttendanceRecord {
   last_activity_at: string
   active_s: number
   idle_s: number
+  /** Minutes after shift start + grace, and the stars for them (1 per started star block). */
+  late_minutes?: number
+  late_stars?: number
+  /** Minutes under the daily target, and the stars for them. */
+  shortfall_minutes?: number
+  shortfall_stars?: number
+  /** Late + short (less what was excused) + stars given by hand that day. */
+  total_stars?: number
+  /** The share of the daily rate the day pays before stars: full, half, none, or off (not a working day). */
+  pay_basis?: 'full' | 'half' | 'none' | 'off'
 }
 
 export const STATUS_LABEL: Record<AttendanceStatus, string> = {
@@ -36,8 +46,8 @@ export const STATUS_CODE: Record<AttendanceStatus, string> = {
   weekend: ''
 }
 
-/** The statuses that are counted in totals, in display order. */
-export const COUNTED: AttendanceStatus[] = ['present', 'late', 'half_day', 'absent', 'on_leave']
+/** The statuses that are counted in totals, in display order. Half day is only on days counted before 2026-10-20. */
+export const COUNTED: AttendanceStatus[] = ['present', 'late', 'absent', 'on_leave']
 
 /** "2026-10" for a day key. */
 export function monthOf(dateKey: string): string {
