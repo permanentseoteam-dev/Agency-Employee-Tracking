@@ -3,7 +3,10 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Field, Input } from '@/components/ui/Input'
 import { FormError } from '@/features/auth/AuthLayout'
+import { useHolidays } from '@/features/calendar/api'
+import { monthDays, monthLabel, monthOf } from '@/lib/attendance'
 import { cn } from '@/lib/cn'
+import { isoWeekday, toDateKey } from '@/lib/dates'
 import type { OrgSettings } from '@/lib/db'
 import { payRates } from '@/lib/pay'
 import { formatPay } from '@/lib/payroll'
@@ -65,13 +68,18 @@ function toInput(f: FormState, s: OrgSettings): RulesInput {
   }
 }
 
-/** What one star costs on an example salary, from the form as typed: "PKR 378.79", or '' while invalid. */
-function exampleStar(f: FormState): string {
+/**
+ * What one star costs on an example salary this month, from the form as typed: the working days ticked
+ * above, less holidays. '' while a field is invalid or a star has a fixed price.
+ */
+function exampleStar(f: FormState, month: string, holidays: Set<string>): string {
   const hours = Number(f.required_hours)
   const block = Number(f.star_block_minutes)
-  if (f.star_value_mode === 'fixed_pkr') return ''
-  if (!(hours > 0) || !(block > 0)) return ''
-  return formatPay(payRates(100000, 22, { required_daily_minutes: hours * 60, star_block_minutes: block }).star_value)
+  if (f.star_value_mode === 'fixed_pkr' || !(hours > 0) || !(block > 0)) return ''
+  const days = monthDays(month).filter((d) => f.work_days.includes(isoWeekday(d)) && !holidays.has(d)).length
+  if (!days) return ''
+  const star = payRates(100000, days, { required_daily_minutes: hours * 60, star_block_minutes: block }).star_value
+  return `About ${formatPay(star)} on a 100,000 salary in ${monthLabel(month)} (${days} working days).`
 }
 
 export function RulesForm() {
@@ -85,6 +93,8 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
   // Everyone can read the rules; only an admin changes them (the server enforces the same).
   const readOnly = useSession((s) => s.user?.role) !== 'admin'
   const save = useSaveSettings()
+  const holidays = useHolidays()
+  const month = monthOf(toDateKey(Date.now(), settings.timezone))
   const [form, setForm] = useState(() => toForm(settings))
   const [errors, setErrors] = useState<RulesErrors>({})
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
@@ -180,7 +190,7 @@ function RulesEditor({ settings }: { settings: OrgSettings }) {
               label="A star costs"
               htmlFor="star_value_mode"
               error={errors.star_value_mode}
-              hint={exampleStar(form) && `About ${exampleStar(form)} on a 100,000 salary with 22 working days.`}
+              hint={exampleStar(form, month, new Set((holidays.data ?? []).map((h) => h.date))) || undefined}
             >
               <select
                 id="star_value_mode"
