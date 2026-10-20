@@ -57,23 +57,6 @@ var require_payroll = __commonJS({
       }
       return total;
     }
-    function attendanceCounts(records) {
-      const out = { absent: 0, half: 0 };
-      for (const r of records || []) {
-        if (r.status === "absent") out.absent++;
-        else if (r.status === "half_day") out.half++;
-      }
-      return out;
-    }
-    function calculate(input) {
-      const base = Number(input.base) || 0;
-      const days = Number(input.workingDays) || 0;
-      const rate = days > 0 ? base / days : 0;
-      const deductedDays = (Number(input.absentDays) || 0) + (Number(input.unpaidLeaveDays) || 0) + 0.5 * (Number(input.halfDays) || 0);
-      const deductions = Math.round(deductedDays * rate);
-      const adjustment = Math.round(Number(input.adjustment) || 0);
-      return { rate, deductions, net: base - deductions + adjustment };
-    }
     var BASIS_SHARE = { full: 1, half: 0.5, none: 0 };
     function round2(x) {
       return Math.round(x * 100) / 100;
@@ -191,8 +174,6 @@ var require_payroll = __commonJS({
       monthRange,
       workingDays,
       unpaidLeaveDays,
-      attendanceCounts,
-      calculate,
       payRates,
       calculateDay,
       calculateMonth,

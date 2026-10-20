@@ -83,7 +83,8 @@ export async function resetStaging(env = stagingEnv()) {
       await tx`update public.star_rules set stars = 0`
       await tx`update public.org_settings set shift_start = '09:00', shift_end = '18:00', work_days = '[1,2,3,4,5]', grace_minutes = 15,
         full_day_min_hours = 8, half_day_min_hours = 4, idle_threshold_minutes = 5, timezone = 'Asia/Karachi',
-        monthly_full_leaves = 0, monthly_half_leaves = 0`
+        monthly_full_leaves = 0, monthly_half_leaves = 0,
+        required_daily_minutes = 360, star_block_minutes = 30, star_value_mode = 'half_hour_pay', star_value_pkr = 0`
     })
   } finally {
     await sql.end()

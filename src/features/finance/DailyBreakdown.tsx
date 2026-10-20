@@ -17,7 +17,7 @@ import { toCsv } from '@/lib/csv'
 import { formatDayKey, formatTime, toDateKey } from '@/lib/dates'
 import { formatDuration } from '@/lib/format'
 import { calculateMonth, type DayLine } from '@/lib/pay'
-import { formatPay, formatPkr } from '@/lib/payroll'
+import { formatPay, formatPkr, isDayPay } from '@/lib/payroll'
 import { recordsByDay } from '@/lib/stars'
 import { errorMessage } from '@/stores/session'
 import { useFinalizeRun, usePayrollLines, usePayrollRuns, useSalaryTable } from './api'
@@ -83,6 +83,9 @@ export function PersonMonth({ person, salary, month, tz, admin }: { person: Empl
 
   const line = lines.data?.find((l) => l.user === person.id)
   const approved = run?.status === 'finalized'
+  if (approved && line && !isDayPay(line)) {
+    return <p className="text-sm text-slate-500">{monthLabel(month)} was approved under the earlier pay rules (before stars cost pay). Its figures are in Payroll.</p>
+  }
   // An approved month is paid on the salary it was approved with.
   const base = approved && line ? line.base : (salary?.monthly_salary_pkr ?? 0)
   const records = attendance.data ?? []

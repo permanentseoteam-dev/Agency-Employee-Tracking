@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { breakdown, formatAdjustment, formatPay, formatPkr, isDayPay, midMonth, payrollCsv, runTotals, type PayrollItem } from './payroll'
 
-// The hand calculation from shared/logic/payroll.test.mjs, as stored (late days cost nothing).
+// A line from a run counted before day pay (2026-10-20): absent, unpaid and half days × the per-day rate.
 const item: PayrollItem = {
   id: 'i1',
   run: 'r1',

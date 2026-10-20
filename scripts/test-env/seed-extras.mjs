@@ -2,7 +2,7 @@
 // - the "Emergency" leave type (unpaid, no limit), as an admin adds it in Rules → Leave types
 // - dummy pay history: the three months before this one, finalized, so every role has
 //   something under Finance. The figures go through the real formula
-//   (shared/logic/payroll.js), so the breakdown dialog adds up.
+//   (shared/logic/payroll.js calculateMonth, on a few made-up days), so the breakdown dialog adds up.
 // This month stays free for running payroll by hand (admin plan A-61).
 // - three clients for the Project tab, with people on more than one, and a few meetings
 //   on their calendars this week, each added by someone on that client
@@ -46,15 +46,35 @@ const shiftMonth = (month, n) => {
   return d.toISOString().slice(0, 7)
 }
 
-// What happened in each month, by email and months back (1 = last month): days off and adjustments.
-// Late days are left out: whether they cost pay is changing (stars), and they don't here.
+// What happened in each month, by email and months back (1 = last month): days off, stars and
+// adjustments. late and short are one day's stars (a late start, short of the daily target); hand
+// is stars given by hand on one day. Only the payroll lines are stored, not these days:
+// Finance → Daily pay counts from attendance, so it won't match those months.
 const MONTHS = {
-  'admin@test.local': { 2: { half: 1 } },
-  'bilal@test.local': { 1: { absent: 1 }, 3: { half: 1 } },
-  'sana@test.local': { 1: { absent: 1 }, 2: { adjustment: 10000, note: 'Eid bonus' } },
-  'asma@test.local': { 1: { half: 1 }, 2: { adjustment: 10000, note: 'Eid bonus' }, 3: { absent: 1 } },
-  'chand@test.local': { 1: { absent: 2, half: 1 }, 2: { unpaid: 1 }, 3: { adjustment: -15000, note: 'Salary advance' } },
-  'faisal@test.local': { 1: { half: 2 }, 3: { unpaid: 2 } }
+  'admin@test.local': { 2: { short: 2 } },
+  'bilal@test.local': { 1: { absent: 1, late: 1 }, 3: { short: 4 } },
+  'sana@test.local': { 1: { absent: 1 }, 2: { late: 2, adjustment: 10000, note: 'Eid bonus' } },
+  'asma@test.local': { 1: { short: 3, hand: 2 }, 2: { adjustment: 10000, note: 'Eid bonus' }, 3: { absent: 1 } },
+  'chand@test.local': { 1: { absent: 2, late: 3, short: 4 }, 2: { unpaid: 1 }, 3: { adjustment: -15000, note: 'Salary advance' } },
+  'faisal@test.local': { 1: { short: 6, hand: 1 }, 3: { unpaid: 2 } }
+}
+
+/**
+ * A month's made-up attendance rows and stars by hand, the way the payroll function reads them,
+ * on the first of the working days someone was employed: absent days, unpaid leave, a late day,
+ * a short day, then a day with stars given by hand.
+ */
+const madeUp = (days, m) => {
+  const free = [...days]
+  const records = []
+  const stars = {}
+  const add = (row) => free.length && records.push({ date: free.shift(), late_stars: 0, shortfall_stars: 0, ...row })
+  for (let n = 0; n < (m.absent ?? 0); n++) add({ status: 'absent', pay_basis: 'none' })
+  for (let n = 0; n < (m.unpaid ?? 0); n++) add({ status: 'on_leave', pay_basis: 'none' })
+  if (m.late) add({ status: 'late', late_stars: m.late, pay_basis: 'full' })
+  if (m.short) add({ status: 'present', shortfall_stars: m.short, pay_basis: 'full' })
+  if (m.hand && free.length) stars[free.shift()] = { hand: m.hand, late: false, short: false }
+  return { records, stars }
 }
 
 export async function seedExtras(api, info, { log = () => {} } = {}) {
@@ -69,29 +89,34 @@ export async function seedExtras(api, info, { log = () => {} } = {}) {
 
   for (let back = 3; back >= 1; back--) {
     const month = shiftMonth(current, -back)
-    const workingDays = payroll.workingDays(month, settings.work_days, holidays)
     const run = await api.create('payroll_runs', { month, status: 'draft' })
     const lines = []
     for (const u of users) {
       const base = salaries.get(u.id)
       if (!base || !payroll.employedDuring(month, u)) continue
       const m = MONTHS[u.email]?.[back] ?? {}
-      const pay = payroll.calculate({
-        base,
-        workingDays,
-        absentDays: m.absent,
-        unpaidLeaveDays: m.unpaid,
-        halfDays: m.half,
-        adjustment: m.adjustment
-      })
+      const input = { month, salary: base, adjustment: m.adjustment, settings, holidays, person: u }
+      // With no attendance yet every working day pays in full: that lists the days they were employed.
+      const employed = payroll.calculateMonth(input).days.filter((d) => d.employed).map((d) => d.date)
+      const pay = payroll.calculateMonth({ ...input, ...madeUp(employed, m) })
+      // The same columns the payroll function writes; half days are part of the day's pay now (0).
       lines.push({
         run: run.id,
         user: u.id,
         base,
-        working_days: workingDays,
-        absent_days: m.absent ?? 0,
-        unpaid_leave_days: m.unpaid ?? 0,
-        half_days: m.half ?? 0,
+        working_days: pay.working_days,
+        absent_days: pay.absent_days,
+        unpaid_leave_days: pay.unpaid_days,
+        half_days: 0,
+        stars: pay.stars,
+        daily_rate: pay.daily_rate,
+        hourly_rate: pay.hourly_rate,
+        star_value: pay.star_value,
+        late_stars: pay.late_stars,
+        shortfall_stars: pay.shortfall_stars,
+        hand_stars: pay.hand_stars,
+        star_deduction_pkr: pay.star_deduction,
+        gross_pkr: pay.gross,
         deductions: pay.deductions,
         adjustment_pkr: m.adjustment ?? 0,
         note: m.note ?? '',

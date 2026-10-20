@@ -72,11 +72,14 @@ export function useAddStarRecord() {
   })
 }
 
-/** Admin only: removes stars given by hand, or takes an excuse back. */
+/**
+ * Admin only: removes stars given by hand, or takes an excuse back. Through the server, which
+ * refuses a month whose payroll is approved and counts the day again so its pay follows.
+ */
 export function useDeleteStarRecord() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (id: string) => must(await supabase.from('star_records').delete().eq('id', id).select()),
+    mutationFn: (id: string) => call('star-record', { remove: id }),
     onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
   })
 }

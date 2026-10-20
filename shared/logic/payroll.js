@@ -1,11 +1,16 @@
-// Pure payroll calculation (plan §4.5). Plain CommonJS with no server globals, so Vitest
-// tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
+// Pure payroll calculation (plan §4.5): day pay, the star-penalty model. Plain CommonJS with no
+// server globals, so Vitest tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
 //
-//   per-day rate = monthly salary ÷ working days in the month (weekends and holidays excluded)
-//   deductions   = (absent days + unpaid-leave days + 0.5 × half days) × rate
-//   net          = monthly salary − deductions + adjustment
-// There is no automatic pro-rating: the admin sets an adjustment for mid-month joiners and leavers.
-// Late days cost nothing here: they give stars instead (star_rules), and stars don't cost pay.
+//   daily rate  = monthly salary ÷ working days in the month (weekends and holidays excluded)
+//   hourly rate = daily rate ÷ the daily target in hours (6 by default)
+//   star value  = pay for one star block (half an hour by default), or a fixed PKR amount
+//   day pay     = max(0, base − stars × star value) on each working day; base is the daily rate
+//                 × the day's pay_basis share (worked or paid leave 1, unpaid half day ½, absent or
+//                 unpaid leave 0)
+//   gross       = Σ day pay; deductions = monthly salary − gross
+//   net         = gross + adjustment, rounded to 2 decimals only at the end
+// A day's stars: late and short of the daily target (attendance.js statusFor) unless an admin
+// excused them that day, plus stars given by hand. Days before joining or after leaving pay nothing.
 
 const MONTH = /^\d{4}-(0[1-9]|1[0-2])$/
 const DAY_MS = 86400000
@@ -46,7 +51,7 @@ function isWorkingDay(day, workDays, holidays) {
   return (workDays || []).indexOf(isoWeekday(day)) !== -1 && !holidays[day]
 }
 
-/** Working days in the month: the per-day rate's divisor. */
+/** Working days in the month: the daily rate's divisor. */
 function workingDays(month, workDays, holidays) {
   const set = holidaySet(holidays)
   return monthDays(month).filter((d) => isWorkingDay(d, workDays, set)).length
@@ -73,36 +78,6 @@ function unpaidLeaveDays(leaves, month, workDays, holidays) {
   }
   return total
 }
-
-/** Absent and half-day counts from the month's attendance records. */
-function attendanceCounts(records) {
-  const out = { absent: 0, half: 0 }
-  for (const r of records || []) {
-    if (r.status === 'absent') out.absent++
-    else if (r.status === 'half_day') out.half++
-  }
-  return out
-}
-
-/** The formula. Amounts are whole rupees; the per-day rate keeps its decimals until the end. */
-function calculate(input) {
-  const base = Number(input.base) || 0
-  const days = Number(input.workingDays) || 0
-  const rate = days > 0 ? base / days : 0
-  const deductedDays = (Number(input.absentDays) || 0) + (Number(input.unpaidLeaveDays) || 0) + 0.5 * (Number(input.halfDays) || 0)
-  const deductions = Math.round(deductedDays * rate)
-  const adjustment = Math.round(Number(input.adjustment) || 0)
-  return { rate: rate, deductions: deductions, net: base - deductions + adjustment }
-}
-
-// ---- Day pay (the star-penalty model) ------------------------------------------------------
-//   daily rate  = monthly salary ÷ working days in the month (weekends and holidays excluded)
-//   hourly rate = daily rate ÷ the daily target in hours (6 by default)
-//   star value  = pay for one star block (half an hour by default), or a fixed PKR amount
-//   day pay     = max(0, base − stars × star value) on each working day; base is the daily rate
-//                 × the day's pay_basis share (worked or paid leave 1, unpaid half day ½, absent or
-//                 unpaid leave 0)
-//   net         = Σ day pay + adjustment, rounded to 2 decimals only at the end
 
 /** Each pay_basis (attendance.statusFor) as a share of the daily rate. */
 const BASIS_SHARE = { full: 1, half: 0.5, none: 0 }
@@ -254,8 +229,6 @@ module.exports = {
   monthRange,
   workingDays,
   unpaidLeaveDays,
-  attendanceCounts,
-  calculate,
   payRates,
   calculateDay,
   calculateMonth,

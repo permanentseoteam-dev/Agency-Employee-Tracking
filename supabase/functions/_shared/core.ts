@@ -99,7 +99,12 @@ export async function loadSettings() {
     full_day_min_hours: Number(s.full_day_min_hours) || 0,
     monthly_full_leaves: Number(s.monthly_full_leaves) || 0,
     monthly_half_leaves: Number(s.monthly_half_leaves) || 0,
-    timezone: (s.timezone as string) || 'Asia/Karachi'
+    timezone: (s.timezone as string) || 'Asia/Karachi',
+    // Day pay: the daily target and the star block in minutes, and what one star is worth.
+    required_daily_minutes: Number(s.required_daily_minutes) || 360,
+    star_block_minutes: Number(s.star_block_minutes) || 30,
+    star_value_mode: (s.star_value_mode as string) || 'half_hour_pay',
+    star_value_pkr: Number(s.star_value_pkr) || 0
   }
 }
 

@@ -1,8 +1,9 @@
 // Pure star rules. Plain CommonJS with no server globals, so Vitest
 // tests the same file the Edge Functions bundle (scripts/build-edge-shared.mjs).
-// Stars count against a person: each rule break
-// gives the rule's stars. Automatic rules come from attendance (the app adds them
-// up); an admin gives the others by hand, or excuses an automatic one for a day.
+// Stars count against a person, and each one costs the star value in payroll (payroll.js).
+// The automatic ones come from attendance: late and short of the daily target, 1 per started
+// block (attendance.js statusFor). An admin gives the others by hand (a rule's stars per break),
+// or excuses a day's late or short stars.
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/
 
@@ -37,37 +38,6 @@ function givenPayload(rec, names) {
 }
 
 /**
- * Counted stars in a month, per person. Stars don't cost pay; payroll only shows the count.
- * Same counting as the app (src/lib/stars.ts):
- * automatic rules from attendance unless excused for that day; by-hand records unless excused.
- * attendance: [{ user, date, status }], rules: [{ id, stars, auto }],
- * records: [{ user, rule, date, excused }] → { [user]: stars }
- */
-function monthStars(attendance, rules, records) {
-  const byId = {}
-  const byStatus = {}
-  for (const r of rules || []) {
-    byId[r.id] = r
-    if (r.auto) byStatus[r.auto] = r
-  }
-  const excused = {}
-  for (const r of records || []) if (r.excused) excused[r.user + '|' + r.rule + '|' + r.date] = true
-  const out = {}
-  const add = (user, rule) => {
-    out[user] = (out[user] || 0) + (Number(rule.stars) || 0)
-  }
-  for (const a of attendance || []) {
-    const rule = byStatus[a.status]
-    if (rule && !excused[a.user + '|' + rule.id + '|' + a.date]) add(a.user, rule)
-  }
-  for (const r of records || []) {
-    const rule = byId[r.rule]
-    if (rule && !r.excused) add(r.user, rule)
-  }
-  return out
-}
-
-/**
  * One person's star records by day, for payroll.calculateDay: the stars given by hand that count,
  * and which automatic parts (late, short) an admin excused. Hand stars use the rule's current stars.
  * rules: [{ id, stars, auto }], records: [{ rule, date, excused }] → { [date]: { hand, late, short } }
@@ -90,4 +60,4 @@ function recordsByDay(rules, records) {
   return out
 }
 
-module.exports = { recordProblem, givenPayload, monthStars, recordsByDay }
+module.exports = { recordProblem, givenPayload, recordsByDay }

@@ -218,7 +218,7 @@ try {
 
   // --- stars: everyone reads the rules, admins write; automatic rules stay ------------------
   const rules = await must(sbEmpA.from('star_rules').select('*'))
-  check('everyone reads the star rules (3 automatic)', rules.filter((r) => r.auto).length === 3)
+  check('everyone reads the star rules (2 automatic: late and short)', rules.filter((r) => r.auto).map((r) => r.auto).sort().join() === 'late,short', JSON.stringify(rules.map((r) => r.auto)))
   await denied('employee cannot add a star rule', () => sbEmpA.from('star_rules').insert({ name: `Phone ${RUN}`, stars: 1 }).select())
   const phone = await allowed('admin adds a rule given by hand', () => sbAdmin.from('star_rules').insert({ name: `Phone ${RUN}`, stars: 2 }).select())
   await denied('admin cannot add another automatic rule', () => sbAdmin.from('star_rules').insert({ name: `Auto ${RUN}`, auto: 'late' }).select())
@@ -275,8 +275,9 @@ try {
   await denied('employee cannot recompute attendance', () => fn(sbEmpA, 'attendance-recompute', { date: day }))
   await denied('manager cannot recompute attendance', () => fn(sbMgrA, 'attendance-recompute', { date: day }))
   await allowed('admin recomputes a finished day', () => fn(sbAdmin, 'attendance-recompute', { date: day }))
-  const [rec] = await must(sbEmpA.from('attendance').select('status, active_s').eq('date', day).eq('user', empA.id))
+  const [rec] = await must(sbEmpA.from('attendance').select('status, active_s, shortfall_stars').eq('date', day).eq('user', empA.id))
   check('the day counts as Present (started 09:05, 4h25m active)', rec?.status === 'present' && rec?.active_s === 4 * 3600 + 25 * 60, JSON.stringify(rec))
+  check('…with 4 stars for being short of the 6-hour target (95 minutes, 1 per started 30)', rec?.shortfall_stars === 4, JSON.stringify(rec))
   await denied('attendance cannot be recomputed for today', () => fn(sbAdmin, 'attendance-recompute', { date: new Date(Date.now() + 5 * 3600000).toISOString().slice(0, 10) }))
   await allowed('the hourly job runs with the service role', () => fn(root, 'attendance-recompute', { nightly: true }))
 
@@ -439,8 +440,11 @@ try {
   await denied('an employee cannot edit their own payroll line', () => sbEmpA.from('payroll_items').update({ adjustment_pkr: 99999 }).eq('id', lineA.id).select())
   await allowed('admin sets an adjustment and note on a draft line', () => sbAdmin.from('payroll_items').update({ adjustment_pkr: -5000, note: 'Advance' }).eq('id', lineA.id).select())
   const adjusted = (await must(sbAdmin.from('payroll_items').select('*').eq('id', lineA.id)))[0]
-  check('net follows the adjustment', Number(adjusted.net) === Number(adjusted.base) - Number(adjusted.deductions) - 5000, JSON.stringify(adjusted))
+  const paisa = (x) => Math.round(Number(x) * 100) // day pay has paisa: compare amounts to the paisa
+  check('net follows the adjustment (gross pay + adjustment)',
+    paisa(adjusted.net) === paisa(Number(adjusted.gross_pkr) - 5000) && paisa(adjusted.net) === paisa(Number(adjusted.base) - Number(adjusted.deductions) - 5000), JSON.stringify(adjusted))
   await denied('the counted figures cannot be edited', () => sbAdmin.from('payroll_items').update({ deductions: 0 }).eq('id', lineA.id).select())
+  await denied('nor can the day-pay figures (daily rate)', () => sbAdmin.from('payroll_items').update({ daily_rate: 1 }).eq('id', lineA.id).select())
   await runPay(sbAdmin)
   const recounted = (await must(sbAdmin.from('payroll_items').select('*').eq('run', pay.data?.run ?? 'x').eq('user', empA.id)))[0]
   check('recounting a draft keeps adjustments and notes', Number(recounted?.adjustment_pkr) === -5000 && recounted?.note === 'Advance')
@@ -546,11 +550,15 @@ try {
   // stars
   check('the late penalty is gone from the rules', !('late_penalty_pkr' in settings[0]))
   check('monthly leave limits start at 0 (no limit)', settings[0].monthly_full_leaves === 0 && settings[0].monthly_half_leaves === 0)
+  check('day pay starts at its defaults: a 6-hour target, 1 star per started 30 minutes, worth half an hour’s pay',
+    settings[0].required_daily_minutes === 360 && settings[0].star_block_minutes === 30 && settings[0].star_value_mode === 'half_hour_pay' && Number(settings[0].star_value_pkr) === 0,
+    JSON.stringify(settings[0]))
   check('payroll lines have no late count any more', !('late_count' in (lines[0] ?? {})))
-  await denied('an employee cannot change star amounts', () => sbEmpA.from('star_rules').update({ stars: 5 }).eq('id', late.id).select())
-  await denied('a manager cannot change star amounts', () => sbMgrA.from('star_rules').update({ stars: 5 }).eq('id', late.id).select())
-  await allowed('an admin sets the stars for a rule break', () => sbAdmin.from('star_rules').update({ stars: 2 }).eq('id', late.id).select())
+  // The automatic rules' stars come from attendance; a rule given by hand has its stars per break.
   const byHand = (await must(sbAdmin.from('star_rules').insert({ name: `Phone in meetings ${RUN}`, stars: 3 }).select()))[0]
+  await denied('an employee cannot change star amounts', () => sbEmpA.from('star_rules').update({ stars: 5 }).eq('id', byHand.id).select())
+  await denied('a manager cannot change star amounts', () => sbMgrA.from('star_rules').update({ stars: 5 }).eq('id', byHand.id).select())
+  await allowed('an admin sets the stars for a rule break', () => sbAdmin.from('star_rules').update({ stars: 2 }).eq('id', byHand.id).select())
   const give = (client, extra) => fn(client, 'star-record', { user: empA.id, rule: byHand.id, date: day, ...extra })
   await denied('an employee cannot give stars', () => give(sbEmpA))
   await denied('a manager cannot give stars', () => give(sbMgrA))
@@ -573,7 +581,6 @@ try {
   await root.from('star_records').delete().eq('rule', byHand.id)
   await allowed('deleting a by-hand rule is allowed', () => sbAdmin.from('star_rules').delete().eq('id', byHand.id).select())
   await root.from('star_records').delete().eq('rule', late.id).eq('user', empA.id)
-  await root.from('star_rules').update({ stars: 0 }).eq('id', late.id)
 
   // Switch role
   const sw = await orgFn(sbAdmin, 'switch-to', { userId: empA.id })

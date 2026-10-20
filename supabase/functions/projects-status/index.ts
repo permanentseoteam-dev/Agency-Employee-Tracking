@@ -43,14 +43,7 @@ serve(async (req) => {
         .filter((l) => l.user === p.id)
         .map((l) => ({ start_date: l.start_date, end_date: l.end_date, half_day: !!l.half_day }))
       const record = att.statusFor(today, settings, segs, leaves, holidays)
-      let live = lib.liveStatus(record, times)
-      if (att.leaveCover(today, leaves) === 'half' && (record.status === 'present' || record.status === 'half_day')) {
-        // A half-day leave: before any activity they're on their half off (half day once the
-        // shift is over, as the nightly record will say), and a late start is the half off.
-        if (!record.active_s) live = now >= times.shiftEnd ? 'half_day' : 'on_leave'
-        else if (live === 'late') live = 'present'
-      }
-      statusOf[p.id] = live
+      statusOf[p.id] = lib.liveStatus(record, times)
     }
   } else {
     for (const r of await sql`select "user", status from attendance where date = ${date} and "user" = any(${members})`) statusOf[r.user] = r.status

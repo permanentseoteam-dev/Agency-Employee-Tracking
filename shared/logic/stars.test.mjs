@@ -34,33 +34,6 @@ describe('givenPayload', () => {
   })
 })
 
-describe('monthStars (a count; stars don’t cost pay)', () => {
-  const rules = [
-    { id: 'late', stars: 1, auto: 'late' },
-    { id: 'absent', stars: 3, auto: 'absent' },
-    { id: 'phone', stars: 2, auto: '' },
-    { id: 'meeting', stars: 1, auto: '' }
-  ]
-  it('adds each counted break’s stars, per person', () => {
-    const attendance = [
-      { user: 'a', date: '2026-10-01', status: 'late' },
-      { user: 'a', date: '2026-10-02', status: 'late' },
-      { user: 'a', date: '2026-10-03', status: 'absent' },
-      { user: 'b', date: '2026-10-01', status: 'present' }
-    ]
-    const records = [
-      { user: 'a', rule: 'phone', date: '2026-10-05', excused: false },
-      { user: 'b', rule: 'meeting', date: '2026-10-05', excused: false }
-    ]
-    expect(s.monthStars(attendance, rules, records)).toEqual({ a: 1 + 1 + 3 + 2, b: 1 })
-  })
-  it('excused stars are not counted', () => {
-    const attendance = [{ user: 'a', date: '2026-10-01', status: 'late' }]
-    const records = [{ user: 'a', rule: 'late', date: '2026-10-01', excused: true }]
-    expect(s.monthStars(attendance, rules, records)).toEqual({})
-  })
-})
-
 describe('recordsByDay (stars for payroll.calculateDay)', () => {
   const rules = [
     { id: 'late', stars: 0, auto: 'late' },
