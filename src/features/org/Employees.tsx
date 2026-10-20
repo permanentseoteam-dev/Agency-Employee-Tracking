@@ -22,6 +22,8 @@ export function Employees() {
   const [showInactive, setShowInactive] = useState(false)
 
   const pending = useMemo(() => (employees.data ?? []).filter((e) => e.pending_approval), [employees.data])
+  // Shown next to the switch, so it's clear when there is nobody inactive to show.
+  const inactive = useMemo(() => (employees.data ?? []).filter((e) => !e.pending_approval && !e.active).length, [employees.data])
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase()
     return (employees.data ?? []).filter(
@@ -58,7 +60,9 @@ export function Employees() {
         </Select>
         <label className="flex shrink-0 items-center gap-2.5 text-sm whitespace-nowrap text-ink-700">
           <Toggle checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
-          Show inactive
+          <span>
+            Show inactive <span className="tabular-nums text-ink-400">({inactive})</span>
+          </span>
         </label>
         <Button className="ml-auto shrink-0" onClick={() => navigate('/org/employees/new')}>
           <UserPlus className="size-4" aria-hidden /> Add employee
