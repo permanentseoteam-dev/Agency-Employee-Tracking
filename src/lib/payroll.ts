@@ -19,9 +19,8 @@ export interface PayrollItem {
   absent_days: number
   unpaid_leave_days: number
   half_days: number
-  /** Counted stars in the month and what they cost (each break costs its rule's price); 0 on older runs. */
+  /** Counted stars in the month (they don't cost pay); 0 on older runs. */
   stars?: number
-  stars_pkr?: number
   deductions: number
   adjustment_pkr: number
   note: string
@@ -45,9 +44,7 @@ export interface Breakdown {
   absent: number
   unpaidLeave: number
   halfDays: number
-  /** What the month's stars cost (already inside deductions). */
-  stars: number
-  /** Deducted under earlier pay rules (a month counted before late days stopped costing pay); usually 0. */
+  /** Deducted under earlier pay rules (a late fine, or star prices before 2026-10-20); usually 0. */
   other: number
 }
 
@@ -57,9 +54,8 @@ export function breakdown(item: PayrollItem): Breakdown {
   const absent = item.absent_days * rate
   const unpaidLeave = item.unpaid_leave_days * rate
   const halfDays = 0.5 * item.half_days * rate
-  const stars = item.stars_pkr ?? 0
-  const other = Math.max(0, Math.round(item.deductions - absent - unpaidLeave - halfDays - stars))
-  return { rate, absent, unpaidLeave, halfDays, stars, other }
+  const other = Math.max(0, Math.round(item.deductions - absent - unpaidLeave - halfDays))
+  return { rate, absent, unpaidLeave, halfDays, other }
 }
 
 /** Joined or left part-way through the month: there is no pro-rating, so the admin sets an adjustment. */
@@ -82,7 +78,7 @@ export function runTotals(items: PayrollItem[]): { base: number; deductions: num
 
 /** The run as a spreadsheet, one line per employee plus a total. Amounts are plain numbers. */
 export function payrollCsv(items: PayrollItem[], nameOf: (userId: string) => string): string {
-  const header = ['Employee', 'Monthly salary', 'Working days', 'Absent', 'Unpaid leave', 'Half days', 'Stars', 'Stars (PKR)', 'Deductions', 'Adjustment', 'Note', 'Net pay']
+  const header = ['Employee', 'Monthly salary', 'Working days', 'Absent', 'Unpaid leave', 'Half days', 'Stars', 'Deductions', 'Adjustment', 'Note', 'Net pay']
   const lines = items.map((i) => [
     nameOf(i.user),
     String(i.base),
@@ -91,13 +87,12 @@ export function payrollCsv(items: PayrollItem[], nameOf: (userId: string) => str
     String(i.unpaid_leave_days),
     String(i.half_days),
     String(i.stars ?? 0),
-    String(i.stars_pkr ?? 0),
     String(i.deductions),
     String(i.adjustment_pkr),
     i.note,
     String(i.net)
   ])
   const t = runTotals(items)
-  lines.push(['Total', String(t.base), '', '', '', '', '', String(items.reduce((s, i) => s + (i.stars_pkr ?? 0), 0)), String(t.deductions), String(t.adjustments), '', String(t.net)])
+  lines.push(['Total', String(t.base), '', '', '', '', '', String(t.deductions), String(t.adjustments), '', String(t.net)])
   return toCsv([header, ...lines])
 }

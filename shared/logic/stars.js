@@ -36,13 +36,13 @@ function givenPayload(rec, names) {
 }
 
 /**
- * What stars cost in a month, per person: each counted rule break costs the rule's price_pkr
- * once, whatever its stars. Same counting as the app (src/lib/stars.ts):
+ * Counted stars in a month, per person. Stars don't cost pay; payroll only shows the count.
+ * Same counting as the app (src/lib/stars.ts):
  * automatic rules from attendance unless excused for that day; by-hand records unless excused.
- * attendance: [{ user, date, status }], rules: [{ id, stars, auto, price_pkr }],
- * records: [{ user, rule, date, excused }] → { [user]: { stars, pkr } }
+ * attendance: [{ user, date, status }], rules: [{ id, stars, auto }],
+ * records: [{ user, rule, date, excused }] → { [user]: stars }
  */
-function monthStarCharges(attendance, rules, records) {
+function monthStars(attendance, rules, records) {
   const byId = {}
   const byStatus = {}
   for (const r of rules || []) {
@@ -53,9 +53,7 @@ function monthStarCharges(attendance, rules, records) {
   for (const r of records || []) if (r.excused) excused[r.user + '|' + r.rule + '|' + r.date] = true
   const out = {}
   const add = (user, rule) => {
-    const o = (out[user] = out[user] || { stars: 0, pkr: 0 })
-    o.stars += Number(rule.stars) || 0
-    o.pkr += Number(rule.price_pkr) || 0
+    out[user] = (out[user] || 0) + (Number(rule.stars) || 0)
   }
   for (const a of attendance || []) {
     const rule = byStatus[a.status]
@@ -68,4 +66,4 @@ function monthStarCharges(attendance, rules, records) {
   return out
 }
 
-module.exports = { recordProblem, givenPayload, monthStarCharges }
+module.exports = { recordProblem, givenPayload, monthStars }

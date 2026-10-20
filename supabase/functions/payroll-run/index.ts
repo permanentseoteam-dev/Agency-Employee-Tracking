@@ -40,10 +40,10 @@ serve(async (req) => {
   for (const s of await sql`select "user", monthly_salary_pkr from salaries`) salaries[s.user] = Number(s.monthly_salary_pkr)
   const attendanceRows = await sql`select "user", date, status from attendance where date >= ${range.from} and date <= ${range.to}`
   const attendance = byUser(attendanceRows as any)
-  // Each counted break costs its rule's price (Rules → Stars); excused ones are free.
-  const starRules = await sql`select id, stars, auto, price_pkr from star_rules`
+  // The month's counted stars, shown on the line; they don't cost pay.
+  const starRules = await sql`select id, stars, auto from star_rules`
   const starRecords = await sql`select "user", rule, date, excused from star_records where date >= ${range.from} and date <= ${range.to}`
-  const starCharges: Record<string, { stars: number; pkr: number }> = starLib.monthStarCharges(attendanceRows, starRules, starRecords)
+  const stars: Record<string, number> = starLib.monthStars(attendanceRows, starRules, starRecords)
   const leaves = byUser(
     (await sql`select lr."user", lr.start_date, lr.end_date, lr.half_day from leave_requests lr join leave_types lt on lt.id = lr.leave_type
       where lr.status = 'approved' and not lt.paid and lr.start_date <= ${range.to} and lr.end_date >= ${range.from}`).map((l) => ({ ...l, paid: false })) as any
@@ -73,18 +73,16 @@ serve(async (req) => {
       const counts = lib.attendanceCounts(attendance[u.id])
       const unpaid = lib.unpaidLeaveDays(leaves[u.id], month, settings.work_days, holidays)
       const keep = kept[u.id] ?? { adjustment: 0, note: '' }
-      const charge = starCharges[u.id] ?? { stars: 0, pkr: 0 }
       const r = lib.calculate({
         base,
         workingDays,
         absentDays: counts.absent,
         unpaidLeaveDays: unpaid,
         halfDays: counts.half,
-        starsPkr: charge.pkr,
         adjustment: keep.adjustment
       })
-      await tx`insert into payroll_items (run, "user", base, working_days, absent_days, unpaid_leave_days, half_days, stars, stars_pkr, deductions, adjustment_pkr, note, net)
-        values (${run.id}, ${u.id}, ${base}, ${workingDays}, ${counts.absent}, ${unpaid}, ${counts.half}, ${charge.stars}, ${r.starsPkr}, ${r.deductions}, ${Math.round(keep.adjustment)}, ${keep.note}, ${r.net})`
+      await tx`insert into payroll_items (run, "user", base, working_days, absent_days, unpaid_leave_days, half_days, stars, deductions, adjustment_pkr, note, net)
+        values (${run.id}, ${u.id}, ${base}, ${workingDays}, ${counts.absent}, ${unpaid}, ${counts.half}, ${stars[u.id] ?? 0}, ${r.deductions}, ${Math.round(keep.adjustment)}, ${keep.note}, ${r.net})`
       items++
     }
   })

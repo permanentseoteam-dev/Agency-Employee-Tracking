@@ -68,16 +68,12 @@ describe('calculate: a hand calculation', () => {
     expect(payroll.calculate({ base: 85000, workingDays: 22, absentDays: 0, unpaidLeaveDays: 0, halfDays: 0, adjustment: 0 })).toEqual({
       rate: 85000 / 22,
       deductions: 0,
-      starsPkr: 0,
       net: 85000
     })
   })
 
-  it('star charges are deducted on top, in whole rupees', () => {
-    const r = payroll.calculate({ base: 85000, workingDays: 22, absentDays: 0, unpaidLeaveDays: 0, halfDays: 0, starsPkr: 1500, adjustment: 0 })
-    expect(r.starsPkr).toBe(1500)
-    expect(r.deductions).toBe(1500)
-    expect(r.net).toBe(83500)
+  it('stars are not deducted (an old caller passing a star charge)', () => {
+    expect(payroll.calculate({ base: 85000, workingDays: 22, starsPkr: 1500, adjustment: 0 }).deductions).toBe(0)
   })
 
   it('a month with no working days deducts nothing', () => {

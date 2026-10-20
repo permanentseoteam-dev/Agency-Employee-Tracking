@@ -30,14 +30,14 @@ describe('givenPayload', () => {
   })
 })
 
-describe('monthStarCharges (each rule has its own price)', () => {
+describe('monthStars (a count; stars don’t cost pay)', () => {
   const rules = [
-    { id: 'late', stars: 1, auto: 'late', price_pkr: 200 },
-    { id: 'absent', stars: 3, auto: 'absent', price_pkr: 500 },
-    { id: 'phone', stars: 2, auto: '', price_pkr: 300 },
-    { id: 'free', stars: 1, auto: '', price_pkr: 0 }
+    { id: 'late', stars: 1, auto: 'late' },
+    { id: 'absent', stars: 3, auto: 'absent' },
+    { id: 'phone', stars: 2, auto: '' },
+    { id: 'meeting', stars: 1, auto: '' }
   ]
-  it('adds each counted break’s price once, whatever its stars, per person', () => {
+  it('adds each counted break’s stars, per person', () => {
     const attendance = [
       { user: 'a', date: '2026-10-01', status: 'late' },
       { user: 'a', date: '2026-10-02', status: 'late' },
@@ -46,20 +46,13 @@ describe('monthStarCharges (each rule has its own price)', () => {
     ]
     const records = [
       { user: 'a', rule: 'phone', date: '2026-10-05', excused: false },
-      { user: 'b', rule: 'free', date: '2026-10-05', excused: false }
+      { user: 'b', rule: 'meeting', date: '2026-10-05', excused: false }
     ]
-    expect(s.monthStarCharges(attendance, rules, records)).toEqual({
-      a: { stars: 1 + 1 + 3 + 2, pkr: 200 + 200 + 500 + 300 },
-      b: { stars: 1, pkr: 0 }
-    })
+    expect(s.monthStars(attendance, rules, records)).toEqual({ a: 1 + 1 + 3 + 2, b: 1 })
   })
-  it('does not multiply the price by the stars: 3 stars priced 20 cost 20', () => {
-    const absent = [{ id: 'absent', stars: 3, auto: 'absent', price_pkr: 20 }]
-    expect(s.monthStarCharges([{ user: 'a', date: '2026-10-03', status: 'absent' }], absent, [])).toEqual({ a: { stars: 3, pkr: 20 } })
-  })
-  it('excused stars are free', () => {
+  it('excused stars are not counted', () => {
     const attendance = [{ user: 'a', date: '2026-10-01', status: 'late' }]
     const records = [{ user: 'a', rule: 'late', date: '2026-10-01', excused: true }]
-    expect(s.monthStarCharges(attendance, rules, records)).toEqual({})
+    expect(s.monthStars(attendance, rules, records)).toEqual({})
   })
 })

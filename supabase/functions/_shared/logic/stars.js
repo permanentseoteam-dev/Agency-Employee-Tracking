@@ -29,7 +29,7 @@ var require_stars = __commonJS({
         given_by_name: names.givenBy || ""
       };
     }
-    function monthStarCharges(attendance, rules, records) {
+    function monthStars(attendance, rules, records) {
       const byId = {};
       const byStatus = {};
       for (const r of rules || []) {
@@ -40,9 +40,7 @@ var require_stars = __commonJS({
       for (const r of records || []) if (r.excused) excused[r.user + "|" + r.rule + "|" + r.date] = true;
       const out = {};
       const add = (user, rule) => {
-        const o = out[user] = out[user] || { stars: 0, pkr: 0 };
-        o.stars += Number(rule.stars) || 0;
-        o.pkr += Number(rule.price_pkr) || 0;
+        out[user] = (out[user] || 0) + (Number(rule.stars) || 0);
       };
       for (const a of attendance || []) {
         const rule = byStatus[a.status];
@@ -54,7 +52,7 @@ var require_stars = __commonJS({
       }
       return out;
     }
-    module.exports = { recordProblem, givenPayload, monthStarCharges };
+    module.exports = { recordProblem, givenPayload, monthStars };
   }
 });
 export default require_stars();
