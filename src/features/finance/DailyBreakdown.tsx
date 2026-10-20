@@ -57,13 +57,14 @@ export function DailyBreakdown() {
       ) : !chosen ? (
         <p className="text-sm text-slate-500">Pick someone.</p>
       ) : (
-        <PersonMonth key={`${userId}|${month}`} person={chosen.person} salary={chosen.salary} month={month} tz={tz} />
+        <PersonMonth key={`${userId}|${month}`} person={chosen.person} salary={chosen.salary} month={month} tz={tz} admin />
       )}
     </div>
   )
 }
 
-function PersonMonth({ person, salary, month, tz }: { person: Employee; salary: Salary | null; month: string; tz: string }) {
+/** One person's month day by day. admin: the Approve button; otherwise it is the person's own read-only view (My pay). */
+export function PersonMonth({ person, salary, month, tz, admin }: { person: Employee; salary: Salary | null; month: string; tz: string; admin?: boolean }) {
   const settings = useOrgSettings()
   const holidays = useHolidays()
   const attendance = useMonthAttendance(month, person.id)
@@ -137,7 +138,7 @@ function PersonMonth({ person, salary, month, tz }: { person: Employee; salary: 
         <Button variant="secondary" onClick={exportCsv}>
           <Download className="size-4" aria-hidden /> Export CSV
         </Button>
-        {!run ? (
+        {!admin ? null : !run ? (
           <Link to="/finance/payroll" className="text-sm font-medium text-indigo-700 hover:underline">
             Run payroll for {monthLabel(month)} to approve it
           </Link>
@@ -159,7 +160,7 @@ function PersonMonth({ person, salary, month, tz }: { person: Employee; salary: 
         <Total label="One star" value={formatPkr(m.star_value, 2)} />
         <Total label="Stars" value={`${m.stars} (${m.late_stars} late · ${m.shortfall_stars} short · ${m.hand_stars} by hand)`} />
         <Total label="Star deduction" value={formatPay(-m.star_deduction)} />
-        <Total label={approved ? 'Net pay' : 'Net pay so far'} value={formatPay(m.net)} strong />
+        <Total label={approved ? 'Net pay' : 'Projected net pay'} value={formatPay(m.net)} strong />
       </div>
 
       <Card>
@@ -198,8 +199,9 @@ function PersonMonth({ person, salary, month, tz }: { person: Employee; salary: 
         </Table>
       </Card>
       <p className="max-w-4xl text-xs text-slate-500">
-        Weekends and holidays aren’t working days, so they aren’t listed. Days not counted yet show full pay. This is worked out from attendance as it is
-        now; the payroll run stores it when you run or recount {monthLabel(month)}.
+        Weekends and holidays aren’t working days, so they aren’t listed. Days not counted yet show full pay, so the projection assumes they are on time
+        and long enough.{' '}
+        {admin ? `This is worked out from attendance as it is now; the payroll run stores it when you run or recount ${monthLabel(month)}.` : 'Your final pay appears above once the month is approved.'}
         {m.hand_stars > m.days.reduce((s, d) => s + d.hand_stars, 0) && ' Stars given by hand on a day off come off the month total.'}
       </p>
     </div>

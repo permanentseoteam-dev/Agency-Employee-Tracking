@@ -97,8 +97,9 @@ export function MyAttendance() {
       </Card>
       <StarsCard userId={user.id} month={month} attendance={records.data ?? []} />
       <InfoBanner>
-        Counted every night at 01:00 from your tracked time. Late means your first activity came after the shift start plus the
-        grace period; Half day means less active time than the half-day minimum.
+        Counted every hour from your tracked time, for the days just finished. Late means your first activity came after the shift start
+        plus the grace period. Each started half hour late, or short of the daily target, is a star, and every star takes its value off
+        that day’s pay.
       </InfoBanner>
     </div>
   )

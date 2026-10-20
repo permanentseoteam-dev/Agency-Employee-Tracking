@@ -123,7 +123,7 @@ export function StarsCard({ userId, month, attendance }: { userId: string; month
         <StarsList lines={lines} />
       )}
       <CardContent className="border-t border-slate-100 pt-3 text-xs text-slate-500 dark:border-slate-800">
-        Each rule break gives the stars set in Rules → Stars. More stars is worse. Stars don’t change your pay.
+        Late and short-hours stars come from your attendance; others are given by hand. Every star takes its value off that day’s pay.
       </CardContent>
     </Card>
   )

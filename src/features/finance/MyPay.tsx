@@ -1,17 +1,22 @@
 import { useState } from 'react'
 import { Card } from '@/components/ui/Card'
 import { Table, Td, Th } from '@/components/ui/Table'
-import { monthLabel } from '@/lib/attendance'
+import { useTimezone } from '@/features/tracking/api'
+import { monthLabel, monthOf } from '@/lib/attendance'
 import { cn } from '@/lib/cn'
+import { toDateKey } from '@/lib/dates'
 import { formatAdjustment, formatPkr } from '@/lib/payroll'
 import { useSession } from '@/stores/session'
 import { useMyPay, type MyPayLine } from './api'
+import { PersonMonth } from './DailyBreakdown'
 import { LineDialog, Total } from './PayrollDetail'
 
 /** A manager's or employee's own pay: read-only, finalized months only (the server hides drafts and other people). */
 export function MyPay() {
   const user = useSession((s) => s.user)!
   const pay = useMyPay(user.id)
+  const tz = useTimezone()
+  const current = monthOf(toDateKey(Date.now(), tz))
   const [open, setOpen] = useState<MyPayLine | null>(null)
 
   if (pay.isLoading) return <p className="text-sm text-slate-500">Loading…</p>
@@ -82,6 +87,11 @@ export function MyPay() {
         Per-day rate = salary ÷ working days (weekends and holidays excluded). Deductions = (absent + unpaid leave + ½ × half days) × rate.
         Stars are a count and don’t change your pay. Click a month for its breakdown. Only the admin can change pay; ask them about anything that looks wrong.
       </p>
+
+      <section className="space-y-3" data-this-month>
+        <h2 className="text-base font-semibold">{monthLabel(current)} so far</h2>
+        <PersonMonth person={user} salary={salary} month={current} tz={tz} />
+      </section>
 
       {open && <LineDialog line={open} month={open.expand?.run?.month ?? ''} editable={false} onClose={() => setOpen(null)} />}
     </div>

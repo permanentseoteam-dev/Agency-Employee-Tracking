@@ -7,7 +7,7 @@ import { TrendChart } from '@/components/ui/TrendChart'
 import { useMonthAttendance } from '@/features/attendance/api'
 import { AttendanceBadge } from '@/features/attendance/status'
 import { monthOf } from '@/lib/attendance'
-import { addDays, formatTime } from '@/lib/dates'
+import { addDays, formatTime, isoWeekday } from '@/lib/dates'
 import { formatDuration, formatSignedDuration } from '@/lib/format'
 import { monthWeeks, overtimeByDay, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
 import { useHolidays } from '@/features/calendar/api'
@@ -97,6 +97,9 @@ export function MyStats() {
   const todayActive = byDay[today]?.active_s ?? 0
   const todayIdle = byDay[today]?.idle_s ?? 0
   const todayTracked = todayActive + todayIdle
+  // The daily target only applies on a working day that isn't a holiday.
+  const target = (org?.required_daily_minutes ?? 360) * 60
+  const workingToday = !!org && org.work_days.includes(isoWeekday(today)) && !(holidays ?? []).some((h) => h.date === today)
   // Net = active − idle, in the whole minutes shown above, so it always matches the two figures.
   const todayNet = (Math.floor(todayActive / 60) - Math.floor(todayIdle / 60)) * 60
   const time = (value: string | undefined) => (value ? formatTime(value.replace(' ', 'T'), tz) : '-')
@@ -105,7 +108,20 @@ export function MyStats() {
   return (
     <div className="mx-auto max-w-7xl space-y-[18px]">
       <StatGrid>
-        <StatCard label="Active today" value={formatDuration(todayActive)} tone="success" progress={share(todayActive, todayTracked)} />
+        <StatCard
+          label="Active today"
+          value={formatDuration(todayActive)}
+          tone="success"
+          progress={workingToday ? Math.min(1, share(todayActive, target)) : share(todayActive, todayTracked)}
+        >
+          {workingToday && (
+            <span className="text-[12.5px] text-ink-500" data-target={target}>
+              {todayActive >= target
+                ? `Daily target of ${target / 3600} h reached`
+                : `${formatDuration(target - todayActive)} to go for the ${target / 3600} h target`}
+            </span>
+          )}
+        </StatCard>
         <StatCard label="Idle today" value={formatDuration(todayIdle)} tone="warning" progress={share(todayIdle, todayTracked)} />
         <StatCard
           label="Net today"
