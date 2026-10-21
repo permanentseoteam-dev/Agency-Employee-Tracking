@@ -113,3 +113,13 @@ describe('validateApprove', () => {
     expect(org.validateApprove(body).error).toContain(message)
   })
 })
+
+describe('actionAllowed (who may run an org action)', () => {
+  it('admins any; managers only approve or reject a sign-up; employees nothing', () => {
+    for (const a of ['invite', 'reset-password', 'set-active', 'approve', 'reject']) expect(org.actionAllowed('admin', a)).toBe(true)
+    expect(org.actionAllowed('manager', 'approve')).toBe(true)
+    expect(org.actionAllowed('manager', 'reject')).toBe(true)
+    for (const a of ['invite', 'reset-password', 'set-active', 'other']) expect(org.actionAllowed('manager', a)).toBe(false)
+    for (const a of ['approve', 'reject', 'invite']) expect(org.actionAllowed('employee', a)).toBe(false)
+  })
+})

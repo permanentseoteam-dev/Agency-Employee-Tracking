@@ -72,7 +72,7 @@ export function notificationText(n: Pick<NotificationRecord, 'type' | 'payload'>
   if (!n.payload) return { title: 'Notification', detail: '' }
   if (n.type === 'signup_pending') {
     const r = n.payload as RegisteredPayload
-    return { title: 'New sign-up waiting for approval', detail: [r.name, r.email, 'approve or reject it in Organization'].filter(Boolean).join(' · ') }
+    return { title: 'New sign-up waiting for approval', detail: [r.name, r.email, 'approve or reject it'].filter(Boolean).join(' · ') }
   }
   if (n.type === 'employee_registered') {
     const r = n.payload as RegisteredPayload
@@ -104,7 +104,9 @@ export function notificationComment(n: Pick<NotificationRecord, 'payload'>): str
 export function notificationLink(n: Pick<NotificationRecord, 'type'>, role: Role): string | null {
   if (n.type === 'leave_requested') return '/my-leaves/pending'
   if (n.type === 'leave_decided') return '/my-leaves'
-  if (n.type === 'employee_registered' || n.type === 'signup_pending') return '/org/employees'
+  if (n.type === 'employee_registered') return '/org/employees'
+  // Admins decide in Organization, managers on their Approvals page.
+  if (n.type === 'signup_pending') return role === 'admin' ? '/org/employees' : '/my-leaves/pending'
   if (n.type === 'stars_given') return role === 'employee' ? '/my-attendance' : '/attendance/mine'
   return null
 }

@@ -117,8 +117,15 @@ function validateSetActive(body, actingUserId) {
   return { data: { userId: userId, active: b.active, left_on: leftOn } }
 }
 
+/** Who may run an org action: admins any; managers only decide on sign-ups (approve or reject). */
+function actionAllowed(role, action) {
+  if (role === 'admin') return true
+  return role === 'manager' && (action === 'approve' || action === 'reject')
+}
+
 module.exports = {
   ROLES: ROLES,
+  actionAllowed: actionAllowed,
   passwordProblem: passwordProblem,
   isDateKey: isDateKey,
   todayKey: todayKey,

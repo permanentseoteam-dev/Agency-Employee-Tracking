@@ -1,8 +1,9 @@
-// Organization actions, admins only (was invite.pb.js). { action, ... }:
+// Organization actions (was invite.pb.js): admins any; managers may approve or reject a sign-up. { action, ... }:
 //   invite          { email, full_name, password, team, role, designation, phone, joined_on, monthly_salary_pkr } → { id }
 //   reset-password  { userId, password } → { id }   (temporary password; must change it; signed out everywhere)
 //   set-active      { userId, active, left_on? } → { id, active }   (deactivating records the leaving date)
-//   approve         { userId, joined_on? } → { id }   (a "Create an account" sign-up)
+//   approve         { userId, joined_on? } → { id }   (a "Create an account" sign-up; a manager's approval puts
+//                   the person in the manager's team, and tells the admins to set the salary)
 //   reject          { userId } → { id }   (deletes the waiting account)
 import org from '../_shared/logic/org.js'
 import { badRequest, body, caller, forbidden, HttpError, json, notFound, serve, sql } from '../_shared/core.ts'
@@ -13,8 +14,10 @@ const profile = async (id: string) => (await sql`select * from profiles where id
 
 serve(async (req) => {
   const me = await caller(req)
-  if (me.role !== 'admin') throw forbidden('Only admins can do this.')
   const b = await body(req)
+  if (!org.actionAllowed(me.role, b.action)) {
+    throw forbidden(me.role === 'manager' ? 'Managers can only approve or reject sign-ups.' : 'Only admins can do this.')
+  }
 
   switch (b.action) {
     case 'invite': {
@@ -66,8 +69,23 @@ serve(async (req) => {
       const p = await profile(r.data.userId)
       if (!p) throw notFound('Employee not found.')
       if (!p.pending_approval) throw badRequest('This account is not waiting for approval.')
-      await sql`update profiles set active = true, pending_approval = false, joined_on = ${r.data.joined_on}, left_on = '' where id = ${p.id}`
+      // A manager's approval puts the person in the manager's team (their first, by name).
+      const [team] = me.role === 'manager' ? await sql`select id from teams where manager = ${me.id} order by name limit 1` : []
+      await sql`update profiles set active = true, pending_approval = false, joined_on = ${r.data.joined_on}, left_on = '',
+        team = coalesce(team, ${team?.id ?? null}) where id = ${p.id}`
       await setCanSignIn(p.id, true)
+      if (me.role === 'manager') {
+        // The admins still set the salary and role: tell them. A failure here never undoes the approval.
+        try {
+          const [e] = await sql`select email from profile_emails where id = ${p.id}`
+          for (const a of await sql`select id from profiles where role = 'admin' and active`) {
+            await sql`insert into notifications ("user", type, payload)
+              values (${a.id}, 'employee_registered', ${sql.json({ user: p.id, name: p.full_name, email: e?.email ?? '' })})`
+          }
+        } catch (err) {
+          console.error('org: telling the admins about an approval', err)
+        }
+      }
       return json(200, { id: p.id })
     }
 

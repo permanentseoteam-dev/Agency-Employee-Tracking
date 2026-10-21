@@ -4,6 +4,8 @@ import { Card } from '@/components/ui/Card'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { allowedMoves, type LeaveBalance, type LeaveRequest } from '@/lib/leave'
 import { dateRange, daysText } from '@/lib/notifications'
+import { PendingSignups } from '@/features/org/PendingSignups'
+import { useEmployees, useOrgLive } from '@/features/org/api'
 import { useSession } from '@/stores/session'
 import { useLeaveBalances, useLeaveLive, usePendingApprovals } from './api'
 import { DecideDialog, type Move } from './DecideDialog'
@@ -17,6 +19,11 @@ export function Approvals() {
   useLeaveLive()
   const [deciding, setDeciding] = useState<{ request: LeaveRequest; status: Move } | null>(null)
   const [kind, setKind] = useState<LeaveKind>('all')
+  // Managers decide on new sign-ups here too (admins do it in Organization).
+  const isManager = user.role === 'manager'
+  const people = useEmployees()
+  useOrgLive()
+  const signups = isManager ? (people.data ?? []).filter((p) => p.pending_approval) : []
   const all = pending.data ?? []
   const requests = byKind(all, kind)
 
@@ -27,6 +34,7 @@ export function Approvals() {
 
   return (
     <div className="space-y-4">
+      <PendingSignups people={signups} manager />
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
           Waiting for a decision{all.length ? ` (${all.length})` : ''}

@@ -100,8 +100,13 @@ var require_org = __commonJS({
       }
       return { data: { userId, active: b.active, left_on: leftOn } };
     }
+    function actionAllowed(role, action) {
+      if (role === "admin") return true;
+      return role === "manager" && (action === "approve" || action === "reject");
+    }
     module.exports = {
       ROLES,
+      actionAllowed,
       passwordProblem,
       isDateKey,
       todayKey,

@@ -1,5 +1,5 @@
 // "Create an account" on the sign-in page (was register.pb.js). Open to guests (deployed with
-// --no-verify-jwt). The new account starts switched off and waiting for an admin: it can't sign
+// --no-verify-jwt). The new account starts switched off and waiting for an admin or a manager: it can't sign
 // in until approved (org: approve). Role, team, salary and status are set here, never taken from
 // the request. At most 5 sign-ups a minute per visitor address.
 // { email, full_name, password, phone? } → { id }
@@ -38,14 +38,14 @@ serve(async (req) => {
     throw err
   }
 
-  // Tell every active admin. A failure here never undoes the account.
+  // Tell every active admin and manager (either may approve). A failure here never undoes the account.
   try {
-    for (const a of await sql`select id from profiles where role = 'admin' and active`) {
+    for (const a of await sql`select id from profiles where role in ('admin', 'manager') and active`) {
       await sql`insert into notifications ("user", type, payload)
         values (${a.id}, 'signup_pending', ${sql.json({ user: id, name: d.full_name, email: d.email })})`
     }
   } catch (err) {
-    console.error('register: notifying the admins', err)
+    console.error('register: notifying the admins and managers', err)
   }
   return json(200, { id })
 })

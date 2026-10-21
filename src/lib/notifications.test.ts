@@ -43,11 +43,12 @@ describe('notificationText', () => {
     ).toEqual({ title: 'New employee registered', detail: 'Sara Self · sara@gmail.com · set their team, role and salary' })
   })
 
-  it('asks the admins to approve a sign-up', () => {
+  it('asks the admins and managers to approve a sign-up', () => {
     expect(
       notificationText({ type: 'signup_pending', payload: { user: 'u9', name: 'Sara Self', email: 'sara@gmail.com' } })
-    ).toEqual({ title: 'New sign-up waiting for approval', detail: 'Sara Self · sara@gmail.com · approve or reject it in Organization' })
+    ).toEqual({ title: 'New sign-up waiting for approval', detail: 'Sara Self · sara@gmail.com · approve or reject it' })
     expect(notificationLink({ type: 'signup_pending' }, 'admin')).toBe('/org/employees')
+    expect(notificationLink({ type: 'signup_pending' }, 'manager')).toBe('/my-leaves/pending')
   })
 
   it('tells someone an admin gave them stars', () => {
