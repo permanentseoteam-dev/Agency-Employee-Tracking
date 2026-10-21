@@ -158,6 +158,8 @@ export const useSession = create<SessionState>((set, get) => {
 
     async login(email, password) {
       const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim().toLowerCase(), password })
+      // Every sign-in starts on the landing page (My stats), whatever page the last person left open.
+      if (!error) window.location.hash = '#/'
       if (error) {
         const code = (error as { code?: string }).code
         const status = !error.status ? 0 : code === 'user_banned' ? 403 : error.status === 429 ? 429 : 400

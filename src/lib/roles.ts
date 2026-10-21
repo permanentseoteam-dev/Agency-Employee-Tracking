@@ -82,8 +82,9 @@ export function navFor(role: Role): NavItem[] {
   return NAV.filter((item) => hasRole(role, item.minRole) && !item.hiddenFor?.includes(role))
 }
 
-export function landingFor(role: Role): string {
-  return role === 'employee' ? '/my-stats' : '/live'
+/** The first page after signing in: My stats, for every role (2026-10-21). */
+export function landingFor(_role: Role): string {
+  return '/my-stats'
 }
 
 export function canOpen(role: Role, path: string): boolean {

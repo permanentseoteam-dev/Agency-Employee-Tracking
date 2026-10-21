@@ -34,8 +34,8 @@ describe('roles', () => {
 
   it('lands each role on the right page', () => {
     expect(landingFor('employee')).toBe('/my-stats')
-    expect(landingFor('manager')).toBe('/live')
-    expect(landingFor('admin')).toBe('/live')
+    expect(landingFor('manager')).toBe('/my-stats')
+    expect(landingFor('admin')).toBe('/my-stats')
   })
 
   it('guards routes by role', () => {
