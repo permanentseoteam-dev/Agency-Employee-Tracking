@@ -51,6 +51,12 @@ export interface NetworkStatus {
   server: boolean
 }
 
+/** What Remember me keeps on this PC (password '' when it couldn't be saved encrypted). */
+export interface SavedLogin {
+  email: string
+  password: string
+}
+
 export interface TrackerApi {
   logError(message: string): void
   /** Sign-in events for the log (names and reasons, never tokens). */
@@ -70,6 +76,10 @@ export interface TrackerApi {
   networkStatus(): Promise<NetworkStatus>
   /** Quits the app (managers and admins); resolves false when the main process refuses. */
   quit(): Promise<boolean>
+  /** Remember me on the sign-in screen: the saved sign-in, filled in after Log out. */
+  loadLogin(): Promise<SavedLogin | null>
+  saveLogin(email: string, password: string): Promise<void>
+  clearLogin(): Promise<void>
 }
 
 declare global {

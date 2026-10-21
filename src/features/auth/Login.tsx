@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
 import { REMEMBER_KEY, useSession } from '@/stores/session'
@@ -18,6 +18,19 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
     }
   })
 
+  // Remember me kept the sign-in on this PC: fill it in (the password is decrypted by Windows).
+  useEffect(() => {
+    let alive = true
+    void window.tracker?.loadLogin?.().then((saved) => {
+      if (!alive || !saved) return
+      setEmail((v) => v || saved.email)
+      setPassword((v) => v || saved.password)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
@@ -29,6 +42,9 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
       } catch {
         // storage blocked: stays signed in, as before
       }
+      // Remember me also keeps the sign-in for after Log out; off forgets it.
+      if (remember) void window.tracker?.saveLogin?.(email.trim().toLowerCase(), password)
+      else void window.tracker?.clearLogin?.()
     } catch (err) {
       const status = (err as { status?: number }).status
       setError(
