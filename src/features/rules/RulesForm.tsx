@@ -85,7 +85,7 @@ function exampleStar(f: FormState, month: string, holidays: Set<string>): string
 export function RulesForm() {
   const settings = useOrgSettings()
   if (settings.isLoading) return <p className="text-sm text-slate-500">Loading rules…</p>
-  if (!settings.data) return <p className="text-sm text-red-600">The rules record is missing. Re-run the seed migration.</p>
+  if (!settings.data) return <p className="text-sm text-red-600">The rules couldn’t be loaded. Log out and sign in again; if this stays, tell your admin.</p>
   return <RulesEditor settings={settings.data} />
 }
 

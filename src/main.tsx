@@ -4,6 +4,7 @@ import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react
 import App from './App'
 import { AppError } from './lib/db'
 import { isPreviewing } from './stores/rolePreview'
+import { setOnUserChange } from './stores/session'
 import './stores/theme' // applies the saved theme before first paint
 import './index.css'
 
@@ -21,6 +22,9 @@ const queryClient = new QueryClient({
   }),
   defaultOptions: { queries: { staleTime: 30_000, retry: 1, refetchOnWindowFocus: false } }
 })
+
+// A different person (or nobody) signed in: nothing cached for the last one may show.
+setOnUserChange(() => queryClient.clear())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

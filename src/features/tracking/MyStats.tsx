@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/Badge'
 import { Card, CardHeader, CardSubtitle, CardTitle } from '@/components/ui/Card'
 import { StatCard, StatGrid } from '@/components/ui/StatCard'
@@ -108,6 +108,12 @@ export function MyStats() {
     const start = Date.parse(s.started_at.replace(' ', 'T'))
     if (s.state === 'active' && toDateKey(start, tz) === today && (firstActive === null || start < firstActive)) firstActive = start
   }
+  // A reminder, not a fixture: the late line shows for 10 seconds after the page opens.
+  const [lateShown, setLateShown] = useState(true)
+  useEffect(() => {
+    const t = setTimeout(() => setLateShown(false), 10_000)
+    return () => clearTimeout(t)
+  }, [])
   // Only while the Late arrival rule exists: an admin can delete it to switch late stars off.
   const lateOn = useStarRules().data?.some((r) => r.auto === 'late') ?? false
   const late =
@@ -133,7 +139,7 @@ export function MyStats() {
                 : `${formatDuration(target - todayActive)} to go for the ${target / 3600} h target`}
             </span>
           )}
-          {late && late.stars > 0 && (
+          {lateShown && late && late.stars > 0 && (
             <span className="block text-[12.5px] text-[var(--warning-text)]" data-late-stars={late.stars}>
               {late.minutes} min late today: {starsText(late.stars)}
             </span>

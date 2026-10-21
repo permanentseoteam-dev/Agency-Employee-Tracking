@@ -1,7 +1,6 @@
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
 import { LogOut, Power, Settings, User } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { ROLE_LABEL } from '@/lib/roles'
 import { useSession } from '@/stores/session'
 import { Avatar } from './Avatar'
@@ -14,7 +13,6 @@ export function ProfileMenu() {
   const user = useSession((s) => s.user)!
   const logout = useSession((s) => s.logout)
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
 
   return (
     <DropdownMenu.Root>
@@ -53,10 +51,7 @@ export function ProfileMenu() {
           <DropdownMenu.Separator className="my-1 h-px bg-[var(--line-strong)]" />
           <DropdownMenu.Item
             className={ITEM}
-            onSelect={() => {
-              queryClient.clear()
-              logout()
-            }}
+            onSelect={() => logout()}
           >
             <LogOut className="size-4" aria-hidden /> Log out
           </DropdownMenu.Item>

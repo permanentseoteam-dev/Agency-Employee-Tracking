@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
 import { REMEMBER_KEY, useSession } from '@/stores/session'
@@ -10,6 +11,7 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(() => {
     try {
       return localStorage.getItem(REMEMBER_KEY) !== 'false'
@@ -76,14 +78,26 @@ export function Login({ onRegister }: { onRegister?: () => void }) {
           />
         </Field>
         <Field label="Password" htmlFor="password">
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="relative">
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="pr-11"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              title={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-r-md text-ink-400 hover:text-ink-700"
+            >
+              {showPassword ? <EyeOff className="size-4" aria-hidden /> : <Eye className="size-4" aria-hidden />}
+            </button>
+          </div>
         </Field>
         <label htmlFor="remember_me" className="flex w-fit cursor-pointer items-center gap-2 text-sm text-ink-700">
           <input id="remember_me" type="checkbox" className="size-4 accent-indigo-600" checked={remember} onChange={(e) => setRemember(e.target.checked)} />

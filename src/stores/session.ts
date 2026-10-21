@@ -38,6 +38,16 @@ export function markSignedInThisRun(): void {
 }
 let session: Session | null = null
 
+/**
+ * Runs when a different person (or nobody) becomes signed in, before the screens see it: main.tsx
+ * drops every cached answer there. Otherwise one fetched with no session in the moment of a Log out
+ * (empty: the server only answers people signed in) is shown to the next person.
+ */
+let onUserChange: () => void = () => {}
+export function setOnUserChange(fn: () => void): void {
+  onUserChange = fn
+}
+
 interface SessionState {
   user: UserRecord | null
   /** False until the saved session has been checked with the server at startup. */
@@ -102,18 +112,22 @@ function endLeftoverSwitch(currentUserId: string | undefined): boolean {
 }
 
 export const useSession = create<SessionState>((set, get) => {
+  const changeTo = (next: UserRecord | null) => {
+    if ((next?.id ?? "") !== (get().user?.id ?? "")) onUserChange()
+    set({ user: next })
+  }
   const apply = async (s: Session | null) => {
     session = s
     if (!s) {
       cache(null)
-      set({ user: null })
+      changeTo(null)
       shareWithMain(null)
       return
     }
     try {
       const user = await loadUser(s)
       cache(user)
-      set({ user })
+      changeTo(user)
       shareWithMain(user)
     } catch {
       shareWithMain(get().user) // offline: keep showing the saved account
