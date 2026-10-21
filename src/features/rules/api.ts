@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { live, must, supabase, type OrgSettings } from '@/lib/db'
 import type { RulesInput } from '@/lib/rules'
+import { endIfSignInRefused } from '@/stores/session'
 
 export interface LeaveType {
   id: string
@@ -19,7 +20,12 @@ export const rulesKeys = {
 export function useOrgSettings() {
   return useQuery({
     queryKey: rulesKeys.settings,
-    queryFn: async () => ((must(await supabase.from('org_settings').select('*').limit(1)) as OrgSettings[])[0] ?? null),
+    queryFn: async () => {
+      const row = (must(await supabase.from('org_settings').select('*').limit(1)) as OrgSettings[])[0] ?? null
+      // Everyone signed in reads this one row: none back means the server may have ended the sign-in.
+      if (!row) await endIfSignInRefused('the rules came back empty')
+      return row
+    },
     staleTime: 5 * 60_000
   })
 }

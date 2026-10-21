@@ -58,8 +58,8 @@ export const NAV: NavItem[] = [
   { path: '/org', label: 'Organization', icon: 'org', minRole: 'admin', section: 'admin', module: 'M3' },
   // Everyone reads the rules (work hours, leave, stars); only an admin changes them.
   { path: '/rules', label: 'Rules', icon: 'rules', minRole: 'employee', section: 'admin', module: 'M4' },
-  // Managers don't see Finance for now (2026-10-15); employees see their own pay, admins everything.
-  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', section: 'admin', hiddenFor: ['manager'], module: 'M11' }
+  // Employees and managers see their own pay (My pay, since 2026-10-21 for managers); admins everything.
+  { path: '/finance', label: 'Finance', icon: 'finance', minRole: 'employee', section: 'admin', module: 'M11' }
 ]
 
 /** Pages every signed-in user can open, whatever role is selected. */

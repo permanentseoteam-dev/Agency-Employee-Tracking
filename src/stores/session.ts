@@ -214,6 +214,21 @@ export const useSession = create<SessionState>((set, get) => {
   }
 })
 
+/**
+ * Asks the server whether this sign-in still counts, when an answer that everyone signed in gets came
+ * back empty. A session the server ended (a password reset, a switched-off account, signed out elsewhere)
+ * still has a token here, but every read is empty until then: sign out, so the sign-in screen shows
+ * instead of empty pages. Returns true when it signed out.
+ */
+export async function endIfSignInRefused(why: string): Promise<boolean> {
+  if (!(await supabase.auth.getSession()).data.session) return false
+  const { error } = await supabase.auth.getUser()
+  if (!error || !error.status || error.status < 400 || error.status >= 500) return false
+  note(`signed out: ${why}, and the server refused the session (${error.status} ${error.message})`)
+  await supabase.auth.signOut({ scope: 'local' })
+  return true
+}
+
 /** Friendly text for any server error (AppError, or a Supabase / network error). */
 export function errorMessage(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
   const e = err as { status?: number; message?: string; response?: { message?: string; data?: Record<string, { message?: string }> } }

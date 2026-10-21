@@ -25,7 +25,7 @@ describe('roles', () => {
     expect(manager).not.toContain('/my-attendance')
     expect(manager).not.toContain('/approvals')
     expect(admin).not.toContain('/my-attendance')
-    expect(manager).not.toContain('/finance')
+    expect(manager).toContain('/finance')
     expect(admin).toContain('/finance')
     expect(manager).not.toContain('/org')
     expect(admin).toContain('/org')
@@ -41,7 +41,7 @@ describe('roles', () => {
   it('guards routes by role', () => {
     expect(canOpen('employee', '/live')).toBe(false)
     expect(canOpen('employee', '/finance/my-pay')).toBe(true)
-    expect(canOpen('manager', '/finance/my-pay')).toBe(false)
+    expect(canOpen('manager', '/finance/my-pay')).toBe(true)
     expect(canOpen('employee', '/my-leaves')).toBe(true)
     expect(canOpen('employee', '/profile')).toBe(true)
     expect(canOpen('employee', '/calendar/month')).toBe(true)
