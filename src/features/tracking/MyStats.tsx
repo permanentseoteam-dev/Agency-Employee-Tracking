@@ -13,6 +13,7 @@ import { lateToday, starsText } from '@/lib/stars'
 import { monthWeeks, overtimeByDay, sumDays, totalsByDay, weekOf, type LiveStatus } from '@/lib/tracking'
 import { useHolidays } from '@/features/calendar/api'
 import { useOrgSettings } from '@/features/rules/api'
+import { useStarRules } from '@/features/stars/api'
 import { useRole } from '@/hooks/useRole'
 import { useSession } from '@/stores/session'
 import { todayKey, useMySegments, useTimezone, useTrackerStatus, type TrackerStatus } from './api'
@@ -107,8 +108,10 @@ export function MyStats() {
     const start = Date.parse(s.started_at.replace(' ', 'T'))
     if (s.state === 'active' && toDateKey(start, tz) === today && (firstActive === null || start < firstActive)) firstActive = start
   }
+  // Only while the Late arrival rule exists: an admin can delete it to switch late stars off.
+  const lateOn = useStarRules().data?.some((r) => r.auto === 'late') ?? false
   const late =
-    org && workingToday ? lateToday(firstActive, zonedTimeToUtc(today, org.shift_start, tz).getTime(), org.grace_minutes, org.star_block_minutes ?? 30) : null
+    org && workingToday && lateOn ? lateToday(firstActive, zonedTimeToUtc(today, org.shift_start, tz).getTime(), org.grace_minutes, org.star_block_minutes ?? 30) : null
   // Net = active − idle, in the whole minutes shown above, so it always matches the two figures.
   const todayNet = (Math.floor(todayActive / 60) - Math.floor(todayIdle / 60)) * 60
   const time = (value: string | undefined) => (value ? formatTime(value.replace(' ', 'T'), tz) : '-')

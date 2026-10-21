@@ -47,7 +47,12 @@ var require_stars = __commonJS({
       }
       return out;
     }
-    module.exports = { recordProblem, givenPayload, recordsByDay };
+    function autoKinds(rules) {
+      const on = { late: false, short: false };
+      for (const r of rules || []) if (r.auto === "late" || r.auto === "short") on[r.auto] = true;
+      return on;
+    }
+    module.exports = { recordProblem, givenPayload, recordsByDay, autoKinds };
   }
 });
 export default require_stars();

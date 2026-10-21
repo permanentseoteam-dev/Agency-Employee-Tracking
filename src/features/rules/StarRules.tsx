@@ -7,19 +7,28 @@ import { Dialog } from '@/components/ui/Dialog'
 import { Field, Input } from '@/components/ui/Input'
 import { Table, Td, Th } from '@/components/ui/Table'
 import { FormError } from '@/features/auth/AuthLayout'
-import { useDeleteStarRule, useSaveStarRule, useStarRules } from '@/features/stars/api'
+import { useRecompute } from '@/features/attendance/api'
+import { useAddAutoRule, useDeleteStarRule, useSaveStarRule, useStarRules } from '@/features/stars/api'
+import { monthOf, recomputeRange } from '@/lib/attendance'
+import { toDateKey } from '@/lib/dates'
 import type { StarRule } from '@/lib/stars'
 import { useRole } from '@/hooks/useRole'
 import { errorMessage } from '@/stores/session'
 import { useOrgSettings } from './api'
 import { ReadOnlyNote } from './RulesForm'
 
-/** Rules → Stars: what each rule break costs in stars. Everyone sees it; only an admin changes it. */
 /** "1 per 30 min late", "1 per 30 min short of 6 h". */
 function autoStars(auto: StarRule['auto'], block: number, targetMinutes: number): string {
   return auto === 'late' ? `1 per ${block} min late` : `1 per ${block} min short of ${targetMinutes / 60} h`
 }
 
+/** The two automatic rules, as the database first had them: what Add back creates. */
+const AUTO_RULES: Pick<StarRule, 'auto' | 'name' | 'description'>[] = [
+  { auto: 'late', name: 'Late arrival', description: 'First activity after shift start + grace: 1 star per started block late.' },
+  { auto: 'short', name: 'Short of the daily target', description: 'Active for less than the daily target: 1 star per started block short.' }
+]
+
+/** Rules → Stars: what each rule break costs in stars. Everyone sees it; only an admin changes it. */
 export function StarRules() {
   const rules = useStarRules()
   const settings = useOrgSettings()
@@ -27,14 +36,43 @@ export function StarRules() {
   const target = settings.data?.required_daily_minutes ?? 360
   const readOnly = useRole().role !== 'admin'
   const remove = useDeleteStarRule()
+  const addBack = useAddAutoRule()
+  const recompute = useRecompute()
   const [editing, setEditing] = useState<StarRule | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const missing = rules.data ? AUTO_RULES.filter((a) => !rules.data.some((r) => r.auto === a.auto)) : []
+
+  // Switching an automatic kind off or on changes this month's stars and pay: count it again.
+  async function recountMonth(what: string) {
+    const today = toDateKey(Date.now(), settings.data?.timezone)
+    const range = recomputeRange(monthOf(today), today)
+    if (!range) return setNotice(what)
+    setNotice(`${what} Counting this month again (up to half a minute)…`)
+    await recompute.mutateAsync(range)
+    setNotice(`${what} This month is counted again.`)
+  }
 
   async function onDelete(r: StarRule) {
     setError(null)
-    if (!window.confirm(`Delete the rule "${r.name}"? The stars already given for it are removed too.`)) return
+    setNotice(null)
+    const text = r.auto
+      ? `Delete the automatic rule "${r.name}"? ${r.auto === 'late' ? 'Late' : 'Short-hours'} stars stop counting for everyone, and this month is counted again. You can add it back later.`
+      : `Delete the rule "${r.name}"? The stars already given for it are removed too.`
+    if (!window.confirm(text)) return
     try {
       await remove.mutateAsync(r.id)
+      if (r.auto) await recountMonth(`${r.name} is deleted: its stars no longer count.`)
+    } catch (err) {
+      setError(errorMessage(err))
+    }
+  }
+
+  async function onAddBack(a: (typeof AUTO_RULES)[number]) {
+    setError(null)
+    try {
+      await addBack.mutateAsync(a)
+      await recountMonth(`${a.name} is back: its stars count again.`)
     } catch (err) {
       setError(errorMessage(err))
     }
@@ -55,6 +93,21 @@ export function StarRules() {
         )}
       </div>
       <FormError message={error} />
+      {notice && (
+        <p role="status" className="text-sm text-emerald-700 dark:text-emerald-400">
+          {notice}
+        </p>
+      )}
+      {!readOnly && missing.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          Switched off:
+          {missing.map((a) => (
+            <Button key={a.auto} variant="secondary" size="sm" loading={addBack.isPending} onClick={() => void onAddBack(a)}>
+              <Plus className="size-4" aria-hidden /> Add back {a.name}
+            </Button>
+          ))}
+        </div>
+      )}
       <Card>
         {rules.isLoading ? (
           <p className="p-6 text-sm text-slate-500">Loading…</p>
@@ -86,11 +139,9 @@ export function StarRules() {
                       <Button variant="ghost" size="sm" onClick={() => setEditing(r)}>
                         Edit
                       </Button>
-                      {!r.auto && (
-                        <Button variant="ghost" size="sm" onClick={() => void onDelete(r)}>
-                          Delete
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" onClick={() => void onDelete(r)}>
+                        Delete
+                      </Button>
                     </Td>
                   )}
                 </tr>

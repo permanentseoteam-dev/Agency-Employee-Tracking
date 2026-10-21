@@ -32,6 +32,16 @@ export function useSaveStarRule() {
   })
 }
 
+/** Admin only: adds a deleted automatic rule back, so its stars count again. */
+export function useAddAutoRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (data: Pick<StarRule, 'auto' | 'name' | 'description'>) =>
+      must(await supabase.from('star_rules').insert({ ...data, stars: 0 }).select().single()),
+    onSuccess: () => qc.invalidateQueries({ queryKey: starKeys.all })
+  })
+}
+
 export function useDeleteStarRule() {
   const qc = useQueryClient()
   return useMutation({

@@ -60,4 +60,14 @@ function recordsByDay(rules, records) {
   return out
 }
 
-module.exports = { recordProblem, givenPayload, recordsByDay }
+/**
+ * Which automatic stars count: late and short each only while their rule exists (an admin can
+ * delete the rule to switch that kind off, and add it back). rules: [{ auto }] → { late, short }
+ */
+function autoKinds(rules) {
+  const on = { late: false, short: false }
+  for (const r of rules || []) if (r.auto === 'late' || r.auto === 'short') on[r.auto] = true
+  return on
+}
+
+module.exports = { recordProblem, givenPayload, recordsByDay, autoKinds }

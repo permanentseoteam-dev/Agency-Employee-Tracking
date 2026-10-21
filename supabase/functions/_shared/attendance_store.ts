@@ -24,6 +24,8 @@ export async function recomputeDays(settings: Settings, days: string[], onlyUser
     (await sql`select month from payroll_runs where status = 'finalized' and month = any(${months})`).map((m) => m.month as string)
   )
   const starRules = await sql`select id, stars, auto from star_rules`
+  // A kind of automatic star counts only while its rule exists (an admin can delete it to switch it off).
+  const kinds = starLib.autoKinds(starRules)
   let written = 0
 
   for (const day of days) {
@@ -60,13 +62,15 @@ export async function recomputeDays(settings: Settings, days: string[], onlyUser
         }
         const r = att.statusFor(day, settings, segments[u.id] ?? [], leaves[u.id] ?? [], holidays)
         // The day's counted stars: late and short unless excused for the day, plus stars given by hand.
+        const lateStars = kinds.late ? r.late_stars : 0
+        const shortStars = kinds.short ? r.shortfall_stars : 0
         const given = starLib.recordsByDay(starRules, starRecords[u.id] ?? [])[day]
-        const totalStars = (given?.late ? 0 : r.late_stars) + (given?.short ? 0 : r.shortfall_stars) + (given?.hand ?? 0)
+        const totalStars = (given?.late ? 0 : lateStars) + (given?.short ? 0 : shortStars) + (given?.hand ?? 0)
         await tx`insert into attendance ("user", date, status, active_s, idle_s, first_activity_at, last_activity_at,
             late_minutes, late_stars, shortfall_minutes, shortfall_stars, total_stars, pay_basis)
           values (${u.id}, ${day}, ${r.status}, ${r.active_s}, ${r.idle_s},
                   ${r.first_activity_at || null}, ${r.last_activity_at || null},
-                  ${r.late_minutes}, ${r.late_stars}, ${r.shortfall_minutes}, ${r.shortfall_stars}, ${totalStars}, ${r.pay_basis})
+                  ${r.late_minutes}, ${lateStars}, ${r.shortfall_minutes}, ${shortStars}, ${totalStars}, ${r.pay_basis})
           on conflict ("user", date) do update set status = excluded.status, active_s = excluded.active_s,
             idle_s = excluded.idle_s, first_activity_at = excluded.first_activity_at, last_activity_at = excluded.last_activity_at,
             late_minutes = excluded.late_minutes, late_stars = excluded.late_stars, shortfall_minutes = excluded.shortfall_minutes,

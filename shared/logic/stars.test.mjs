@@ -54,3 +54,11 @@ describe('recordsByDay (stars for payroll.calculateDay)', () => {
     })
   })
 })
+
+describe('autoKinds (deleting an automatic rule switches its stars off)', () => {
+  it('counts late and short only while their rule exists', () => {
+    expect(s.autoKinds([{ auto: 'late' }, { auto: 'short' }, { auto: '' }])).toEqual({ late: true, short: true })
+    expect(s.autoKinds([{ auto: 'short' }, { auto: '' }])).toEqual({ late: false, short: true })
+    expect(s.autoKinds([])).toEqual({ late: false, short: false })
+  })
+})
